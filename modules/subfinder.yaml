@@ -1,0 +1,42 @@
+name: "subfinder_module"
+description: "基于标准Go协议栈的工业级被动子域名探测组件"
+
+
+# 1. 验证命令是否可用
+check:
+  command: "subfinder -version"
+  expect_keyword: ""     # 必须包含这个特征词
+  exclude_keyword: "not found"    # 💥【新增】如果包含这个词，则直接判定为“不可用”
+
+# 2. 如果不可用，如何自动安装（延续你最爱的本地快速二进制离线拷贝自愈策略）
+install:
+  steps:
+    # 只要把你本地下载好的 subfinder 二进制放在 bin 下即可，不依赖系统 libpcap
+    - "cp ./bin/subfinder /usr/bin/subfinder"
+    - "chmod +x /usr/bin/subfinder"
+
+# 3. 给定域名的扫描命令配置
+execute:
+  inputs: ["DOMAIN"]
+  outputs: ["SUBDOMAIN"] # 💥 完美承接！输出类型与之前一模一样
+  # -d 指定域名，-silent 隐藏 Banner 头，只吐出干净的纯文本域名行
+  timeout: 900
+  max_parallel_num: 5
+  command: "subfinder -d {{data}} -silent"
+
+# 4. 结果解析器：提取其输出的标准每行一个子域名的格式
+parser:
+  type: "rules"
+  rules:
+    - match:
+        type: regex
+        pattern: "^(?P<SUBDOMAIN>[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})$"
+      extract:
+        SUBDOMAIN: "{{SUBDOMAIN}}"
+
+# 5. 数据持久化存储配置
+save:
+  format: "text" 
+  template: "{{SUBDOMAIN}}"
+  output_path: "./outputs/subfinder_{{DOMAIN}}_results.txt"
+  mode: "append"

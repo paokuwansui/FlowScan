@@ -1,0 +1,47 @@
+name: "observer_ward_module"
+description: "跨平台社区化高精度Web指纹及服务识别组件"
+
+# 1. 验证命令是否可用
+check:
+  command: "observer_ward -V"    # 打印版本信息进行测试
+  expect_keyword: "" # 正常会回显工具名称及版本号
+  exclude_keyword: "not found"    # 找不到命令一票否决触发自愈
+
+# 2. 如果不可用，如何自动安装 (采用你优化的本地离线二进制直接拷贝策略)
+install:
+  steps:
+    # 2.1 复制本地预先准备好的静态编译二进制文件到全局变量目录
+    - "cp ./bin/observer_ward /usr/bin/observer_ward"
+    - "chmod +x /usr/bin/observer_ward"
+    - "observer_ward -u" 
+
+# 3. 给定目标的扫描命令配置
+execute:
+  inputs: ["LIVE_URL"]
+  outputs: ["FINGERPRINT"]
+  timeout: 900
+  max_parallel_num: 10
+  # 🌟 核心：直接用占位符填充 -t 参数，并强制要求输出格式为 json
+  command: "observer_ward -t {{data}} --format json --silent"
+
+# 4. 结果解析器：提取其输出的标准结构化数据
+# 当识别成功时，输出格式通常为一行干净的 JSON 字符串，类似：
+# {"url":"http://evilcorp.com","name":["RuoYi"],"priority":1,"length":14332}
+parser:
+  type: "rules"
+  rules:
+    # 匹配任何以{开头且包含url字段的JSON行
+    - match:
+        type: regex
+        pattern: '^\{.*"url".*\}$'
+      extract:
+        FINGERPRINT: "{{name}}"
+      filters:
+        FINGERPRINT:
+          if_not_empty: true
+
+# 5. 数据持久化存储配置
+save:
+  format: "json" # 指纹属于强结构化资产，必须使用标准 JSON 格式追加固化
+  output_path: "./outputs/fingerprints_{{DOMAIN}}_results.json"
+  mode: "append"

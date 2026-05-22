@@ -1,0 +1,48 @@
+name: "nuclei_module"
+description: "基于模板的下一代快速漏洞扫描组件"
+
+# 1. 验证命令是否可用
+check:
+  command: "nuclei -version"
+  expect_keyword: ""        # 正常安装会输出版本号
+  exclude_keyword: "not found"    # 找不到命令一票否决
+
+# 2. 如果不可用，如何自动安装 (这里使用 Go 官方最新安全模式编译安装)
+install:
+  steps:
+    # 直接移动源文件
+    - "cp ./bin/nuclei /usr/bin/nuclei"
+    - "chmod +x /usr/bin/nuclei"
+    - "nuclei -update"
+    - "nuclei -ut"
+    # 源码安装
+    # - "apt-get update && apt-get install -y golang-go git"
+    # - "go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest"
+    # - "mv /root/go/bin/nuclei /usr/local/bin/nuclei" # 移到全局变量目录
+    # - "nuclei -ut" # 【关键步骤】下载或更新官方漏洞模板库（nuclei-templates）
+
+# 3. 给定域名的扫描命令配置
+execute:
+  inputs: ["LIVE_URL"]                # 💥 完美对接！上游模块产出的 URL 直接作为它的输入
+  outputs: ["VULNERABILITY"]     # 它的产出是漏洞报警
+  timeout: 1800
+  max_parallel_num: 2
+  # -u 指定目标，-tags ruoyi 定向扫描若依漏洞，-silent 隐藏 Banner
+  command: "nuclei -u {{data}} -severity high,critical -silent"
+
+# 4. 结果解析器：提取 Nuclei 的标准控制台输出
+# Nuclei 的标准无彩回显通常为: [ruoyi-scheduled-task-rce] [http] [critical] http://target.com:8080
+parser:
+  type: "rules"
+  rules:
+    - match:
+        type: regex
+        pattern: "^\\[(?P<VULN_ID>[a-zA-Z0-9-]+)\\]\\s+\\[(?P<PROTO>[a-z]+)\\]\\s+\\[(?P<SEVERITY>[a-z]+)\\]\\s+(?P<VULNERABILITY>https?://[a-zA-Z0-9./:-]+)$"
+      extract:
+        VULNERABILITY: "{{VULNERABILITY}}"
+
+# 5. 数据持久化存储配置
+save:
+  format: "json" # 💥 漏洞数据极其重要，强烈建议使用 json 结构化格式存储，方便后续推送到后台
+  output_path: "./outputs/nuclei_{{DOMAIN}}_vulns.json"
+  mode: "append"

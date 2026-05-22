@@ -1,0 +1,64 @@
+name: "fscan_module"
+description: "一款全方位一键内网/外网漏洞和弱口令综合扫描组件"
+
+# 1. 验证命令是否可用
+check:
+  command: "fscan"
+  expect_keyword: "Fscan 2"        
+  exclude_keyword: ""    
+
+# 2. 如果不可用，如何自动安装
+install:
+  steps:
+    - "cp ./bin/fscan /usr/bin/fscan"
+    - "chmod +x /usr/bin/fscan"
+
+# 3. 给定目标的扫描命令配置
+execute:
+  inputs: ["IP", "SUBDOMAIN"]    
+  outputs: ["LIVE_URL", "PORT_OPEN", "VULNERABILITY"]     
+  timeout: 1800
+  max_parallel_num: 3
+  command: "fscan -h {{data}} -no -silent"
+
+# 4. 结果解析器：使用声明式规则引擎（更直观的配置）
+parser:
+  type: "rules"
+  rules:
+    # 规则1: 提取 [+] 开头的漏洞信息
+    - match:
+        type: prefix
+        value: "[+]"
+      extract:
+        VULNERABILITY: "{{rest}}"
+    
+    # 规则2: 提取 PORT 类型的 JSON 消息
+    - match:
+        type: json_field
+        field: type
+        equals: PORT
+      extract:
+        PORT_OPEN: "{{host}}:{{port}}"
+    
+    # 规则3: 提取 HTTP/HTTPS 服务并构建 URL
+    # 🌟 使用模板方法链将 "ssl" 转换为 "https"
+    - match:
+        type: json_field
+        field: type
+        equals: SERVICE
+      extract:
+        LIVE_URL: "{{service.replace('ssl','https')}}://{{host}}:{{port}}"
+    
+    # 规则4: 提取异常 Shell 监听服务
+    - match:
+        type: json_field
+        field: service
+        equals: dps-shell
+      extract:
+        VULNERABILITY: "异常Shell监听服务: {{target}} [ {{banner}} ]"
+
+# 5. 数据持久化存储配置
+save:
+  format: "json" 
+  output_path: "./outputs/fscan_GLOBAL_BATCH_vulns.json"
+  mode: "append"

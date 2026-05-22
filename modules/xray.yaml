@@ -1,0 +1,42 @@
+name: "xray_passive_module"
+description: "长亭科技 Xray 被动漏洞代理监听组件"
+
+# 1. 验证命令是否可用
+check:
+  command: "cd ./bin/xray && ./xray version"
+  expect_keyword: "Version: 1.9.11"          
+  exclude_keyword: ""    
+
+# 2. 如果不可用，如何自动安装
+install:
+  steps:
+    - "chmod +x ./bin/xray/xray"
+
+# 3. 扫描命令配置（切换为被动监听模式）
+execute:
+  inputs: ["START"]
+  outputs: ["VULNERABILITY"]     
+  timeout: 99999999
+  max_parallel_num: 1
+  # webscan 开启Web扫描
+  # --listen 指定本地被动监听的 IP 和端口
+  # --no-color 禁用色彩输出
+  command: "cd ./bin/xray && ./xray webscan --listen 127.0.0.1:7777"
+
+# 4. 结果解析器：提取 Xray 被动监听到漏洞时的输出
+# 被动模式下，Xray 探测到漏洞时的控制台输出与主动模式一致：
+#   [VULN] [sqldet] http://evilcorp.com Vuln Target Found
+parser:
+  type: "rules"
+  rules:
+    - match:
+        type: prefix
+        value: "[VULN]"
+      extract:
+        VULNERABILITY: "{{rest}}"
+
+# 5. 数据持久化存储配置
+save:
+  format: "json" 
+  output_path: "./outputs/xray_passive_vulns.json"
+  mode: "append"

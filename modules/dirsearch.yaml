@@ -1,0 +1,51 @@
+name: "dirsearch_module"
+description: "基于 Python 开发的高并发 Web 敏感目录与隐藏文件爆破组件"
+
+# 1. 验证命令是否可用
+check:
+  command: "dirsearch --version"
+  expect_keyword: ""     # 正常可用会输出版本号
+  exclude_keyword: "not found"    # 找不到命令直接一票否决触发自愈
+
+# 2. 如果不可用，如何自动安装 (采用你优化的本地离线源码拷贝与依赖补齐策略)
+install:
+  steps:
+    - "apt update"
+    - "apt install dirsearch -y"
+
+
+# 3. 给定目标的扫描命令配置
+execute:
+  inputs: ["LIVE_URL"]                # 💥 完美对接！httpx 洗干净的活 URL 直接喂给它进行目录深度轰炸
+  outputs: ["URI"] # 爆破成功后，产出发现的敏感接口 URL 和其对应的状态码
+  timeout: 1800
+  max_parallel_num: 2
+  # -u 指定目标 URL
+  # -e * 指定扫描所有常见的后缀（php,asp,jsp,html,zip,bak等）
+  # --format=json 强制让工具只以标准的单行 JSON 格式实时吐出结果
+  # --quiet 隐藏 Banner 头和进度条，防止干扰 Python 引擎的 readline 读取
+  command: "dirsearch -u {{data}} -e * --format=json --quiet"
+
+# 4. 结果解析器：提取其输出的标准结构化 JSON 数据
+# 当 dirsearch 发现敏感目录时，其输出通常为一行干净的 JSON（包含路径、状态码和大小）：
+# {"path": "/.git/config", "status": 200, "content-length": 341, "url": "http://evilcorp.com"}
+parser:
+  type: "rules"
+  rules:
+    # 匹配包含url字段的JSON（表示发现了有效路径）
+    - match:
+        type: json_field
+        field: url
+        equals: null
+      extract:
+        URL: "{{url}}"
+        STATUS_CODE: "{{status}}"
+      filters:
+        URL:
+          if_not_empty: true
+
+# 5. 数据持久化存储配置
+save:
+  format: "json" # 敏感目录资产关系到源码泄露和后台暴露，强烈推荐使用 JSON 格式追加固化
+  output_path: "./outputs/dirsearch_{{DOMAIN}}_results.json"
+  mode: "append"

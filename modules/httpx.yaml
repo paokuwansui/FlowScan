@@ -1,0 +1,48 @@
+name: "httpx_module"
+description: "基于多用途的高速 HTTP 存活探测与基础指纹识别组件"
+
+# 1. 验证命令是否可用
+check:
+  command: "httpx -version"
+  expect_keyword: ""          # 正常安装会回显工具名称及版本号
+  exclude_keyword: "not found"    # 找不到命令一票否决触发自愈
+
+# 2. 如果不可用，如何自动安装 (采用你优化的本地离线二进制直接拷贝策略)
+install:
+  steps:
+    # 2.1 复制本地预先准备好的 httpx 静态编译二进制产物到全局变量目录
+    - "snap install httpx"
+
+# 3. 给定目标的扫描命令配置
+execute:
+  inputs: ["URL", "PORT_OPEN"] # 💥 完美承接 Ksubdomain 扔出来的子域名，或者直接输入的顶级域名
+  outputs: ["LIVE_URL"] # 过滤清洗后，产出真正活着的标准 URL、网页标题和状态码
+  timeout: 900
+  max_parallel_num: 10
+  # -silent 隐藏烦人的 Banner 头
+  # -json 强制开启单行结构化 JSON 输出，绝不产生多余的彩色控制台边框
+  # -status-code -title 分别明确指示在 JSON 中包含状态码和网页标题
+  command: "echo '{{data}}' | httpx -silent -json"
+
+# 4. 结果解析器：提取其输出的标准结构化单行 JSON 数据
+# 当探测成功且存活时，Httpx 的输出格式通常为一行干净的 JSON 字符串，类似：
+# {"url":"http://admin.evilcorp.com","title":"RuoYi Management System","status_code":200,"timestamp":"2026-..." }
+parser:
+  type: "rules"
+  rules:
+    # 匹配包含url字段的JSON（表示HTTP请求成功）
+    - match:
+        type: json_field
+        field: url
+        equals: null
+      extract:
+        LIVE_URL: "{{url}}"
+      filters:
+        LIVE_URL:
+          if_not_empty: true
+
+# 5. 数据持久化存储配置
+save:
+  format: "json" # Web 存活资产包含标题和状态码，必须使用标准 JSON 格式追加固化
+  output_path: "./outputs/web_alive_{{DOMAIN}}_results.json"
+  mode: "append"

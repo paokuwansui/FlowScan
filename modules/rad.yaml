@@ -1,0 +1,49 @@
+name: "rad_module"
+description: "长亭下一代自动化动态爬虫和高级 Web 交互页面点击组件"
+
+# 1. 验证命令是否可用
+check:
+  command: "./bin/rad/rad"
+  expect_keyword: ""          # 正常安装可用会输出 rad 帮助文档
+  exclude_keyword: "Permission denied"    # 找不到命令或报错一票否决触发自愈
+
+# 2. 如果不可用，如何自动安装 (采用你优化的本地离线二进制直接拷贝策略)
+install:
+  steps:
+    - "chmod +x ./bin/rad/rad"
+    - "wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
+    - "apt install ./google-chrome-stable_current_amd64.deb -y"
+    - "rm -f ./google-chrome-stable_current_amd64.deb"
+    - "sed -i 's|exec -a \"$0\" \"$HERE/chrome\" \"$@\"|exec -a \"$0\" \"/usr/bin/google-chrome-stable\" \"$@\" --no-sandbox|' /usr/bin/google-chrome"
+
+# 3. 给定目标的扫描命令配置
+execute:
+  inputs: ["LIVE_URL"]                # 💥 完美对接！它可以深度消费上游拼凑或爬出的 URL
+  outputs: ["URL"]                # 它深度互动后，会源源不断挖出更多更深、带参数的新 URL 扔回总线
+  timeout: 1800
+  max_parallel_num: 1
+  # -t 指定扫描的目标 URL
+  # --no-color 禁用终端色彩输出，让回显文字保持纯净
+  # --headless 强制使用无头模式，防止在没有图形界面的 Linux VPS 上报错卡死
+  command: "./bin/rad/rad -t {{data}} --http-proxy http://127.0.0.1:7777 --no-color --headless -c ./bin/rad/rad_config.yml"
+
+# 4. 结果解析器：提取 Rad 运行时吐出的控制台标准输出
+# Rad 成功探测到新交互接口时的标准无彩回显行为通常为：
+#   [GET] http://evilcorp.com
+#   [POST] http://evilcorp.com
+parser:
+  type: "rules"
+  rules:
+    - match:
+        type: regex
+        pattern: "^\\[(?P<METHOD>[A-Z]+)\\]\\s+(?P<URL>https?://[a-zA-Z0-9./_?=&:-]+)$"
+      extract:
+        URL: "{{URL}}"
+
+# 5. 数据持久化存储配置
+save:
+  format: "text" 
+  # 保存时将请求方法和 URL 一起格式化：如 [GET] http://xxxx
+  template: "[{{METHOD}}] {{URL}}"
+  output_path: "./outputs/rad_{{DOMAIN}}_urls.txt"
+  mode: "append"
