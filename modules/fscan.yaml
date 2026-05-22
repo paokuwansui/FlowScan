@@ -1,0 +1,57 @@
+name: fscan_module
+description: 一款全方位一键内网/外网漏洞和弱口令综合扫描组件
+check:
+  command: fscan
+  expect_keyword: Fscan 2
+  exclude_keyword: ''
+install:
+  steps:
+  - tmpdir=$(mktemp -d) && cd "$tmpdir" && curl -fsSL https://api.github.com/repos/shadow1ng/fscan/releases/latest
+    | python3 -c "import json,sys; data=json.load(sys.stdin); assets=data.get('assets',[]);
+    matches=[a['browser_download_url'] for a in assets if 'linux' in a['name'].lower()
+    and ('amd64' in a['name'].lower() or 'x64' in a['name'].lower())]; print(matches[0]
+    if matches else assets[0]['browser_download_url'])" | xargs -I{} sh -c 'curl -fL
+    "{}" -o fscan_pkg && (tar -xzf fscan_pkg || unzip -o fscan_pkg || mv fscan_pkg
+    fscan) && find . -type f -name "fscan*" -perm /111 -print -quit | xargs -I%% install
+    -m 0755 %% /usr/local/bin/fscan'
+execute:
+  inputs:
+  - IP
+  - SUBDOMAIN
+  outputs:
+  - LIVE_URL
+  - PORT_OPEN
+  - VULNERABILITY
+  timeout: 1800
+  max_parallel_num: 3
+  command: fscan -h {{data}} -no -silent
+parser:
+  type: rules
+  rules:
+  - match:
+      type: prefix
+      value: '[+]'
+    extract:
+      VULNERABILITY: '{{rest}}'
+  - match:
+      type: json_field
+      field: type
+      equals: PORT
+    extract:
+      PORT_OPEN: '{{host}}:{{port}}'
+  - match:
+      type: json_field
+      field: type
+      equals: SERVICE
+    extract:
+      LIVE_URL: '{{service.replace(''ssl'',''https'')}}://{{host}}:{{port}}'
+  - match:
+      type: json_field
+      field: service
+      equals: dps-shell
+    extract:
+      VULNERABILITY: '异常Shell监听服务: {{target}} [ {{banner}} ]'
+save:
+  format: json
+  output_path: ./outputs/fscan_GLOBAL_BATCH_vulns.json
+  mode: append

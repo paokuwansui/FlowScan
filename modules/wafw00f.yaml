@@ -1,0 +1,42 @@
+name: wafw00f_module
+description: WAF/CDN 识别模块，识别目标前置防护产品
+check:
+  command: wafw00f --version
+  expect_keyword: WAFW00F
+  exclude_keyword: not found
+install:
+  steps:
+  - python3 -m pip install --break-system-packages wafw00f || python3 -m pip install
+    wafw00f
+execute:
+  inputs:
+  - LIVE_URL
+  outputs:
+  - WAF
+  - FINGERPRINT
+  timeout: 300
+  max_parallel_num: 5
+  command: wafw00f {{data}} -f json -o - --no-colors
+parser:
+  type: rules
+  rules:
+  - match:
+      type: json_field
+      field: detected
+      equals: true
+    extract:
+      URL: '{{url}}'
+      FIREWALL: '{{firewall}}'
+      MANUFACTURER: '{{manufacturer}}'
+      WAF: '{{url}} | {{firewall}} | {{manufacturer}}'
+      FINGERPRINT: 'WAF: {{firewall}}'
+    events:
+      WAF: '{{WAF}}'
+      FINGERPRINT: 'WAF: {{firewall}}'
+    filters:
+      WAF:
+        if_not_empty: true
+save:
+  format: json
+  output_path: ./outputs/wafw00f_{{DOMAIN}}_results.json
+  mode: append

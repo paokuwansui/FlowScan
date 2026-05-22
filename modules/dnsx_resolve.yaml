@@ -1,0 +1,37 @@
+name: dnsx_resolve_module
+description: 将 SUBDOMAIN 解析为 A 记录 IP，产出 IP 事件
+check:
+  command: dnsx -version
+  expect_keyword: Current Version
+  exclude_keyword: not found
+install:
+  steps:
+  - go install github.com/projectdiscovery/dnsx/cmd/dnsx@latest
+  - install -m 0755 ~/go/bin/dnsx /usr/local/bin/dnsx
+execute:
+  inputs:
+  - SUBDOMAIN
+  outputs:
+  - IP
+  timeout: 300
+  max_parallel_num: 10
+  command: echo '{{data}}' | dnsx -a -json -silent
+parser:
+  type: rules
+  rules:
+  - match:
+      type: json_field
+      field: host
+      equals: null
+    extract:
+      SUBDOMAIN: '{{host}}'
+      IP: $.a[*]
+    events:
+      IP: $.a[*]
+    filters:
+      IP:
+        if_not_empty: true
+save:
+  format: json
+  output_path: ./outputs/dnsx_resolve_{{DOMAIN}}_results.json
+  mode: append

@@ -1,0 +1,36 @@
+name: httpx_module
+description: 基于多用途的高速 HTTP 存活探测与基础指纹识别组件
+check:
+  command: ~/go/bin/httpx -version || /usr/local/bin/httpx -version
+  expect_keyword: Current Version
+  exclude_keyword: not found
+install:
+  steps:
+  - go install github.com/projectdiscovery/httpx/cmd/httpx@latest
+execute:
+  inputs:
+  - URL
+  - PORT_OPEN
+  outputs:
+  - LIVE_URL
+  timeout: 900
+  max_parallel_num: 10
+  command: echo '{{data}}' | ~/go/bin/httpx -tls-probe -json -silent
+parser:
+  type: rules
+  rules:
+  - match:
+      type: json_field
+      field: url
+      equals: null
+    extract:
+      LIVE_URL: '{{url}}'
+    events:
+      LIVE_URL: '{{url}}'
+    filters:
+      LIVE_URL:
+        if_not_empty: true
+save:
+  format: json
+  output_path: ./outputs/httpx_alive_{{DOMAIN}}_results.json
+  mode: append

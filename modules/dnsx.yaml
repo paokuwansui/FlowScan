@@ -1,0 +1,31 @@
+name: dnsx_brute_module
+description: 基于标准Go底层网络栈的高并发子域名本地字典爆破组件
+check:
+  command: dnsx -version
+  expect_keyword: Current Version
+  exclude_keyword: not found
+install:
+  steps:
+  - go install github.com/projectdiscovery/dnsx/cmd/dnsx@latest
+  - install -m 0755 ~/go/bin/dnsx /usr/local/bin/dnsx
+execute:
+  inputs:
+  - DOMAIN
+  outputs:
+  - SUBDOMAIN
+  command: dnsx -d {{data}} -w ./wordlists/subdomains.txt -t 200 -silent
+  timeout: 1800
+  max_parallel_num: 3
+parser:
+  type: rules
+  rules:
+  - match:
+      type: regex
+      pattern: ^(?P<SUBDOMAIN>[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})$
+    extract:
+      SUBDOMAIN: '{{SUBDOMAIN}}'
+save:
+  format: text
+  template: '{{SUBDOMAIN}}'
+  output_path: ./outputs/dnsx_brute_{{DOMAIN}}_results.txt
+  mode: append

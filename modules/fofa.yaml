@@ -1,0 +1,54 @@
+name: fofa_module
+description: 一款网络空间测绘搜索引擎
+check:
+  command: fofa-flowscan --help
+  expect_keyword: 'usage:'
+  exclude_keyword: unable to open X server
+install:
+  steps:
+  - python3 -m pip install --break-system-packages requests || python3 -m pip install
+    requests
+  - install -m 0755 ./bin/fofa_query.py ~/.local/bin/fofa-flowscan || install -m 0755
+    ./bin/fofa_query.py /usr/local/bin/fofa-flowscan
+execute:
+  inputs:
+  - DOMAIN
+  outputs:
+  - DOMAIN
+  - SUBDOMAIN
+  - IP
+  - URL
+  timeout: 900
+  max_parallel_num: 20
+  command: FOFA_KEY="$FOFA_KEY" fofa-flowscan {{data}}
+parser:
+  type: rules
+  rules:
+  - match:
+      type: json_field
+      field: type
+      equals: URL
+    extract:
+      URL: '{{value}}'
+  - match:
+      type: json_field
+      field: type
+      equals: IP
+    extract:
+      IP: '{{value}}'
+  - match:
+      type: json_field
+      field: type
+      equals: SUBDOMAIN
+    extract:
+      SUBDOMAIN: '{{value}}'
+  - match:
+      type: json_field
+      field: type
+      equals: DOMAIN
+    extract:
+      DOMAIN: '{{value}}'
+save:
+  format: json
+  output_path: ./outputs/web_alive_{{DOMAIN}}_results.json
+  mode: append
