@@ -1,0 +1,78 @@
+{
+    "info": {
+        "args": "/usr/lib/python3/dist-packages/dirsearch/dirsearch.py -u http://bms.baidu.com:80 -e LICENSE PARSER_GUIDE.md README.md __pycache__ batch_main.py bin domain.txt finish_domain.txt loader.py modules myenv outputs reports resume.cfg runner.py test.baidu wordlists --format=json --quiet",
+        "time": "Sun May 24 03:34:36 2026"
+    },
+    "results": [
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 403,
+            "url": "http://bms.baidu.com/.%2e/%2e%2e/%2e%2e/%2e%2e/etc/passwd"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 403,
+            "url": "http://bms.baidu.com/%2e%2e//google.com"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 403,
+            "url": "http://bms.baidu.com/%2e%2e;/test"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 403,
+            "url": "http://bms.baidu.com/..;/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 403,
+            "url": "http://bms.baidu.com/\\..\\..\\..\\..\\..\\..\\..\\..\\..\\etc\\passwd"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 403,
+            "url": "http://bms.baidu.com/asset.."
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 403,
+            "url": "http://bms.baidu.com/cgi-bin/.%2e/%2e%2e/%2e%2e/%2e%2e/etc/passwd"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 403,
+            "url": "http://bms.baidu.com/javax.faces.resource.../"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 403,
+            "url": "http://bms.baidu.com/javax.faces.resource.../WEB-INF/web.xml.jsf"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 403,
+            "url": "http://bms.baidu.com/static.."
+        }
+    ]
+}

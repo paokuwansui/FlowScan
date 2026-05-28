@@ -1,0 +1,36 @@
+{
+    "info": {
+        "args": "/usr/lib/python3/dist-packages/dirsearch/dirsearch.py -u http://baiqueling.baidu.com:80 -e LICENSE PARSER_GUIDE.md README.md __pycache__ batch_main.py bin domain.txt finish_domain.txt loader.py modules myenv outputs reports resume.cfg runner.py test.baidu wordlists --format=json --quiet",
+        "time": "Sun May 24 04:50:59 2026"
+    },
+    "results": [
+        {
+            "content-length": 144,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 424,
+            "url": "http://baiqueling.baidu.com/\\..\\..\\..\\..\\..\\..\\..\\..\\..\\etc\\passwd"
+        },
+        {
+            "content-length": 144,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 424,
+            "url": "http://baiqueling.baidu.com/a%5c.aspx"
+        },
+        {
+            "content-length": 36,
+            "content-type": "application/octet-stream",
+            "redirect": "",
+            "status": 200,
+            "url": "http://baiqueling.baidu.com/readme"
+        },
+        {
+            "content-length": 622,
+            "content-type": "application/octet-stream",
+            "redirect": "",
+            "status": 200,
+            "url": "http://baiqueling.baidu.com/README.md"
+        }
+    ]
+}

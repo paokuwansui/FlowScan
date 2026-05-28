@@ -11,7 +11,7 @@ check:
 install:
   steps:
     # 2.1 复制本地预先准备好的 httpx 静态编译二进制产物到全局变量目录
-    - "python3 -m pip install requests"
+    - "source myenv/bin/activate;python3 -m pip install requests"
 
 # 3. 给定目标的扫描命令配置
 execute:

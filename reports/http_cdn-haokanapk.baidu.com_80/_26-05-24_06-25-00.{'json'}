@@ -1,0 +1,36 @@
+{
+    "info": {
+        "args": "/usr/lib/python3/dist-packages/dirsearch/dirsearch.py -u http://cdn-haokanapk.baidu.com:80 -e LICENSE PARSER_GUIDE.md README.md __pycache__ batch_main.py bin domain.txt finish_domain.txt loader.py modules myenv outputs reports resume.cfg runner.py test.baidu wordlists --format=json --quiet",
+        "time": "Sun May 24 06:25:45 2026"
+    },
+    "results": [
+        {
+            "content-length": 8058,
+            "content-type": "image/png",
+            "redirect": "",
+            "status": 200,
+            "url": "http://cdn-haokanapk.baidu.com/abc"
+        },
+        {
+            "content-length": 0,
+            "content-type": "application/octet-stream",
+            "redirect": "",
+            "status": 200,
+            "url": "http://cdn-haokanapk.baidu.com/aaa"
+        },
+        {
+            "content-length": 17595,
+            "content-type": "image/x-icon",
+            "redirect": "",
+            "status": 200,
+            "url": "http://cdn-haokanapk.baidu.com/favicon.ico"
+        },
+        {
+            "content-length": 409,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 200,
+            "url": "http://cdn-haokanapk.baidu.com/manifest.json"
+        }
+    ]
+}

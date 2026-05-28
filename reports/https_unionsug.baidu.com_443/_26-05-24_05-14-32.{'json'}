@@ -1,0 +1,386 @@
+{
+    "info": {
+        "args": "/usr/lib/python3/dist-packages/dirsearch/dirsearch.py -u https://unionsug.baidu.com:443 -e LICENSE PARSER_GUIDE.md README.md __pycache__ batch_main.py bin domain.txt finish_domain.txt loader.py modules myenv outputs reports resume.cfg runner.py test.baidu wordlists --format=json --quiet",
+        "time": "Sun May 24 05:14:50 2026"
+    },
+    "results": [
+        {
+            "content-length": 365,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 404,
+            "url": "https://unionsug.baidu.com/reports.LICENSE"
+        },
+        {
+            "content-length": 365,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 404,
+            "url": "https://unionsug.baidu.com/report.LICENSE"
+        },
+        {
+            "content-length": 365,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 404,
+            "url": "https://unionsug.baidu.com/reports"
+        },
+        {
+            "content-length": 365,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 404,
+            "url": "https://unionsug.baidu.com/report"
+        },
+        {
+            "content-length": 365,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 404,
+            "url": "https://unionsug.baidu.com/reports/Webalizer/"
+        },
+        {
+            "content-length": 184,
+            "content-type": "text/html",
+            "redirect": "http://unionsug.baidu.com:8311/static/",
+            "status": 301,
+            "url": "https://unionsug.baidu.com/static"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/submit"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/subadmin"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/submit_article.LICENSE"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/subscribe.html"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/sugarcrm.log"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/super1"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/sugarcrm/index.php?module=Accounts&action=ShowDuplicates"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/sub-login/"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/sunvalleyadmin"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/super.php"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/super"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/super1/"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/sugarcrm/index.php?module=Contacts&action=ShowDuplicates"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/super_index"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/sugarcrm"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/subversion/"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/subscribe"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/super_inde.php"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/subscription.LICENSE"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/supe.php"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/super_logi.php"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/superadmin"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/superuser/"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/super_login"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/superman"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/superuse.php"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/superuser"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/supermanager"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/supervise/"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/superma.php"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/superman/"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/supervise/Logi.php"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/support.LICENSE"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/supermanage.php"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/supervise/Login"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/supervisord/"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/superuser.php"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/support"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/supervisor/"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/support_login/"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/surgemail/"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/support/"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/surgemail/mtemp/surgeweb/tpl/shared/modules/swfupload.swf"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/survey"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/support_admin"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/suspended.page"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/surveyadmin"
+        },
+        {
+            "content-length": 41,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://unionsug.baidu.com/surgemail/mtemp/surgeweb/tpl/shared/modules/swfupload_f9.swf"
+        }
+    ]
+}

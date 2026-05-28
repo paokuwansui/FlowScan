@@ -1,0 +1,15 @@
+{
+    "info": {
+        "args": "/usr/lib/python3/dist-packages/dirsearch/dirsearch.py -u http://jmy-pic.baidu.com:80 -e LICENSE PARSER_GUIDE.md README.md __pycache__ batch_main.py bin domain.txt finish_domain.txt loader.py modules myenv outputs reports resume.cfg runner.py test.baidu wordlists --format=json --quiet",
+        "time": "Sun May 24 04:59:14 2026"
+    },
+    "results": [
+        {
+            "content-length": 0,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 200,
+            "url": "http://jmy-pic.baidu.com/test/"
+        }
+    ]
+}

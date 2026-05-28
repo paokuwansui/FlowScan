@@ -1,0 +1,190 @@
+{
+    "info": {
+        "args": "/usr/lib/python3/dist-packages/dirsearch/dirsearch.py -u https://q1.baidu.com:443 -e LICENSE PARSER_GUIDE.md README.md __pycache__ batch_main.py bin domain.txt finish_domain.txt loader.py modules myenv outputs reports resume.cfg runner.py test.baidu wordlists --format=json --quiet",
+        "time": "Sun May 24 05:57:49 2026"
+    },
+    "results": [
+        {
+            "content-length": 184,
+            "content-type": "text/html",
+            "redirect": "http://q1.baidu.com:8004/js/",
+            "status": 301,
+            "url": "https://q1.baidu.com/js"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://q1.baidu.com/js/elfinder/elfinder.php"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://q1.baidu.com/js/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://q1.baidu.com/js/config.js"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://q1.baidu.com/js/FCKeditor"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://q1.baidu.com/js/routing"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://q1.baidu.com/js/prepod.js"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://q1.baidu.com/js/swfupload/swfupload.swf"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://q1.baidu.com/js/qa.js"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://q1.baidu.com/js/swfupload/swfupload_f9.swf"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://q1.baidu.com/js/tiny_mce"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://q1.baidu.com/js/prod.js"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://q1.baidu.com/js/yui/uploader/assets/uploader.swf"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://q1.baidu.com/js/envConfig.js"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://q1.baidu.com/js/tinymce/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://q1.baidu.com/js/ZeroClipboard.swf"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://q1.baidu.com/js/ZeroClipboard10.swf"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://q1.baidu.com/js/tiny_mce/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://q1.baidu.com/js/tinymce"
+        },
+        {
+            "content-length": 0,
+            "content-type": "application/octet-stream",
+            "redirect": "",
+            "status": 200,
+            "url": "https://q1.baidu.com/monitor"
+        },
+        {
+            "content-length": 0,
+            "content-type": "application/octet-stream",
+            "redirect": "",
+            "status": 200,
+            "url": "https://q1.baidu.com/monitor/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "application/octet-stream",
+            "redirect": "",
+            "status": 200,
+            "url": "https://q1.baidu.com/mongodb/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "application/octet-stream",
+            "redirect": "",
+            "status": 200,
+            "url": "https://q1.baidu.com/mongo/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "application/octet-stream",
+            "redirect": "",
+            "status": 200,
+            "url": "https://q1.baidu.com/monit/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "application/octet-stream",
+            "redirect": "",
+            "status": 200,
+            "url": "https://q1.baidu.com/monitoring"
+        },
+        {
+            "content-length": 0,
+            "content-type": "application/octet-stream",
+            "redirect": "",
+            "status": 200,
+            "url": "https://q1.baidu.com/monitoring/"
+        }
+    ]
+}

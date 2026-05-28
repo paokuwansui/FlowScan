@@ -1,0 +1,36 @@
+{
+    "info": {
+        "args": "/usr/lib/python3/dist-packages/dirsearch/dirsearch.py -u http://afd.baidu.com:80 -e LICENSE PARSER_GUIDE.md README.md __pycache__ batch_main.py bin domain.txt finish_domain.txt loader.py modules myenv outputs reports resume.cfg runner.py test.baidu wordlists --format=json --quiet",
+        "time": "Sun May 24 04:22:27 2026"
+    },
+    "results": [
+        {
+            "content-length": 326,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "http://afd.baidu.com/js"
+        },
+        {
+            "content-length": 325,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "http://afd.baidu.com/js/"
+        },
+        {
+            "content-length": 457,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "http://afd.baidu.com/pprof/"
+        },
+        {
+            "content-length": 457,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "http://afd.baidu.com/pprof"
+        }
+    ]
+}

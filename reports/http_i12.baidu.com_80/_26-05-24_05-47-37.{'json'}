@@ -1,0 +1,29 @@
+{
+    "info": {
+        "args": "/usr/lib/python3/dist-packages/dirsearch/dirsearch.py -u http://i12.baidu.com:80 -e LICENSE PARSER_GUIDE.md README.md __pycache__ batch_main.py bin domain.txt finish_domain.txt loader.py modules myenv outputs reports resume.cfg runner.py test.baidu wordlists --format=json --quiet",
+        "time": "Sun May 24 05:48:04 2026"
+    },
+    "results": [
+        {
+            "content-length": 476,
+            "content-type": "text/xml",
+            "redirect": "",
+            "status": 200,
+            "url": "http://i12.baidu.com/crossdomain.xml"
+        },
+        {
+            "content-length": 12,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://i12.baidu.com/favicon.ico"
+        },
+        {
+            "content-length": 100,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://i12.baidu.com/robots.txt"
+        }
+    ]
+}

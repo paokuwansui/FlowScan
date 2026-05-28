@@ -1,0 +1,71 @@
+{
+    "info": {
+        "args": "/usr/lib/python3/dist-packages/dirsearch/dirsearch.py -u https://track.cdn.hiphotos.baidu.com:443 -e LICENSE PARSER_GUIDE.md README.md __pycache__ batch_main.py bin domain.txt finish_domain.txt loader.py modules myenv outputs reports resume.cfg runner.py test.baidu wordlists --format=json --quiet",
+        "time": "Sun May 24 06:07:18 2026"
+    },
+    "results": [
+        {
+            "content-length": 476,
+            "content-type": "text/xml",
+            "redirect": "",
+            "status": 200,
+            "url": "https://track.cdn.hiphotos.baidu.com/crossdomain.xml"
+        },
+        {
+            "content-length": 4383,
+            "content-type": "image/jpeg",
+            "redirect": "",
+            "status": 200,
+            "url": "https://track.cdn.hiphotos.baidu.com/doc/"
+        },
+        {
+            "content-length": 4383,
+            "content-type": "image/jpeg",
+            "redirect": "",
+            "status": 200,
+            "url": "https://track.cdn.hiphotos.baidu.com/doc/en/changes.html"
+        },
+        {
+            "content-length": 43,
+            "content-type": "text/html",
+            "redirect": "/doc/api",
+            "status": 301,
+            "url": "https://track.cdn.hiphotos.baidu.com/doc/api/"
+        },
+        {
+            "content-length": 4383,
+            "content-type": "image/jpeg",
+            "redirect": "",
+            "status": 200,
+            "url": "https://track.cdn.hiphotos.baidu.com/doc/html/index.html"
+        },
+        {
+            "content-length": 4383,
+            "content-type": "image/jpeg",
+            "redirect": "",
+            "status": 200,
+            "url": "https://track.cdn.hiphotos.baidu.com/doc/stable.version"
+        },
+        {
+            "content-length": 12,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://track.cdn.hiphotos.baidu.com/favicon.ico"
+        },
+        {
+            "content-length": 1649,
+            "content-type": "image/gif",
+            "redirect": "",
+            "status": 200,
+            "url": "https://track.cdn.hiphotos.baidu.com/logo.gif"
+        },
+        {
+            "content-length": 100,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://track.cdn.hiphotos.baidu.com/robots.txt"
+        }
+    ]
+}

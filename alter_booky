@@ -1,0 +1,22 @@
+1:loader.py
+	return subprocess.run(
+            cmd,         
+            shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='ignore', timeout=timeout
+        )
+
+	====>
+
+	return subprocess.run(
+            f"bash -c '{cmd}'",
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            errors='ignore',
+            timeout=timeout
+        )
+
+
+
+2:
+

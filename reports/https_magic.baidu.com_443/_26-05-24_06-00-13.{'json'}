@@ -1,0 +1,1611 @@
+{
+    "info": {
+        "args": "/usr/lib/python3/dist-packages/dirsearch/dirsearch.py -u https://magic.baidu.com:443 -e LICENSE PARSER_GUIDE.md README.md __pycache__ batch_main.py bin domain.txt finish_domain.txt loader.py modules myenv outputs reports resume.cfg runner.py test.baidu wordlists --format=json --quiet",
+        "time": "Sun May 24 06:00:43 2026"
+    },
+    "results": [
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/LICENSE.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/LICENSE.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/.cc-ban.txt.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/.dep.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/.svn"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/.svnignore"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/1.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/2.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/2010.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/2011.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/2012.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/2013.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/2014.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/2015.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/2016.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/2017.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/2018.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/2019.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/2020.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/_config.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/accounts.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/admin.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/admin2.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/adovbs.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/affiliates.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/app/etc/local.xml.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/archive.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/auth.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/back.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/backup.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/backup.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/backup.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/backup.inc.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/backup.sql.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/backups.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/backups.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/backups.inc.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/backups.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/backups.sql.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/bitrix/.settings.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/bitrix/.settings.php.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/bitrix/modules/error.log.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/bitrix/settings.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/bitrix/settings.php.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/buck.sql"
+        },
+        {
+            "content-length": 38,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://magic.baidu.com/cc"
+        },
+        {
+            "content-length": 38,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://magic.baidu.com/cc-errors.txt"
+        },
+        {
+            "content-length": 38,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://magic.baidu.com/cc-log.txt"
+        },
+        {
+            "content-length": 38,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://magic.baidu.com/cc_admin"
+        },
+        {
+            "content-length": 38,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://magic.baidu.com/ccbill.log"
+        },
+        {
+            "content-length": 38,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://magic.baidu.com/ccadmin"
+        },
+        {
+            "content-length": 38,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://magic.baidu.com/ccct-admin"
+        },
+        {
+            "content-length": 38,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://magic.baidu.com/ccp14admin/"
+        },
+        {
+            "content-length": 18,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://magic.baidu.com/check"
+        },
+        {
+            "content-length": 18,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://magic.baidu.com/check.php"
+        },
+        {
+            "content-length": 18,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://magic.baidu.com/checkadmin.php"
+        },
+        {
+            "content-length": 18,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://magic.baidu.com/checked_accounts.txt"
+        },
+        {
+            "content-length": 18,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://magic.baidu.com/checkadmin"
+        },
+        {
+            "content-length": 18,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://magic.baidu.com/checkapache.html"
+        },
+        {
+            "content-length": 18,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://magic.baidu.com/checklogin.php"
+        },
+        {
+            "content-length": 18,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://magic.baidu.com/checklogin"
+        },
+        {
+            "content-length": 18,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://magic.baidu.com/checkuser.php"
+        },
+        {
+            "content-length": 18,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://magic.baidu.com/checkuser"
+        },
+        {
+            "content-length": 18,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://magic.baidu.com/checkout"
+        },
+        {
+            "content-length": 18,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://magic.baidu.com/checkouts/"
+        },
+        {
+            "content-length": 18,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "https://magic.baidu.com/checkstyle/"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/clients.sql"
+        },
+        {
+            "content-length": 574,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/collectl/"
+        },
+        {
+            "content-length": 574,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/collectd/"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/common.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/conf.php.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/conf.php.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/config.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/config.inc.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/config.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/config.inc.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/config.ini.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/config.ini.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/config.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/config.php.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/config.php.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/config.php.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/config.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/config/config.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/config/db.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/config/settings.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/configuration.php.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/configuration.php.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/configure.php.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/connect.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/customers.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/cvs"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/CVS/"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/cvs/"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/CVS/Entries"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/cvsadmin"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/CVS/Root"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/data.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/database.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/database.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/database_credentials.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/db.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/db.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/db_backup.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/dbase.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/dbdump.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/debug.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/df_main.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/dump.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/dump.inc.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/dump.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/dump.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/dump.sql.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 404,
+            "url": "https://magic.baidu.com/favicon.ico"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/forum.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/global.asa.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/global.asa.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/global.asax.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/global.asax.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/globals.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/htaccess.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/htaccess.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/htpasswd/htpasswd.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/htpasswd.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/inc/config.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/includes/adovbs.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/includes/bootstrap.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/index.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/index.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/index.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/index.php.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/index1.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/index2.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/install.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/install.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/install.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/local_conf.php.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/localsettings.php.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/localhost.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/localsettings.php.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/maintenance.flag.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/Makefile.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/MANIFEST.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/members.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/Mkfile.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/mysql.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/mysql_debug.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/mysqldump.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/orders.sql"
+        },
+        {
+            "content-length": 72,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/p/"
+        },
+        {
+            "content-length": 72,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/p/m/a/"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/passwd.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/phpini.bak"
+        },
+        {
+            "content-length": 71,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/plugin.xml"
+        },
+        {
+            "content-length": 71,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/plugin/build"
+        },
+        {
+            "content-length": 72,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/plugins"
+        },
+        {
+            "content-length": 72,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/plugins/"
+        },
+        {
+            "content-length": 72,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/plugins/fckeditor"
+        },
+        {
+            "content-length": 72,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/plugins.log"
+        },
+        {
+            "content-length": 72,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/plugins/servlet/oauth/users/icon"
+        },
+        {
+            "content-length": 72,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/plugins/sfSWFUploadPlugin/web/sfSWFUploadPlugin/swf/swfupload.swf"
+        },
+        {
+            "content-length": 72,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/plugins/sfSWFUploadPlugin/web/sfSWFUploadPlugin/swf/swfupload_f9.swf"
+        },
+        {
+            "content-length": 71,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/plugins/tiny_mce/"
+        },
+        {
+            "content-length": 72,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/plugins/tiny_mce"
+        },
+        {
+            "content-length": 72,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/plugins/tinymce/"
+        },
+        {
+            "content-length": 72,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/plugins/servlet/gadgets/makeRequest"
+        },
+        {
+            "content-length": 72,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/plugins/web.config"
+        },
+        {
+            "content-length": 72,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/plugins/editors/fckeditor"
+        },
+        {
+            "content-length": 72,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/plugins/servlet/gadgets/makeRequest?url=https://google.com"
+        },
+        {
+            "content-length": 72,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/plugins/upload.php"
+        },
+        {
+            "content-length": 72,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/plugins/tinymce"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/revision.inc"
+        },
+        {
+            "content-length": 74,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/root"
+        },
+        {
+            "content-length": 74,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/root/"
+        },
+        {
+            "content-length": 74,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/rootadmin"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/sales.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/schema.sql"
+        },
+        {
+            "content-length": 74,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/sdk/"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/secring.bak"
+        },
+        {
+            "content-length": 74,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/service"
+        },
+        {
+            "content-length": 74,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/service-registry/instance-status"
+        },
+        {
+            "content-length": 74,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/service-registry/instance-status.json"
+        },
+        {
+            "content-length": 74,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/service.asmx"
+        },
+        {
+            "content-length": 74,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/service.pwd"
+        },
+        {
+            "content-length": 74,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/service.grp"
+        },
+        {
+            "content-length": 74,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/servicedesk/customer/user/login"
+        },
+        {
+            "content-length": 74,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/servicedesk"
+        },
+        {
+            "content-length": 74,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/serviceaccount.crt"
+        },
+        {
+            "content-length": 74,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/servicedesk/customer/user/signup"
+        },
+        {
+            "content-length": 74,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/services/"
+        },
+        {
+            "content-length": 74,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/service?Wsdl"
+        },
+        {
+            "content-length": 74,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/services"
+        },
+        {
+            "content-length": 74,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 405,
+            "url": "https://magic.baidu.com/services/config/databases.yml"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/settings.php.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/settings.php.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/setup.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/site.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/sql.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/sql.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/sqldump.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/static/dump.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/temp.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/translate.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/typo3conf/ext/crawler/ext_tables.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/typo3conf/ext/pw_highslide_gallery/ext_tables.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/typo3conf/ext/static_info_tables/ext_tables.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/typo3conf/ext/static_info_tables/ext_tables_static+adt-orig.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/typo3conf/ext/static_info_tables/ext_tables_static+adt.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/typo3conf/ext/twwc_pages/ext_tables.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/typo3conf/ext/yag_themepack_jquery/ext_tables.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/uploads/dump.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/users.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/vb.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/web.config.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/web.config.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/web.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/wp-config.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/wp-config.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/wp-config.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/wp-config.php.bak"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/wp-config.php.inc"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/wp-config.php.old"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/wp-content/uploads/dump.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/www.sql"
+        },
+        {
+            "content-length": 570,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "https://magic.baidu.com/wwwroot.sql"
+        }
+    ]
+}

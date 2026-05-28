@@ -1,0 +1,3956 @@
+{
+    "info": {
+        "args": "/usr/lib/python3/dist-packages/dirsearch/dirsearch.py -u http://web.campus.baidu.com:80 -e LICENSE PARSER_GUIDE.md README.md __pycache__ batch_main.py bin domain.txt finish_domain.txt loader.py modules myenv outputs reports resume.cfg runner.py test.baidu wordlists --format=json --quiet",
+        "time": "Sun May 24 03:47:00 2026"
+    },
+    "results": [
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/+CSCOT+/oem-customization?app=AnyConnect&type=oem&platform=..&resource-type=..&name=%2bCSCOE%2b/portal_inc.lua"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/..;/"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/+CSCOT+/translation-table?type=mst&textdomain=/%2bCSCOE%2b/portal_inc.lua&default-language&lang=../"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.asa"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.backup"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.bashrc"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.bash_history"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.bzr/branch-format"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.bzr/"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.bzr/README"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.cer"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.config.inc.php.swp"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.DS_Store"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.ds_store"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.env.backup"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/COMMIT_EDITMSG"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/description"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/FETCH_HEAD"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/hooks/"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/hooks/applypatch-msg"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/hooks/pre-applypatch"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/hooks/commit-msg"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/HEAD"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/hooks/post-update"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/index"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/hooks/pre-rebase"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/hooks/pre-commit"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/branches/"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/logs/HEAD"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/logs/head"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/config"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/hooks/pre-push"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/logs/refs/heads"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/hooks/prepare-commit-msg"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/hooks/pre-receive"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/head"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/info/attributes"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/logs/"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/info/refs"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/info/exclude"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/hooks/update"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/logs/refs/remotes/origin/master"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/info/"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/logs/refs/remotes/origin"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/logs/refs/remotes"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/logs/refs"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/logs/refs/heads/master"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/objects/"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/refs/"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/refs/heads"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/logs/refs/remotes/origin/HEAD"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/refs/heads/master"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/objects/info/packs"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/packed-refs"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/refs/remotes/origin/master"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/refs/remotes"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/refs/remotes/origin/HEAD"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/refs/tags"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.git/refs/remotes/origin"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.hg/"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.hg/hgrc"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.hg/store/data/"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.hg/store/undo"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.hg/undo.dirstate"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.hg/requires"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.hg/dirstate"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.hg/branch"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.htpasswd_test"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.htpasswds"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.inc.php"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.lighttpd.conf"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.mdb"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.svn/"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.svn/text"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.svn/text-base/"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.svn/wc.db"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.svn/entries"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.svn/text-base/index.php.svn-base"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.svn/prop"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.svn/all-wcprops"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.www_acl"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/.wwwacl"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/1.sql"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/2.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/2010.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/2011.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/2012.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/2013.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/2014.sql"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/2015.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/2016.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/2017.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/2018.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/2019.sql"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/2020.sql"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/;/json"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/;json/"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/;/admin"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/;admin/"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/;/login"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/;login/"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/\\..\\..\\..\\..\\..\\..\\..\\..\\..\\etc\\passwd"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/_log/error.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/_log/access.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/_logs/error.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/_logs/access.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/_mmServerScripts/MMHTTPDB.php"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/access.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/accounts.sql"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/admin.inc.php"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/admin.mdb"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/admin/_logs/access.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/admin/_logs/error.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/admin/access.log"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/admin/error.log"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/admin/log/error.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/admin/logs/access.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/admin/logs/error.log"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/affiliates.sql"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/analytics/saw.dll?getPreviewImage&previewFilePath=/etc/passwd"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/apache/logs/access.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/apache/logs/error.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/app/unschedule.bat"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/archive.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/aspxspy.aspx"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/back.sql"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/backup.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/backups.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/bitrix/error.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/bitrix/modules/error.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/bitrix/modules/error.log.old"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/bmc_help2u/servlet/helpServlet2u?textareaWrap=/bmc_help2u/WEB-INF/web.xml"
+        },
+        {
+            "content-length": 178,
+            "content-type": "text/html",
+            "redirect": "http://web.campus.baidu.com/bower_components/",
+            "status": 301,
+            "url": "http://web.campus.baidu.com/bower_components"
+        },
+        {
+            "content-length": 564,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/bower_components/"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/buck.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/Build.bat"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/c99shell.php"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/c99.php"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/cgi-bin/printenv"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/cgi-bin/printenv.pl"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/clients.mdb"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/clients.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/cmdjsp.jsp"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/cms/components/login.ascx"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/components/login.ascx"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/conf.inc.php~"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/config.inc.php.txt"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/config.inc.php"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/config.inc.php~"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/config.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/configuration.inc.php~"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/conn.asp"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/customers.mdb"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/customers.sql"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/data.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/data.mdb"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/database.mdb"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/database.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/db.mdb"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/db.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/db/main.mdb"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/db_backup.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/db1.mdb"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/dbaccess.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/dbase.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/dbdump.sql"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/devdata.db"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/df_main.sql"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/dump.sql"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/eam/vib?id=/etc/issue"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/error.log.0"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/error/error.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/error.log"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/etc/passwd"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/faces/javax.faces.resource/web.xml?ln=../WEB-INF"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/faces/javax.faces.resource/web.xml?ln=..\\\\WEB-INF"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/Files/binder.backup"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/forum.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/getFavicon?host=burpcollaborator.net"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/global.asa"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/global.asax"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/global.asa.temp"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/global.asa.tmp"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/global.asax.tmp"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/global.asax.temp"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/htaccess.backup"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/hTTgS.mdb"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/httpd.conf.backup"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/http_access.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/httpd/logs/error.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/httpd.conf"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/httpd.conf.default"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/httpd/logs/access.log"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/iisadmpwd/aexp2b.htr"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/iisadmpwd/achg.htr"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/iisadmpwd/aexp2.htr"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/iisadmpwd/aexp.htr"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/iisadmpwd/aexp4.htr"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/iisadmpwd/aexp4b.htr"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/iisadmpwd/anot3.htr"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/iisadmpwd/anot.htr"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/iisadmpwd/aexp3.htr"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/images/c99.php"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/import_error.log"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index-test.php"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index-bak"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.LICENSE"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.7z"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.gz"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.class"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.bak"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.inc"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.001"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.bz2"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.htm"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.jsp"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/index.backup"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.php-bak"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.html"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.pHp"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.php"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.php.bak"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.000"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.php3"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.cs"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.old"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.php4"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.php."
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.java"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.php5"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.php/login/"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.php::$DATA"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.orig"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.rar"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.save"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.php~"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.tar.bz2"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.vb"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.tgz"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.xml"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.shtml"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index1.bak"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.zip"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index1.htm"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index2.bak"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index2"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.tar"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index_files"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/index.tmp"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index.tar.gz"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index_manage"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/index.temp"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index2.php"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index3.php"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index_admin.LICENSE"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index~"
+        },
+        {
+            "content-length": 1295,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/index~1"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/install.sql"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/invoker/EJBInvokerServlet/"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/invoker/JMXInvokerServlet"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/invoker/JMXInvokerServlet/"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/javax.faces.resource.../WEB-INF/web.xml.jsf"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/jkstatus;"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/jmx-console"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/jmx-console/"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/jmx-console/HtmlAdaptor?action=inspectMBean&name=jboss.system:type=ServerInfo"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/learn/ruubikcms/ruubikcms/tiny_mce/plugins/tinybrowser/error.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/lighttpd.error.log"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/lighttpd.access.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/localhost.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/log.mdb"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/log/access.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/log/error.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/log/www-error.log"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/logs.mdb"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/logs/error.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/logs/www-error.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/logs/access.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/madspotshell.php"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/main.mdb"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/members.mdb"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/members.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/msdac/root.exe?/c+dir"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/mysql.err"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/mysql.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/mysql.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/mysql_debug.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/mysqldump.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/nginx-ssl.access.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/nginx.conf"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/nginx-ssl.error.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/nginx-error.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/nginx-access.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/null.htw"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/orders.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/password.mdb"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/password.txt"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/passwords.mdb"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/personal.mdb"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/php-backdoor.php"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/php-findsock-shell.php"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/php-error.log"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/php-fpm/www-error.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/php-reverse-shell.php"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/php-tiny-shell.php"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/php-fpm/error.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/php_error.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/phpMyAdmin.old/index.php"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/printenv.tmp"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/private.mdb"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/qsd-php-backdoor.php"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/qwertypoiu.htw"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/qwertypoiu.printer"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/r57.php"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/r57shell.php"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/remote/fgt_lang?lang=/../../../..//////////dev/cmdb/sslvpn_websession"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/remote/fgt_lang?lang=/../../../../////////////////////////bin/sslvpnd"
+        },
+        {
+            "content-length": 66,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 500,
+            "url": "http://web.campus.baidu.com/report"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/sales.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/scripts/cgimail.exe"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/schema.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/scripts/root.exe?/c+dir"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/scripts/tools/getdrvs.exe"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/scripts/tools/newdsn.exe"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/servlet/oracle.xml.xsql.XSQLServlet/soapdocs/webapps/soap/WEB-INF/config/soapConfig.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/servlet/Oracle.xml.xsql.XSQLServlet/soapdocs/webapps/soap/WEB-INF/config/soapConfig.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/setup.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/shell.php"
+        },
+        {
+            "content-length": 2235,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://web.campus.baidu.com/shop"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/simple-backdoor.php"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/site.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/Sites/Knowledge/Membership/Inspiredtutorial/Viewcode.asp"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/soapdocs/webapps/soap/WEB-INF/config/soapConfig.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/sql.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/sql_error.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/sqldump.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/static/dump.sql"
+        },
+        {
+            "content-length": 564,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 404,
+            "url": "http://web.campus.baidu.com/static/api/swagger.yaml"
+        },
+        {
+            "content-length": 564,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 404,
+            "url": "http://web.campus.baidu.com/static/api/swagger.json"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/temp.sql"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/test.mdb"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/text-base/etc/passwd"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/tmp/access.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/tmp/error.log"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/tmp/madspotshell.php"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/translate.sql"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/typo3conf/ext/pw_highslide_gallery/ext_tables.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/typo3conf/ext/static_info_tables/ext_tables_static+adt-orig.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/typo3conf/ext/twwc_pages/ext_tables.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/typo3conf/ext/crawler/ext_tables.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/typo3conf/ext/yag_themepack_jquery/ext_tables.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/typo3conf/ext/static_info_tables/ext_tables_static+adt.sql"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/typo3conf/ext/static_info_tables/ext_tables.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/uploader.php"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/uploads/dump.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/users.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/users.mdb"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/users.db"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/Vagrantfile.backup"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/vb.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/war/WEB-INF/classes/"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wavemaker/studioService.download?method=getContent&inUrl=file///etc/passwd"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/web-console/ServerInfo.jsp"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/war/WEB-INF/deploy/"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF./"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/application.properties"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/cas-servlet.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/application.yml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/application-client.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF./web.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/web-app/WEB-INF/classes"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/applicationContext.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/cas-theme-default.properties"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/app-config.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/application_config.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/config.properties"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/db.properties"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/default_views.properties"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/beans.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/cas.properties"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/commons-logging.properties"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/faces-config.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/countries.properties"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/demo.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/default-theme.properties"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/applicationContext.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/fckeditor.properties"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/hibernate.cfg.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/log4j.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/messages.properties"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/META-INF/app-config.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/mobile.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/languages.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/logback.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/protocol_views.properties"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/META-INF/persistence.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/struts-default.vm"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/struts.properties"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/struts.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/log4j.properties"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/theme.properties"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/validation.properties"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/velocity.properties"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/web.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/resources/config.properties"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/services.properties"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/conf/caches.properties"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/conf/config.properties"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/conf/core.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/conf/core_context.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/conf/caches.dat"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/classes/persistence.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/conf/db.properties"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/conf/daemons.properties"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/components.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/conf/mime.types"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/conf/search.properties"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/conf/page_navigator.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/conf/webmaster.properties"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/conf/wml.properties"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/conf/editors.properties"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/config.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/conf/jpa_context.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/conf/jtidy.properties"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/config/faces-config.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/config/mua-endpoints.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/config/security.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/config/soapConfig.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/config/dashboard-statistics.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/config/web-core.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/conf/lutece.properties"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/config/metadata.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/config/webflow-config.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/config/users.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/decorators.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/dispatcher-servlet.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/geronimo-web.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/faces-config.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/hibernate.cfg.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/config/webmvc-config.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/deployerConfigContext.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/jax-ws-catalog.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/ejb-jar.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/glassfish-web.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/ias-web.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/jboss-ejb-client.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/jboss-web.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/jboss-ejb3.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/ibm-web-ext.xmi"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/ibm-web-bnd.xmi"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/liferay-display.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/jetty-web.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/jboss-deployment-structure.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/jboss-client.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/liferay-look-and-feel.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/jboss-webservices.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/local-jps.properties"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/local.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/jrun-web.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/glassfish-resources.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/jonas-web.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/liferay-layout-templates.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/liferay-plugin-package.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/liferay-portlet.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/openx-config.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/portlet-custom.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/jetty-env.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/portlet.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/logback.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/logs/log.log"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/remoting-servlet.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/resin-web.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/resources/config.properties"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/restlet-servlet.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/quartz-properties.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/service.xsd"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/spring-config/application-context.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/spring-config.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/sitemesh.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/spring-config/management-config.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/spring-config/presentation-config.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/spring-config/services-config.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/spring-config/services-remote-config.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/spring-config/authorization-config.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/spring-configuration/filters.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/spring-config/messaging-config.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/spring-dispatcher-servlet.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/rexip-web.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/spring/webmvc-config.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/springweb-servlet.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/spring-context.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/sun-jaxws.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/struts-config.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/sun-web.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/tiles-defs.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/spring-mvc.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/spring-ws-servlet.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/struts-config-ext.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/struts-config-widgets.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/trinidad-config.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/validator-rules.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/tjc-web.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/web-jetty.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/web-borland.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/web.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/weblogic.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/validation.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/urlrewrite.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/web2.xml"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/web.xml.jsf"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/web.config.temp"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/web.config.tmp"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WEB-INF/workflow-properties.xml"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/web.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wls-wsat/CoordinatorPortType"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php-bak"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.2"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.backup"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.8"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.new"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.bk"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.0"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.dist"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.1"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.old"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.7"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.inc"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.save"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.bak1"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.4"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.bak"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.9"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.swn"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.orig"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.5"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.disabled"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.cust"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.original"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.swo"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.6"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.3"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.txt"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.zip"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php_"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php_bak"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php_new"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php.swp"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php_1"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php_Old"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-config.php~"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wp-content/uploads/dump.sql"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WS_FTP.LOG"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/WS_FTP.log"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wshell.php"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/www.sql"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/www-error.log"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/wwwroot.sql"
+        },
+        {
+            "content-length": 195,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/xshell.php"
+        },
+        {
+            "content-length": 196,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 403,
+            "url": "http://web.campus.baidu.com/yarn-error.log"
+        }
+    ]
+}

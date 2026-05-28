@@ -1,0 +1,134 @@
+{
+    "info": {
+        "args": "/usr/lib/python3/dist-packages/dirsearch/dirsearch.py -u http://ack.tuisong.baidu.com:80 -e LICENSE PARSER_GUIDE.md README.md __pycache__ batch_main.py bin domain.txt finish_domain.txt loader.py modules myenv outputs reports resume.cfg runner.py test.baidu wordlists --format=json --quiet",
+        "time": "Sun May 24 03:39:39 2026"
+    },
+    "results": [
+        {
+            "content-length": 78,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "http://ack.tuisong.baidu.com/2016.tar.gz"
+        },
+        {
+            "content-length": 79,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "http://ack.tuisong.baidu.com/admin_backup"
+        },
+        {
+            "content-length": 75,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "http://ack.tuisong.baidu.com/adminftp"
+        },
+        {
+            "content-length": 81,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "http://ack.tuisong.baidu.com/administrativo"
+        },
+        {
+            "content-length": 128,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 400,
+            "url": "http://ack.tuisong.baidu.com/click"
+        },
+        {
+            "content-length": 80,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "http://ack.tuisong.baidu.com/config.php-eb"
+        },
+        {
+            "content-length": 80,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "http://ack.tuisong.baidu.com/database.yml~"
+        },
+        {
+            "content-length": 77,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "http://ack.tuisong.baidu.com/deploy.env"
+        },
+        {
+            "content-length": 85,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "http://ack.tuisong.baidu.com/httpd.conf.default"
+        },
+        {
+            "content-length": 80,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "http://ack.tuisong.baidu.com/INSTALL_admin"
+        },
+        {
+            "content-length": 340,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "http://ack.tuisong.baidu.com/js/"
+        },
+        {
+            "content-length": 340,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "http://ack.tuisong.baidu.com/js"
+        },
+        {
+            "content-length": 74,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "http://ack.tuisong.baidu.com/log/old"
+        },
+        {
+            "content-length": 75,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "http://ack.tuisong.baidu.com/logon.py"
+        },
+        {
+            "content-length": 471,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "http://ack.tuisong.baidu.com/pprof"
+        },
+        {
+            "content-length": 471,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "http://ack.tuisong.baidu.com/pprof/"
+        },
+        {
+            "content-length": 68,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "http://ack.tuisong.baidu.com/r"
+        },
+        {
+            "content-length": 87,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 404,
+            "url": "http://ack.tuisong.baidu.com/thirdparty/fckeditor"
+        }
+    ]
+}

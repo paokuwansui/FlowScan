@@ -1,0 +1,1254 @@
+{
+    "info": {
+        "args": "/usr/lib/python3/dist-packages/dirsearch/dirsearch.py -u http://yi.baidu.com:80 -e LICENSE PARSER_GUIDE.md README.md __pycache__ batch_main.py bin domain.txt finish_domain.txt loader.py modules myenv outputs reports resume.cfg runner.py test.baidu wordlists --format=json --quiet",
+        "time": "Sun May 24 05:26:34 2026"
+    },
+    "results": [
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/%2e%2e;/test"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.%2e/%2e%2e/%2e%2e/%2e%2e/etc/passwd"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/..;/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.bash_history"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.DS_Store"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.ds_store"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/description"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/branches/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/config"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/FETCH_HEAD"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/hooks/post-update"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/hooks/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/COMMIT_EDITMSG"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/HEAD"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/head"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/hooks/commit-msg"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/hooks/pre-receive"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/hooks/applypatch-msg"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/hooks/prepare-commit-msg"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/logs/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/hooks/pre-applypatch"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/info/exclude"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/hooks/update"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/info/refs"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/index"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/logs/refs/remotes/origin"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/logs/head"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/info/attributes"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/hooks/pre-commit"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/logs/refs"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/packed-refs"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/logs/refs/heads"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/hooks/pre-push"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/logs/refs/remotes/origin/master"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/logs/refs/remotes"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/logs/refs/heads/master"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/hooks/pre-rebase"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/objects/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/refs/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/refs/heads/master"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/objects/info/packs"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/logs/refs/remotes/origin/HEAD"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/refs/remotes"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/logs/HEAD"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/refs/heads"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/refs/remotes/origin"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/refs/remotes/origin/master"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/info/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/refs/tags"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.git/refs/remotes/origin/HEAD"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.htaccess"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.mysql_history"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.python_history"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.svn/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.svn/text"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.svn/wc.db"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.svn/entries"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.svn/all-wcprops"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.svn/prop"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.svn/text-base/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/.svn/text-base/index.php.svn-base"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/;admin/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/;login/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/;json/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/admin/.htaccess"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/Admin;/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/admin;/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/administrator/.htaccess"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/app/.htaccess"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/cgi-bin/.%2e/%2e%2e/%2e%2e/%2e%2e/etc/passwd"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/etc/hosts"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/etc/passwd"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/examples/jsp/%252e%252e/%252e%252e/manager/html/"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/META-INF/MANIFEST.MF"
+        },
+        {
+            "content-length": 49,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/robots.txt"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/text-base/etc/passwd"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/cas-servlet.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/application.properties"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/application_config.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/app-config.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/application.yml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/default-theme.properties"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/beans.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/application-client.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/applicationContext.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/default_views.properties"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/db.properties"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/log4j.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/cas.properties"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/applicationContext.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/faces-config.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/cas-theme-default.properties"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/fckeditor.properties"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/commons-logging.properties"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/countries.properties"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/languages.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/demo.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/logback.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/protocol_views.properties"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/config.properties"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/META-INF/persistence.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/log4j.properties"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/persistence.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/hibernate.cfg.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/messages.properties"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/mobile.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/services.properties"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/struts.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/struts.properties"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/META-INF/app-config.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/components.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/validation.properties"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/theme.properties"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/web.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/classes/velocity.properties"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/config.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/ejb-jar.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/deployerConfigContext.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/jboss-ejb-client.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/glassfish-web.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/jboss-ejb3.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/jboss-deployment-structure.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/decorators.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/geronimo-web.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/ias-web.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/glassfish-resources.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/jboss-webservices.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/jrun-web.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/liferay-display.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/jetty-env.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/hibernate.cfg.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/jboss-web.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/liferay-layout-templates.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/jetty-web.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/local.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/jax-ws-catalog.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/openx-config.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/dispatcher-servlet.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/logback.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/liferay-look-and-feel.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/liferay-plugin-package.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/faces-config.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/jboss-client.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/portlet-custom.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/portlet.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/jonas-web.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/quartz-properties.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/spring-config.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/local-jps.properties"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/resin-web.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/liferay-portlet.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/rexip-web.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/sitemesh.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/remoting-servlet.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/spring-context.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/spring-dispatcher-servlet.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/springweb-servlet.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/restlet-servlet.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/struts-config.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/spring-ws-servlet.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/tjc-web.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/spring-mvc.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/struts-config-widgets.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/sun-jaxws.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/trinidad-config.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/urlrewrite.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/tiles-defs.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/validation.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/weblogic.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/struts-config-ext.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/workflow-properties.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/web-borland.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/validator-rules.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/web-jetty.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/sun-web.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/web.xml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://yi.baidu.com/WEB-INF/web2.xml"
+        }
+    ]
+}

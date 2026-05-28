@@ -1,0 +1,120 @@
+{
+    "info": {
+        "args": "/usr/lib/python3/dist-packages/dirsearch/dirsearch.py -u https://ada.baidu.com:443 -e LICENSE PARSER_GUIDE.md README.md __pycache__ batch_main.py bin domain.txt finish_domain.txt loader.py modules myenv outputs reports resume.cfg runner.py test.baidu wordlists --format=json --quiet",
+        "time": "Sun May 24 03:19:00 2026"
+    },
+    "results": [
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://ada.baidu.com/analytics/saw.dll?getPreviewImage&previewFilePath=/etc/passwd"
+        },
+        {
+            "content-length": 98,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://ada.baidu.com/BingSiteAuth.xml"
+        },
+        {
+            "content-length": 32,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 200,
+            "url": "https://ada.baidu.com/common"
+        },
+        {
+            "content-length": 32,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 200,
+            "url": "https://ada.baidu.com/common/"
+        },
+        {
+            "content-length": 318,
+            "content-type": "image/x-icon",
+            "redirect": "",
+            "status": 200,
+            "url": "https://ada.baidu.com/favicon.ico"
+        },
+        {
+            "content-length": 97,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 404,
+            "url": "https://ada.baidu.com/gateway/"
+        },
+        {
+            "content-length": 103,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 404,
+            "url": "https://ada.baidu.com/gateway/routes"
+        },
+        {
+            "content-length": 106725,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://ada.baidu.com/local/"
+        },
+        {
+            "content-length": 106725,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://ada.baidu.com/local"
+        },
+        {
+            "content-length": 47,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://ada.baidu.com/site/common.xml"
+        },
+        {
+            "content-length": 47,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://ada.baidu.com/site/"
+        },
+        {
+            "content-length": 23,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 404,
+            "url": "https://ada.baidu.com/static/api/swagger.json"
+        },
+        {
+            "content-length": 179,
+            "content-type": "text/html",
+            "redirect": "/static/",
+            "status": 301,
+            "url": "https://ada.baidu.com/static"
+        },
+        {
+            "content-length": 23,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 404,
+            "url": "https://ada.baidu.com/static/dump.sql"
+        },
+        {
+            "content-length": 23,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 404,
+            "url": "https://ada.baidu.com/static/api/swagger.yaml"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://ada.baidu.com/wavemaker/studioService.download?method=getContent&inUrl=file///etc/passwd"
+        }
+    ]
+}

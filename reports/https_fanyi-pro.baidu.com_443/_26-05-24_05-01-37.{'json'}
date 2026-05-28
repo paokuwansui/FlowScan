@@ -1,0 +1,729 @@
+{
+    "info": {
+        "args": "/usr/lib/python3/dist-packages/dirsearch/dirsearch.py -u https://fanyi-pro.baidu.com:443 -e LICENSE PARSER_GUIDE.md README.md __pycache__ batch_main.py bin domain.txt finish_domain.txt loader.py modules myenv outputs reports resume.cfg runner.py test.baidu wordlists --format=json --quiet",
+        "time": "Sun May 24 05:02:07 2026"
+    },
+    "results": [
+        {
+            "content-length": 160,
+            "content-type": "text/html",
+            "redirect": "http://www.baidu.com/search/error.html",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/%2e%2e//google.com"
+        },
+        {
+            "content-length": 160,
+            "content-type": "text/html",
+            "redirect": "http://www.baidu.com/search/error.html",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/.bak"
+        },
+        {
+            "content-length": 160,
+            "content-type": "text/html",
+            "redirect": "http://www.baidu.com/search/error.html",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/.inc"
+        },
+        {
+            "content-length": 160,
+            "content-type": "text/html",
+            "redirect": "http://www.baidu.com/search/error.html",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/.old"
+        },
+        {
+            "content-length": 160,
+            "content-type": "text/html",
+            "redirect": "http://www.baidu.com/search/error.html",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/.settings/org.eclipse.php.core.prefs"
+        },
+        {
+            "content-length": 160,
+            "content-type": "text/html",
+            "redirect": "http://www.baidu.com/search/error.html",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/.sql"
+        },
+        {
+            "content-length": 160,
+            "content-type": "text/html",
+            "redirect": "http://www.baidu.com/search/error.html",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/.svn"
+        },
+        {
+            "content-length": 160,
+            "content-type": "text/html",
+            "redirect": "http://www.baidu.com/search/error.html",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/.svnignore"
+        },
+        {
+            "content-length": 30204,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://fanyi-pro.baidu.com/AboutUs"
+        },
+        {
+            "content-length": 30204,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://fanyi-pro.baidu.com/aboutus"
+        },
+        {
+            "content-length": 19613,
+            "content-type": "application/json",
+            "redirect": "",
+            "status": 200,
+            "url": "https://fanyi-pro.baidu.com/api/config"
+        },
+        {
+            "content-length": 160,
+            "content-type": "text/html",
+            "redirect": "http://www.baidu.com/search/error.html",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/cvs"
+        },
+        {
+            "content-length": 160,
+            "content-type": "text/html",
+            "redirect": "http://www.baidu.com/search/error.html",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/CVS/Entries"
+        },
+        {
+            "content-length": 160,
+            "content-type": "text/html",
+            "redirect": "http://www.baidu.com/search/error.html",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/CVS/Root"
+        },
+        {
+            "content-length": 160,
+            "content-type": "text/html",
+            "redirect": "http://www.baidu.com/search/error.html",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/CVS/"
+        },
+        {
+            "content-length": 160,
+            "content-type": "text/html",
+            "redirect": "http://www.baidu.com/search/error.html",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/cvs/"
+        },
+        {
+            "content-length": 160,
+            "content-type": "text/html",
+            "redirect": "http://www.baidu.com/search/error.html",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/cvsadmin"
+        },
+        {
+            "content-length": 49127,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://fanyi-pro.baidu.com/doc"
+        },
+        {
+            "content-length": 49127,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://fanyi-pro.baidu.com/doc/"
+        },
+        {
+            "content-length": 4286,
+            "content-type": "image/x-icon",
+            "redirect": "",
+            "status": 200,
+            "url": "https://fanyi-pro.baidu.com/favicon.ico"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.backup"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.bak"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.001"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index-bak"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.bz2"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.class"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.LICENSE"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.cs"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index-test.php"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.htm"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.000"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.7z"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.old"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.php-bak"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.php.bak"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.php"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.html"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.gz"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.jsp"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.inc"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.java"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.orig"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.php."
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.pHp"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.php4"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.php~"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.php::$DATA"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.php/login/"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.rar"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.shtml"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.tar"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.php5"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.php3"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.tar.gz"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.temp"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.tgz"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.xml"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.save"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index1.bak"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.tar.bz2"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.zip"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.tmp"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index_admin.LICENSE"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index.vb"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index1.htm"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index2"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index2.php"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index2.bak"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index3.php"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index_files"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index~"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index_manage"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/index~1"
+        },
+        {
+            "content-length": 37176,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://fanyi-pro.baidu.com/main"
+        },
+        {
+            "content-length": 37176,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://fanyi-pro.baidu.com/main/"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/order.log"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/order.LICENSE"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/order_add_log.txt"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/order.txt"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/OrderProcessorEJB/services/FrontGate"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/order_admin"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/orders.LICENSE"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/orders.csv"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/orders"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/order"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/orders_log"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/OrderProcessorEJB/"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/order_log"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/OrderProcessorEJB/services/FrontGate/wsdl/"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/orders.log"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/orders.sql"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/orders.xls"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/orders.sql.gz"
+        },
+        {
+            "content-length": 17,
+            "content-type": "text/html",
+            "redirect": "/",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/orders.txt"
+        },
+        {
+            "content-length": 160,
+            "content-type": "text/html",
+            "redirect": "http://www.baidu.com/search/error.html",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/phpMyAdmin.old/index.php"
+        },
+        {
+            "content-length": 31422,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://fanyi-pro.baidu.com/qa/"
+        },
+        {
+            "content-length": 184,
+            "content-type": "text/html",
+            "redirect": "http://fanyi-pro.baidu.com:8044/static/",
+            "status": 301,
+            "url": "https://fanyi-pro.baidu.com/static"
+        },
+        {
+            "content-length": 160,
+            "content-type": "text/html",
+            "redirect": "http://www.baidu.com/search/error.html",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/static/api/swagger.yaml"
+        },
+        {
+            "content-length": 160,
+            "content-type": "text/html",
+            "redirect": "http://www.baidu.com/search/error.html",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/static.LICENSE"
+        },
+        {
+            "content-length": 160,
+            "content-type": "text/html",
+            "redirect": "http://www.baidu.com/search/error.html",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/static.."
+        },
+        {
+            "content-length": 160,
+            "content-type": "text/html",
+            "redirect": "http://www.baidu.com/search/error.html",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/static/dump.sql"
+        },
+        {
+            "content-length": 160,
+            "content-type": "text/html",
+            "redirect": "http://www.baidu.com/search/error.html",
+            "status": 302,
+            "url": "https://fanyi-pro.baidu.com/static/api/swagger.json"
+        }
+    ]
+}

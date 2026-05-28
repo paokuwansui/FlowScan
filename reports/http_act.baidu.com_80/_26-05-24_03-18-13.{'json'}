@@ -1,0 +1,64 @@
+{
+    "info": {
+        "args": "/usr/lib/python3/dist-packages/dirsearch/dirsearch.py -u http://act.baidu.com:80 -e LICENSE PARSER_GUIDE.md README.md __pycache__ batch_main.py bin domain.txt finish_domain.txt loader.py modules myenv outputs reports resume.cfg runner.py test.baidu wordlists --format=json --quiet",
+        "time": "Sun May 24 03:18:25 2026"
+    },
+    "results": [
+        {
+            "content-length": 23,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://act.baidu.com/debug/"
+        },
+        {
+            "content-length": 23,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://act.baidu.com/debug/pprof"
+        },
+        {
+            "content-length": 23,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://act.baidu.com/debug/pprof/profile"
+        },
+        {
+            "content-length": 23,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://act.baidu.com/debug/pprof/"
+        },
+        {
+            "content-length": 23,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://act.baidu.com/debug/pprof/trace"
+        },
+        {
+            "content-length": 23,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://act.baidu.com/debug/pprof/heap"
+        },
+        {
+            "content-length": 23,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://act.baidu.com/debug/pprof/goroutine?debug=1"
+        },
+        {
+            "content-length": 23,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://act.baidu.com/metrics"
+        }
+    ]
+}

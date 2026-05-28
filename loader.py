@@ -31,7 +31,8 @@ class ModuleEnvironmentManager:
         # stdout=subprocess.PIPE, stderr=subprocess.STDOUT 强行合并捕获常规输出与红字报错
         # text=True 转换为字符串，errors='ignore' 斩断 Windows 等环境怪异回显导致的编码死锁
         return subprocess.run(
-            cmd,
+            # cmd,
+            f"bash -c '{cmd}'",
             shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,

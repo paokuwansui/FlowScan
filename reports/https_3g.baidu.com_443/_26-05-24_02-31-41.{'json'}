@@ -1,0 +1,2052 @@
+{
+    "info": {
+        "args": "/usr/lib/python3/dist-packages/dirsearch/dirsearch.py -u https://3g.baidu.com:443 -e LICENSE PARSER_GUIDE.md README.md __pycache__ batch_main.py bin domain.txt finish_domain.txt loader.py modules myenv outputs reports resume.cfg runner.py test.baidu wordlists --format=json --quiet",
+        "time": "Sun May 24 02:33:40 2026"
+    },
+    "results": [
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=86570951512931435961658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/+CSCOE+/logon.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "http://m.baidu.com/error.jsp?traceid=",
+            "status": 302,
+            "url": "https://3g.baidu.com/.%2e/%2e%2e/%2e%2e/%2e%2e/etc/passwd"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=84073140051028073721658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/+CSCOE+/session_password.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "http://m.baidu.com/error.jsp?traceid=",
+            "status": 302,
+            "url": "https://3g.baidu.com/%2e%2e//google.com"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=7923309282385510228498721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=83825632076843363861648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/.html"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "http://m.baidu.com/error.jsp?traceid=8460192946763834098",
+            "status": 302,
+            "url": "https://3g.baidu.com/.tconn/tconn.conf"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8926039646818226705368721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/__dummy.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8776220402809679218848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/_admin.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=70262047133686691571658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/_layouts/userinfo.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=9208192257102443225368721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/_layouts/settings.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=87522659915556275171628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/_layouts/alllibs.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8751887175404005651848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/_vti_inf.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8797336334688418837368721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/_vti_info.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "http://m.baidu.com/error.jsp?traceid=8170293868400067148368721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/a"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=65877402726243131461658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/account/login.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=7392455150809301998848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/account/login.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=7372717577054209065848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/accounts.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=7267246778113926607368721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/accounts.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=86778447309226130531658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/accounts/login.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=87330622650503787941648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/accounts/login.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "http://m.baidu.com/error.jsp?traceid=94741156383380011531648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/ad"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=85240708958586031991658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/adm.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=89486956679786189951628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/adm.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=93688732673536478881668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/admin.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=9235084537862636529508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/admin.htm.php"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=94390130554265126431668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/admin.html.php"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=89192780962832464781628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/admin.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=9571604120437311511848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/admin/login.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=84590066290359166741658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/admin/login.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=89925934845997837081628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/administrator.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8743250498177455864498721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/administrator.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8997989029020227413848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/analog.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "http://m.baidu.com/error.jsp?traceid=90499273212485251761648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/api"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=81411137487869938851668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/api/swagger/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8795365335416150240848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/api/swagger/static/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=76046959204222884011668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/apadminred.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "http://m.baidu.com/error.jsp?traceid=8281952138954749205498721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/app"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=86529524061664217761658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/api/swagger-ui.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8037602786420242871508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/aphtpasswd.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=81454117785775731601648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/api/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=86275220121445110581668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/auth.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8720767362727514138508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/auth.html"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956112313629409389322661128486337271",
+            "status": 302,
+            "url": "https://3g.baidu.com/book"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956112326547865708244595526938169509",
+            "status": 302,
+            "url": "https://3g.baidu.com/books"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956112307421839468021930467992358686",
+            "status": 302,
+            "url": "https://3g.baidu.com/books.LICENSE"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956112324199710828856376574306234465",
+            "status": 302,
+            "url": "https://3g.baidu.com/bookContent.swf"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "http://m.baidu.com/error.jsp?traceid=8675166385058816819848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/c"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8860264825427298858848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/cancel.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "http://m.baidu.com/error.jsp?traceid=",
+            "status": 302,
+            "url": "https://3g.baidu.com/cgi-bin/.%2e/%2e%2e/%2e%2e/%2e%2e/etc/passwd"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=81527605105152728741668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/cgi-bin/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8435364462382707193368721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/CHANGELOG.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=93073646202629386091658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/ChangeLog.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=87631361285116741601668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/Changelog.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8885424365842283567848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/changelog.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=85683687976869740871648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/CHANGES.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8217622075195289705368721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/checkapache.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8480337829387453236368721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/CFIDE/Administrator/startstop.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=84535793499275997111648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/city.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=87428427774275479901668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/ckeditor/ckfinder/ckfinder.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=86712399389088844391648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/ckfinder/ckfinder.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8205000755603509891508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/cms/design.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=91685658070502875321628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/conf.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=87895330018583129361668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/controlpanel.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=89742962629930599851648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/controlpanel.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8497429230904583019848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/core/latest/swagger-ui/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8607466889985443962848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/cp.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=93716772157215487061628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/csp/gateway/slc/api/swagger-ui.html"
+        },
+        {
+            "content-length": 121,
+            "content-type": "text/xml",
+            "redirect": "",
+            "status": 200,
+            "url": "https://3g.baidu.com/crossdomain.xml"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=88695403648602309051648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/dashboard/howto.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8824639184120051407508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/dashboard/faq.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "http://m.baidu.com/error.jsp?traceid=8753914833013073873508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/data"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8961202561133865188848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/default.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=9096720577183389947848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/demo/ejb/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=87826210078765780971668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/desktop/index_framed.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=90531115498929592931658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/dfshealth.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=9081560678154121838848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/doc/en/changes.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=9240022479277550186498721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/doc/html/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=7271397945121764783368721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/docpicker/common_proxy/http/www.redbooks.ibm.com/Redbooks.nsf/RedbookAbstracts/sg247798.html?Logout&RedirectTo=http://example.com"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=68135357614163068881628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/docs/html/admin/ch01s04.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=7738234158807982454848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/docs/html/admin/ch03s07.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=89862557705018631151658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/docs/html/admin/ch01.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=85036303389589149301648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/docs/html/developer/ch02.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=79893273833346733421658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/docs/html/admin/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8479970359797696118498721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/docs/html/developer/ch03s15.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=9044174328558177793508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/docs/html/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8244117518034214126848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/Documentation.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=88906945612391451431658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/docs/CHANGELOG.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=90725497601038727601658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/druid/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "http://m.baidu.com/error.jsp?traceid=8893287110263977465508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/e"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8863851148781015114508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/email.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=88263427398274961291648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/error404.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8959741155579850323498721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/ErrorPage.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=6314028439956332563498721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/estore/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8796851093624214854508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/estore/annotated-index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8191559844818384434368721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/examples/jsp/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8430288747288005441508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/examples/servlets/index.html"
+        },
+        {
+            "content-length": 0,
+            "content-type": "application/octet-stream",
+            "redirect": "",
+            "status": 200,
+            "url": "https://3g.baidu.com/f"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8526066972877139880508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/fastlane/Preview.html"
+        },
+        {
+            "content-length": 318,
+            "content-type": "image/x-icon",
+            "redirect": "",
+            "status": 200,
+            "url": "https://3g.baidu.com/favicon.ico"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=86342849234359100241648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/fckeditor/_samples/default.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=81190498442504452011668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/file_upload.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=83895834953321283981658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/file_upload.html"
+        },
+        {
+            "content-length": 16489,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://3g.baidu.com/error.jsp"
+        },
+        {
+            "content-length": 16489,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://3g.baidu.com/error.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=9345030263143340790368721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/grabbed.html"
+        },
+        {
+            "content-length": 0,
+            "content-type": "application/octet-stream",
+            "redirect": "",
+            "status": 200,
+            "url": "https://3g.baidu.com/i"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8352483383235495188498721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/help.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=9138180351681102167368721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/home.html"
+        },
+        {
+            "content-length": 58,
+            "content-type": "text/html",
+            "redirect": "http://image.baidu.com/",
+            "status": 301,
+            "url": "https://3g.baidu.com/img"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=90026956433249135781668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/imprint.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=92447722321758940511628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/index1.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8567244280049937074498721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/INSTALL.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=86099801373785495761668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/Install.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=86081484368316644491668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/install.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=92762334345699997391648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/install.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8349587496448272604508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/installation.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=86601645152780502711628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/installation.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=85082860320450860081668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/jasperserver/login.html"
+        },
+        {
+            "content-length": 0,
+            "content-type": "application/octet-stream",
+            "redirect": "",
+            "status": 200,
+            "url": "https://3g.baidu.com/link"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=95095728831671066791628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/linktous.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=92082190668318593921648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/log.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=6897530585842573158848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/log.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=77780023907035242821648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/login.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=83547114531670176011668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/login.html"
+        },
+        {
+            "content-length": 569,
+            "content-type": "image/gif",
+            "redirect": "",
+            "status": 200,
+            "url": "https://3g.baidu.com/logo.gif"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=9109433625034529985368721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/logon.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8511981065444106390498721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/logon/logon.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8523330190158382263508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/logon/LogonPoint/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8704236806867883489498721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/logon.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=89080194544824923771668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/logs.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=91616359375730302461628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/logs.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "http://m.baidu.com/error.jsp?traceid=7213890906159735556368721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/m"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=95856980431450748421648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/mail.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=83458224594440316531668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/maintenance.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=90643087186817493201648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/manual/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=91116429168639955961648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/mapix/mapix/doc/en/changes.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=89980756329342081271668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/mapix/doc/en/changes.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=86913794055826835571668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/member/login.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=7709506570081869310508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/members.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=9021260171389349602368721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/members.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=62455020219258758351628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/members/login.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=59548572686000036941668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/mics/mics.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=7551636538747782890508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/mifs/c/d/android.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=93268103681550766231648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/mifs/user/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "http://m.baidu.com/error.jsp?traceid=8947907188562559279498721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/mobile"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8688809502530146753848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/modelsearch/admin.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=9174933572788424517368721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/modelsearch/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8906511796230115467368721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/modelsearch/login.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=95492331860888353291668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/moderator/admin.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8979867720228082422508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/moderator/login.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8378322782534404760848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/moderator.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8991968253079664156848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/netadmin.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=90495966002433736441668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/netadmin.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=9476625974352047558508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/nucleus/documentation/history.html"
+        },
+        {
+            "content-length": 0,
+            "content-type": "application/octet-stream",
+            "redirect": "",
+            "status": 200,
+            "url": "https://3g.baidu.com/null"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "http://m.baidu.com/error.jsp?traceid=9268554844291471001848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/p"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "http://m.baidu.com/error.jsp?traceid=94691245082142975221658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/page"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=90991783597438319681628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/pages/admin/admin-login.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=97090534252470113751658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/panel-administracion/admin.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=87169018750793904351628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/panel-administracion/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8116868877504834309848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/panel-administracion/login.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=92708307780651035421648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/password.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=90738660339436730341648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/passwords.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=83244456561498513721628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/phpmyadmin/docs/html/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8781978360503531953848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/phpmyadmin/doc/html/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=67219747896134213951658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/popup.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=70336210999162968731648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/popup.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "http://m.baidu.com/error.jsp?traceid=8094531065459001653498721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/portal"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=85809903535936254661648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/Privacy.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8746154369022917105498721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/post.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=7991755251715070267508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/prod-api/druid/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "http://m.baidu.com/error.jsp?traceid=8292504615822028044508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/product"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "http://m.baidu.com/error.jsp?traceid=9629926675820448546498721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/proxy"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8110118270537045701368721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/PRTG/index.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8915274633371147856368721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/prtg/index.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=9070015763381295065508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/queryhit.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "http://m.baidu.com/error.jsp?traceid=69356794772664629561648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/r"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=83133641588860623101648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/README.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=9275102522442517333368721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/README.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8445807996697386490368721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/ReadMe.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=86044872298823921231628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/Readme.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=9261834595349790918508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/readme.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=92526393194855754121628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/recherche.html"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956120818159913068394526401436118075",
+            "status": 302,
+            "url": "https://3g.baidu.com/recommend.LICENSE"
+        },
+        {
+            "content-length": 0,
+            "content-type": "application/octet-stream",
+            "redirect": "",
+            "status": 200,
+            "url": "https://3g.baidu.com/redirect"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=81939023322055558851648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/relogin.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=87626283939621456371668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/relogin.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=88073831558715535951628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/reset.html"
+        },
+        {
+            "content-length": 477,
+            "content-type": "text/html",
+            "redirect": "https://wappass.baidu.com/static/captcha/tuxing_v2.html?&logid=8865876522234583982&ak=248b24c134a6b4f52ee85f8b9577d4a8&backurl=https%3A%2F%2F3g.baidu.com%2Fs&ext=km0tNAyk4MXhwv4GKFSjZsxim%2BEyGttfPzxNmijdMOptFeZGkdyWDoKAHsYozKy%2F6X9uZjaFY0Z9O%2FmexNtbDcr4sKrrOjBgKc1iXg9d8xJndgmCMa91dcCCGVk%2B21MkyAfgnb%2B4siLvXhn6xYG8NVxmiKVZxbOrCJdaDJrEIPXz4iHj3aij7juhgL%2BSP3Vi&signature=f4572e999f85ed0eb0e2d198fd77b800&timestamp=1779561209",
+            "status": 302,
+            "url": "https://3g.baidu.com/s"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=85894707400138877831648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/sap/hana/xs/formLogin/login.html"
+        },
+        {
+            "content-length": 252,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://3g.baidu.com/robots.txt"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956120906750750828622292721903311654",
+            "status": 302,
+            "url": "https://3g.baidu.com/search"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=92010926295376900871648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/searchresults.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=87118193739324625391668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/settings.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8760685969453514458498721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/signin.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=81564188734525954221648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/signin.html"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121103059763308491706771114813752",
+            "status": 302,
+            "url": "https://3g.baidu.com/soft-admin"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121124535255148870595059310461352",
+            "status": 302,
+            "url": "https://3g.baidu.com/soft_admin"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121118495457389138924360934847527",
+            "status": 302,
+            "url": "https://3g.baidu.com/software"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=81576959777357365621628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/source/inspector.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8920164445090979022508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/start.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "http://m.baidu.com/error.jsp?traceid=8810837444078282585498721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/static"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8673227486488596032508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/subscribe.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=90287911681518122961628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/stssys.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=81664152466425622841628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/swagger-ui.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=86206042199347337061658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/swagger/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=87102045005904104971648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/swagger/swagger-ui.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8481117267239663017508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/swagger/swagger-ui.html"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "http://m.baidu.com/error.jsp?traceid=8302394053006084735",
+            "status": 302,
+            "url": "https://3g.baidu.com/tconn.conf"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "http://m.baidu.com/error.jsp?traceid=86079906698321454981648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/t"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=87096507032591069211668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/templates/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8503205562397003562498721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/stzx_admin/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8173797857317567619368721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/test.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8916873602420428105848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/test.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=79873220080230849181658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/test2.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8582129001052304962508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/postinfo.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=81072602404812585861628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/tiny_mce/plugins/imagemanager/pages/im/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8712762020497131936848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/tiny_mce/plugins/filemanager/examples.html"
+        },
+        {
+            "content-length": 0,
+            "content-type": "application/octet-stream",
+            "redirect": "",
+            "status": 200,
+            "url": "https://3g.baidu.com/upload"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=88446978323470285111628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/upload.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=84153751863130425501648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/upload.html"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121628225587309366903045342473815",
+            "status": 302,
+            "url": "https://3g.baidu.com/user"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121626380093549044760092920571075",
+            "status": 302,
+            "url": "https://3g.baidu.com/user-data.txt"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121618327685228165070346252797466",
+            "status": 302,
+            "url": "https://3g.baidu.com/user.html"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121625876777068055584118006420799",
+            "status": 302,
+            "url": "https://3g.baidu.com/user.LICENSE"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121626212321388887963519961137925",
+            "status": 302,
+            "url": "https://3g.baidu.com/user.asp"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121604737484908859493899457724840",
+            "status": 302,
+            "url": "https://3g.baidu.com/user.php"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121616145991788262145987440451244",
+            "status": 302,
+            "url": "https://3g.baidu.com/user.txt"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121623864166508078578428009733352",
+            "status": 302,
+            "url": "https://3g.baidu.com/user/0"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121624535255148990248659771559918",
+            "status": 302,
+            "url": "https://3g.baidu.com/user/1"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121623695738989125217581885392358",
+            "status": 302,
+            "url": "https://3g.baidu.com/user/2"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121626212321389032169950113455930",
+            "status": 302,
+            "url": "https://3g.baidu.com/user/3"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121624534599788424876066255001363",
+            "status": 302,
+            "url": "https://3g.baidu.com/user/admin"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121602053785708331691708507907318",
+            "status": 302,
+            "url": "https://3g.baidu.com/user/login.LICENSE"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121618159913069068524662129147137",
+            "status": 302,
+            "url": "https://3g.baidu.com/user/admin.php"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121602892646508845736127826923233",
+            "status": 302,
+            "url": "https://3g.baidu.com/user/signup"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121616145991788984164281066342761",
+            "status": 302,
+            "url": "https://3g.baidu.com/user_admin"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121623695738988567361026489883636",
+            "status": 302,
+            "url": "https://3g.baidu.com/user_guide"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121626883410029043448684554288959",
+            "status": 302,
+            "url": "https://3g.baidu.com/user_uploads"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121604905257069416253967637163580",
+            "status": 302,
+            "url": "https://3g.baidu.com/usercp.LICENSE"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121613629409389093667895299442527",
+            "status": 302,
+            "url": "https://3g.baidu.com/useradmin"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121607086295148106079807964919661",
+            "status": 302,
+            "url": "https://3g.baidu.com/usercp"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121613797181548962115697071997921",
+            "status": 302,
+            "url": "https://3g.baidu.com/userdb"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121623696394348186474629338259347",
+            "status": 302,
+            "url": "https://3g.baidu.com/userfiles"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121613797181548551027605250314858",
+            "status": 302,
+            "url": "https://3g.baidu.com/userinfo.LICENSE"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121602053785709041732300368288677",
+            "status": 302,
+            "url": "https://3g.baidu.com/user-data.txt.i"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121615978219628635435248342088633",
+            "status": 302,
+            "url": "https://3g.baidu.com/userlogin"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121618159913068858786256535504987",
+            "status": 302,
+            "url": "https://3g.baidu.com/userlogin.php"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121617488824429211695426324781992",
+            "status": 302,
+            "url": "https://3g.baidu.com/users"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121617656596588788633021458162424",
+            "status": 302,
+            "url": "https://3g.baidu.com/usernote.LICENSE"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121616145991788599425349739662687",
+            "status": 302,
+            "url": "https://3g.baidu.com/userportal/webpages/myaccount/login.jsp"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121623360850028069030311966390207",
+            "status": 302,
+            "url": "https://3g.baidu.com/users.LICENSE"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121604401940589419920350025578624",
+            "status": 302,
+            "url": "https://3g.baidu.com/users.csv"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121615139358828744027312254758015",
+            "status": 302,
+            "url": "https://3g.baidu.com/users.db"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121607254067308861393607249975468",
+            "status": 302,
+            "url": "https://3g.baidu.com/users.json"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121602891991148422003643751598841",
+            "status": 302,
+            "url": "https://3g.baidu.com/users.php"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121605576345709155770317892375127",
+            "status": 302,
+            "url": "https://3g.baidu.com/users.ini"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121617488169069318557897795294881",
+            "status": 302,
+            "url": "https://3g.baidu.com/users.pwd"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121612622776429473967303635634312",
+            "status": 302,
+            "url": "https://3g.baidu.com/users.mdb"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121628225587309412743730288947597",
+            "status": 302,
+            "url": "https://3g.baidu.com/users.sql"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121617824368748684959284097969642",
+            "status": 302,
+            "url": "https://3g.baidu.com/users.log"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121623528622189260662284024725367",
+            "status": 302,
+            "url": "https://3g.baidu.com/users.sqlite"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121617655941229177916688975414498",
+            "status": 302,
+            "url": "https://3g.baidu.com/users/admin"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121603059763309296472694877137515",
+            "status": 302,
+            "url": "https://3g.baidu.com/users.xls"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121612958320748640478450960440032",
+            "status": 302,
+            "url": "https://3g.baidu.com/users/login"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121626380093548565883373153459786",
+            "status": 302,
+            "url": "https://3g.baidu.com/users/admin.php"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121624031283308926690398717736815",
+            "status": 302,
+            "url": "https://3g.baidu.com/users.txt"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121612622776428917749007025443011",
+            "status": 302,
+            "url": "https://3g.baidu.com/users.sql.gz"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121617823713388573930389468750552",
+            "status": 302,
+            "url": "https://3g.baidu.com/users/login.LICENSE"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8914634945289497189848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/v1/test/js/console.html"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=177956121624199710829038940863728323895",
+            "status": 302,
+            "url": "https://3g.baidu.com/usernames.txt"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "http://m.baidu.com/error.jsp?traceid=84795098927856061471648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/video"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=90095917201249640621658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/vpn/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=91117059248047423961668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/vti_inf.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=90046770576996482501628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/VERSIONS.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=85310540231832835391658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/webadmin.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=86911655848540394831668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/webadmin/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8447325018518754322368721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/webadmin/login.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=9444901975705200033848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/webdav/index.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=90414303426452796981658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/webadmin/admin.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=82498712027181500521628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/WebSphereSamples/SingleSamples/AccountAndTransfer/create.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=88325328012960469361668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/WebSphereSamples/SingleSamples/Increment/increment.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=87951753046482622211658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/WebSphereSamples/YourCo/main.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8607968688358140230848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/webstats.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=87765788823345279011648621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/wps/myproxy/http/www.redbooks.ibm.com/Redbooks.nsf/RedbookAbstracts/sg247798.html?Logout&RedirectTo=http://example.com"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=86164410824640394831658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/wps/proxy/http/www.redbooks.ibm.com/Redbooks.nsf/RedbookAbstracts/sg247798.html?Logout&RedirectTo=http://example.com"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=8222897210434927297508721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/wps/cmis_proxy/http/www.redbooks.ibm.com/Redbooks.nsf/RedbookAbstracts/sg247798.html?Logout&RedirectTo=http://example.com"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=9229347299501229129848721210",
+            "status": 302,
+            "url": "https://3g.baidu.com/wps/common_proxy/http/www.redbooks.ibm.com/Redbooks.nsf/RedbookAbstracts/sg247798.html?Logout&RedirectTo=http://example.com"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=90112987375946308871628621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/wwwstats.htm"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=86808193995796329641668621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/yonetici.html"
+        },
+        {
+            "content-length": 154,
+            "content-type": "text/html",
+            "redirect": "https://m.baidu.com/error.jsp?traceid=88897434881278143771658621210",
+            "status": 302,
+            "url": "https://3g.baidu.com/yonetim.html"
+        }
+    ]
+}

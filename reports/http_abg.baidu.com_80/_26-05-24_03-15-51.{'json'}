@@ -1,0 +1,29 @@
+{
+    "info": {
+        "args": "/usr/lib/python3/dist-packages/dirsearch/dirsearch.py -u http://abg.baidu.com:80 -e LICENSE PARSER_GUIDE.md README.md __pycache__ batch_main.py bin domain.txt finish_domain.txt loader.py modules myenv outputs reports resume.cfg runner.py test.baidu wordlists --format=json --quiet",
+        "time": "Sun May 24 03:16:11 2026"
+    },
+    "results": [
+        {
+            "content-length": 98,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://abg.baidu.com/BingSiteAuth.xml"
+        },
+        {
+            "content-length": 1602,
+            "content-type": "image/png",
+            "redirect": "",
+            "status": 200,
+            "url": "http://abg.baidu.com/favicon.ico"
+        },
+        {
+            "content-length": 276,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "http://abg.baidu.com/robots.txt"
+        }
+    ]
+}

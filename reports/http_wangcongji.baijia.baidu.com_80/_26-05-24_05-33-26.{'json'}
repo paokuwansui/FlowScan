@@ -1,0 +1,36 @@
+{
+    "info": {
+        "args": "/usr/lib/python3/dist-packages/dirsearch/dirsearch.py -u http://wangcongji.baijia.baidu.com:80 -e LICENSE PARSER_GUIDE.md README.md __pycache__ batch_main.py bin domain.txt finish_domain.txt loader.py modules myenv outputs reports resume.cfg runner.py test.baidu wordlists --format=json --quiet",
+        "time": "Sun May 24 05:33:39 2026"
+    },
+    "results": [
+        {
+            "content-length": 178,
+            "content-type": "text/html",
+            "redirect": "https://baijia.baidu.com/s?old_id=admin/admin.asp",
+            "status": 301,
+            "url": "http://wangcongji.baijia.baidu.com/article/admin/admin.asp"
+        },
+        {
+            "content-length": 178,
+            "content-type": "text/html",
+            "redirect": "https://baijia.baidu.com/s?old_id=",
+            "status": 301,
+            "url": "http://wangcongji.baijia.baidu.com/article/"
+        },
+        {
+            "content-length": 178,
+            "content-type": "text/html",
+            "redirect": "https://baijia.baidu.com/s?old_id=admin",
+            "status": 301,
+            "url": "http://wangcongji.baijia.baidu.com/article/admin"
+        },
+        {
+            "content-length": 612,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://wangcongji.baijia.baidu.com/index.html"
+        }
+    ]
+}

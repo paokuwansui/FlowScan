@@ -1,0 +1,29 @@
+{
+    "info": {
+        "args": "/usr/lib/python3/dist-packages/dirsearch/dirsearch.py -u http://ada.baidu.com:80 -e LICENSE PARSER_GUIDE.md README.md __pycache__ batch_main.py bin domain.txt finish_domain.txt loader.py modules myenv outputs reports resume.cfg runner.py test.baidu wordlists --format=json --quiet",
+        "time": "Sun May 24 03:19:21 2026"
+    },
+    "results": [
+        {
+            "content-length": 98,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://ada.baidu.com/BingSiteAuth.xml"
+        },
+        {
+            "content-length": 47,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://ada.baidu.com/site/common.xml"
+        },
+        {
+            "content-length": 47,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "http://ada.baidu.com/site/"
+        }
+    ]
+}

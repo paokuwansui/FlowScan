@@ -1,0 +1,99 @@
+{
+    "info": {
+        "args": "/usr/lib/python3/dist-packages/dirsearch/dirsearch.py -u https://fanyi-app.baidu.com:443 -e LICENSE PARSER_GUIDE.md README.md __pycache__ batch_main.py bin domain.txt finish_domain.txt loader.py modules myenv outputs reports resume.cfg runner.py test.baidu wordlists --format=json --quiet",
+        "time": "Sun May 24 03:37:42 2026"
+    },
+    "results": [
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://fanyi-app.baidu.com/analytics/saw.dll?getPreviewImage&previewFilePath=/etc/passwd"
+        },
+        {
+            "content-length": 184,
+            "content-type": "text/html",
+            "redirect": "http://fanyi-app.baidu.com:8034/static/",
+            "status": 301,
+            "url": "https://fanyi-app.baidu.com/static"
+        },
+        {
+            "content-length": 34,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://fanyi-app.baidu.com/upload/"
+        },
+        {
+            "content-length": 34,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://fanyi-app.baidu.com/upload"
+        },
+        {
+            "content-length": 34,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://fanyi-app.baidu.com/upload/1.php"
+        },
+        {
+            "content-length": 34,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://fanyi-app.baidu.com/upload/2.php"
+        },
+        {
+            "content-length": 34,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://fanyi-app.baidu.com/upload/b_user.csv"
+        },
+        {
+            "content-length": 34,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://fanyi-app.baidu.com/upload/test.txt"
+        },
+        {
+            "content-length": 34,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://fanyi-app.baidu.com/upload/b_user.xls"
+        },
+        {
+            "content-length": 34,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://fanyi-app.baidu.com/upload/loginIxje.php"
+        },
+        {
+            "content-length": 34,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://fanyi-app.baidu.com/upload/upload.php"
+        },
+        {
+            "content-length": 34,
+            "content-type": "text/html",
+            "redirect": "",
+            "status": 200,
+            "url": "https://fanyi-app.baidu.com/upload/test.php"
+        },
+        {
+            "content-length": 0,
+            "content-type": "text/plain",
+            "redirect": "",
+            "status": 200,
+            "url": "https://fanyi-app.baidu.com/wavemaker/studioService.download?method=getContent&inUrl=file///etc/passwd"
+        }
+    ]
+}
