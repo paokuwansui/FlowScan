@@ -26,7 +26,7 @@ pip install pyyaml
 
 ### 2. 准备扫描工具
 
-模块 YAML 已内置自动安装步骤：优先通过 `go install`、`pip install`、`apt install` 或 GitHub Release 在线安装工具，并把工具放到 `~/.local/bin` 或 `/usr/local/bin`。项目内 Python 适配器会安装成命令（例如 `fofa-flowscan`、`nmap-service-flowscan`、`secretfinder-flowscan`），运行时不再直接调用 `./bin` 下的二进制。
+模块 YAML 已内置自动安装步骤：优先通过 `go install`、`pip install`、`apt install` 或 GitHub Release 在线安装工具。当前项目约定优先把第三方工具安装到 `$HOME/.local/bin`，项目内 Python 适配器保留在 `./bin/` 下并由模块显式调用，避免依赖系统级写入权限。
 
 建议确保 PATH 包含用户本地 bin：
 
@@ -34,7 +34,7 @@ pip install pyyaml
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-FOFA 模块需要设置环境变量：
+FOFA/FoFaX 模块如需使用 API Key，可设置环境变量：
 
 ```bash
 export FOFA_KEY='你的 FOFA API Key'
@@ -94,10 +94,11 @@ skcn/
 ├── runner.py              # 核心编排引擎
 ├── loader.py              # 工具加载器
 ├── target.txt             # 目标文件（用户创建）
+├── stop_event.txt         # 实时终止事件树（用户可编辑）
 ├── finish_target.txt      # 已完成目标记录（自动生成）
-├── modules/               # 扫描模块配置（17 个 YAML 模块）
+├── modules/               # 扫描模块配置（18 个 YAML 模块）
 │   ├── dnsx.yaml / dnsx_resolve.yaml / subfinder.yaml
-│   ├── fofa.yaml / httpx.yaml / naabu.yaml / nmap_service.yaml
+│   ├── afrog.yaml / fofa.yaml / httpx.yaml / naabu.yaml / nmap_service.yaml
 │   ├── fscan.yaml / nuclei.yaml / xray.yaml
 │   ├── rad.yaml / katana.yaml / dirsearch.yaml
 │   ├── observer_ward.yaml / wafw00f.yaml / tlsx.yaml
@@ -140,10 +141,13 @@ test.org
 |------|------|------|
 | `DOMAIN` | 域名（默认） | `example.com` |
 | `IP` | IP 地址 | `[IP]192.168.1.1` |
-| `URL` | URL 地址 | `[URL]http://target.com` |
-| `LIVE_URL` | 存活的 URL | `[LIVE_URL]https://admin.example.com` |
+| `URL` | 未验证 URL/页面链接 | `[URL]http://target.com/a.js` |
+| `LIVE_URL` | 已确认存活的 Web URL | `[LIVE_URL]https://admin.example.com` |
 | `SUBDOMAIN` | 子域名 | `[SUBDOMAIN]api.example.com` |
 | `PORT_OPEN` | 开放端口 | `[PORT_OPEN]192.168.1.1:443` |
+| `ICON_PATH` | favicon/icon 完整 URL 或路径 | `[ICON_PATH]https://example.com/favicon.ico` |
+| `ICON_HASH` | favicon hash | 通常由 httpx 产出 |
+| `VULNERABILITY` | 漏洞结果 | 通常由 nuclei/afrog/fscan/xray 产出 |
 
 ---
 
@@ -206,10 +210,10 @@ Worker 池 (10个并发 Worker)
 
 📈 统计信息:
 --------------------------------------------------------------------------------
-   总模块数: 17
+   总模块数: 18
    ├─ 背景服务: 1
-   └─ 扫描任务: 16
-   事件类型总数: 12
+   └─ 扫描任务: 17
+   事件类型总数: 17+
 ```
 
 ---
@@ -218,16 +222,17 @@ Worker 池 (10个并发 Worker)
 
 | 模块文件 | 模块名 | 输入 | 输出 | 功能 |
 |---|---|---|---|---|
+| `afrog.yaml` | `afrog_module` | `LIVE_URL` | `VULNERABILITY` | Afrog 高危/严重漏洞扫描（`-S high,critical`） |
 | `dirsearch.yaml` | `dirsearch_module` | `LIVE_URL` | `URI` | Web 敏感目录与隐藏文件爆破 |
 | `dnsx.yaml` | `dnsx_brute_module` | `DOMAIN` | `SUBDOMAIN` | 本地字典子域名爆破 |
 | `dnsx_resolve.yaml` | `dnsx_resolve_module` | `SUBDOMAIN` | `IP` | 子域名 A 记录解析 |
-| `fofa.yaml` | `fofa_module` | `DOMAIN` | `DOMAIN, SUBDOMAIN, IP, URL` | FOFA 网络空间测绘查询 |
+| `fofa.yaml` | `fofa_module` | `DOMAIN, LIVE_URL, ICON_PATH` | `DOMAIN, SUBDOMAIN, IP, URL` | 基于 FoFaX 的网络空间测绘、证书和 icon 反查 |
 | `fscan.yaml` | `fscan_module` | `IP, SUBDOMAIN` | `LIVE_URL, PORT_OPEN, VULNERABILITY` | 综合漏洞和弱口令扫描 |
-| `httpx.yaml` | `httpx_module` | `URL, PORT_OPEN` | `LIVE_URL` | HTTP 存活探测与基础指纹 |
+| `httpx.yaml` | `httpx_module` | `URL, PORT_OPEN` | `LIVE_URL, DOMAIN, SUBDOMAIN, IP, ICON_PATH, ICON_HASH, CERT_ORG, CERT_FINGERPRINT` | HTTP 存活探测、favicon 和证书基础信息归一化 |
 | `katana.yaml` | `katana_module` | `LIVE_URL` | `URL` | Web 爬虫，发现页面/接口/JS 链接 |
 | `naabu.yaml` | `naabu_module` | `IP, SUBDOMAIN` | `PORT_OPEN` | 高速端口发现 |
 | `nmap_service.yaml` | `nmap_service_module` | `PORT_OPEN` | `SERVICE, LIVE_URL` | 服务版本识别并补充 HTTP 类 LIVE_URL |
-| `nuclei.yaml` | `nuclei_module` | `LIVE_URL` | `VULNERABILITY` | 模板化漏洞扫描 |
+| `nuclei.yaml` | `nuclei_module` | `LIVE_URL` | `VULNERABILITY` | 模板化高危/严重漏洞扫描 |
 | `observer_ward.yaml` | `observer_ward_module` | `LIVE_URL` | `FINGERPRINT` | Web 指纹识别 |
 | `rad.yaml` | `rad_module` | `LIVE_URL` | `URL` | 动态爬虫和页面交互 URL 发现 |
 | `secretfinder.yaml` | `secretfinder_module` | `URL, URI, LIVE_URL` | `SECRET, VULNERABILITY` | 前端敏感信息发现 |
@@ -257,8 +262,8 @@ check:
 # 2. 自动安装步骤
 install:
   steps:
-    - "cp ./bin/tool /usr/bin/tool"
-    - "chmod +x /usr/bin/tool"
+    - "mkdir -p $HOME/.local/bin"
+    - "GOBIN=$HOME/.local/bin go install example.com/tool@latest"
 
 # 3. 执行配置
 execute:
@@ -276,7 +281,9 @@ parser:
         type: prefix | json_field | regex | multi_match
         # ... 匹配配置
       extract:
-        EVENT_TYPE: "{{variable}}"
+        FIELD_NAME: "{{variable}}"
+      events:
+        EVENT_TYPE: "{{FIELD_NAME}}"
       filters:
         EVENT_TYPE:
           if_not_empty: true
@@ -305,12 +312,22 @@ save:
 
 **2. json_field - JSON 字段匹配**
 ```yaml
+# 顶层字段 equals
 - match:
     type: json_field
     field: type
     equals: PORT
   extract:
     PORT_OPEN: "{{host}}:{{port}}"
+
+# 嵌套字段 regex（Afrog 示例：只接收 high/critical）
+- match:
+    type: json_field
+    field: info.severity
+    regex: (?i)^(high|critical)$
+  extract:
+    SEVERITY: $.info.severity
+    VULNERABILITY: "[afrog] [{{id}}] [{{SEVERITY}}] {{fulltarget}}"
 ```
 
 **3. regex - 正则表达式**
@@ -384,6 +401,7 @@ extract:
 
 - `web_alive_example.com_results.json` - HTTPX 存活检测结果
 - `nuclei_example.com_vulns.json` - Nuclei 漏洞扫描结果
+- `afrog_example.com_vulns.json` - Afrog 高危/严重漏洞扫描结果
 - `fingerprints_example.com_results.json` - Observer Ward 指纹识别结果
 - `rad_example.com_urls.txt` - Rad 爬虫发现的 URL
 - `dirsearch_example.com_results.json` - Dirsearch 目录爆破结果
@@ -496,11 +514,25 @@ if len(self.seen_events) > 10000:  # 调整阈值
 
 ## 🐛 故障排查
 
+### 实时终止无关事件树
+
+运行中可以编辑项目根目录的 `stop_event.txt`，每行格式和 `target.txt` 相同：
+
+```text
+[URL]http://www.baidu.com
+[LIVE_URL]https://test.example.com
+[DOMAIN]noise.example
+```
+
+程序会约每秒读取一次该文件。命中的事件及其所有子事件会被取消：已排队事件会被丢弃，运行中的模块任务会收到 cancel 并终止底层子进程，后续派生事件也不会再入队。适合临时停止无关紧要、占用进度的扫描分支。
+
+---
+
 ### 问题1：模块不执行
 
 **检查：**
 1. 查看启动日志中的模块环境检查/自动安装信息
-2. 确认 `PATH` 包含 `$HOME/.local/bin` 和 `/usr/local/bin`
+2. 确认模块 YAML 中显式调用的 `$HOME/.local/bin/<tool>` 文件存在且可执行
 3. 单独运行 YAML 的 `check.command`，确认命中的是预期工具
 4. 查看 `outputs/logs/` 中对应模块 debug 输出
 

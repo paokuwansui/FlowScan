@@ -1,20 +1,15 @@
 name: observer_ward_module
 description: 跨平台社区化高精度Web指纹及服务识别组件
 check:
-  command: observer_ward --help
+  command: '"$HOME/.local/bin/observer_ward" --help'
   expect_keyword: observer_ward
   exclude_keyword: not found
 install:
   steps:
-  - tmpdir=$(mktemp -d) && cd "$tmpdir" && curl -fsSL https://api.github.com/repos/0x727/ObserverWard/releases/latest
-    | python3 -c "import json,sys; data=json.load(sys.stdin); assets=data.get('assets',[]);
-    matches=[a['browser_download_url'] for a in assets if 'linux' in a['name'].lower()
-    and ('amd64' in a['name'].lower() or 'x64' in a['name'].lower())]; print(matches[0]
-    if matches else assets[0]['browser_download_url'])" | xargs -I{} sh -c 'curl -fL
-    "{}" -o observer_ward_pkg && (tar -xzf observer_ward_pkg || unzip -o observer_ward_pkg
-    || mv observer_ward_pkg observer_ward) && find . -type f -name "observer_ward*"
-    -perm /111 -print -quit | xargs -I%% install -m 0755 %% /usr/local/bin/observer_ward'
-  - observer_ward -u
+  - mkdir -p "$HOME/.local/bin" && command -v observer_ward >/dev/null 2>&1 && ln
+    -sf "$(command -v observer_ward)" "$HOME/.local/bin/observer_ward"
+  - '"$HOME/.local/bin/observer_ward" -u || "$HOME/.local/bin/observer_ward" --update-plugin
+    || true'
 execute:
   inputs:
   - LIVE_URL
@@ -22,7 +17,7 @@ execute:
   - FINGERPRINT
   timeout: 900
   max_parallel_num: 10
-  command: observer_ward -t {{data}} --format json --silent
+  command: '"$HOME/.local/bin/observer_ward" -t {{data}} --format json --silent'
 parser:
   type: rules
   rules:
@@ -42,3 +37,5 @@ save:
   format: json
   output_path: ./outputs/fingerprints_{{DOMAIN}}_results.json
   mode: append
+event_extractors:
+  FINGERPRINT: ''

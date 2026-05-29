@@ -2,14 +2,14 @@ name: nmap_service_module
 description: 基于 nmap -sV 的服务版本识别模块，将 PORT_OPEN(host:port) 转换为 SERVICE，并为 HTTP 类服务补充
   LIVE_URL
 check:
-  command: nmap --version
+  command: nmap --version && test -x "$HOME/.local/bin/nmap-service-flowscan"
   expect_keyword: Nmap
   exclude_keyword: not found
 install:
   steps:
-  - apt update
-  - apt install -y nmap
-  - install -m 0755 ./bin/nmap_service.py /usr/local/bin/nmap-service-flowscan
+  - command -v nmap >/dev/null 2>&1 || { echo "nmap is required; install it with your
+    package manager"; exit 1; }
+  - mkdir -p "$HOME/.local/bin" && install -m 0755 ./bin/nmap_service.py "$HOME/.local/bin/nmap-service-flowscan"
 execute:
   inputs:
   - PORT_OPEN
@@ -18,7 +18,7 @@ execute:
   - LIVE_URL
   timeout: 300
   max_parallel_num: 5
-  command: nmap-service-flowscan {{data}}
+  command: '"$HOME/.local/bin/nmap-service-flowscan" {{data}}'
 parser:
   type: rules
   rules:
@@ -47,3 +47,6 @@ save:
   format: json
   output_path: ./outputs/nmap_service_{{DOMAIN}}_results.json
   mode: append
+event_extractors:
+  SERVICE: ''
+  LIVE_URL: (?P<value>https?://\S+)

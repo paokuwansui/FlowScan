@@ -63,6 +63,10 @@ class ModuleEnvironmentManager:
             logging.debug(f"模块 [{self.name}] 环境检查命令执行引发异常: {e}")
             return False
 
+        if result.returncode != 0:
+            logging.debug(f"模块 [{self.name}] 环境检查命令退出码非零: {result.returncode}")
+            return False
+
         if exclude_keyword and exclude_keyword in output:
             logging.debug(f"模块 [{self.name}] 触发排除词 '{exclude_keyword}'，环境不可用。")
             return False

@@ -8,8 +8,9 @@
 
 1. **简洁直观**：纯YAML配置，无需编写Python代码
 2. **强大表达力**：支持一条输出产生多个不同类型的事件
-3. **多条件匹配**：支持前缀、JSON字段、正则、多条件AND等匹配方式
+3. **多条件匹配**：支持前缀、JSON字段、嵌套JSON字段、正则、多条件AND等匹配方式
 4. **条件过滤**：内置过滤器支持空值检测、内容检测、大小写转换
+5. **保存与派发分离**：`extract` 可保存富字段，`events` 精确控制继续流转的事件
 
 ---
 
@@ -77,8 +78,28 @@ parser:
 
 **特点：**
 - 自动解析JSON
-- 所有JSON字段都可在模板中使用
-- 只有指定字段等于期望值时才匹配
+- 所有顶层JSON字段都可在模板中使用
+- `field` 支持顶层字段和点路径字段，例如 `type`、`info.severity`
+- 不写 `equals`/`regex` 时，只检查字段存在且非空
+- `equals` 用于精确匹配，`regex` 用于正则匹配；二者同时存在时必须都满足
+
+嵌套字段 + 正则过滤示例：
+
+```yaml
+- match:
+    type: json_field
+    field: info.severity
+    regex: (?i)^(high|critical)$
+  extract:
+    AFROG_ID: '{{id}}'
+    SEVERITY: $.info.severity
+    MATCHED_AT: '{{fulltarget}}'
+    VULNERABILITY: '[afrog] [{{AFROG_ID}}] [{{SEVERITY}}] {{MATCHED_AT}}'
+  events:
+    VULNERABILITY: '{{VULNERABILITY}}'
+```
+
+这类规则适合 Nuclei 或未来 JSON 输出模块：保存完整字段，同时只把 high/critical 风险继续派发。当前 `afrog.yaml` 为了贴近实时控制台输出，使用 regex fallback 解析 stdout 中的 HIGH/CRITICAL 行。
 
 #### 3. regex - 正则表达式匹配
 
@@ -186,7 +207,7 @@ extract:
   SUBDOMAIN: $.cert.subject_an[*]
 ```
 
-支持对象链、数组下标和 `[*]` 通配。通配结果是列表，事件生成器会为列表中的每个元素生成一个事件。
+支持对象链、数组下标和 `[*]` 通配。通配结果是列表，事件生成器会为列表中的每个元素生成一个事件。`json_field.field` 的点路径匹配和这里的 JSON Path 使用同一套取值语义。
 
 ### 模板替换引擎
 
@@ -387,7 +408,7 @@ example.com                  # 默认 DOMAIN
 | `IP` | IP 地址 | naabu、fscan |
 | `PORT_OPEN` | `host:port` | nmap_service、httpx |
 | `URL` | 未验证 URL | httpx、secretfinder |
-| `LIVE_URL` | 存活 Web URL | nuclei、dirsearch、rad、katana、wafw00f、observer_ward、secretfinder、tlsx |
+| `LIVE_URL` | 存活 Web URL | nuclei、afrog、dirsearch、rad、katana、wafw00f、observer_ward、secretfinder、tlsx、fofa |
 | `URI` | 目录/文件路径 URL | secretfinder |
 | `SERVICE` | 服务识别结果 | 终端保存事件 |
 | `VULNERABILITY` | 漏洞或风险 | 终端保存事件 |
@@ -395,6 +416,10 @@ example.com                  # 默认 DOMAIN
 | `FINGERPRINT` | 指纹 | 终端保存事件 |
 | `WAF` | WAF/CDN 识别 | 终端保存事件 |
 | `CERT_INFO` | 证书信息 | 终端保存事件 |
+| `ICON_PATH` | favicon/icon URL 或路径 | fofa |
+| `ICON_HASH` | favicon hash | 终端保存事件 |
+| `CERT_ORG` | 证书组织 | 终端保存事件 |
+| `CERT_FINGERPRINT` | 证书指纹 | 终端保存事件 |
 
 没有消费者的事件会直接通过来源模块的 `save` 配置落盘，不会继续入队造成卡死。
 
@@ -406,10 +431,11 @@ example.com                  # 默认 DOMAIN
 2. **合理使用过滤器**：用`if_not_empty`避免生成空事件
 3. **明确outputs声明**：只在outputs中声明你真正需要的事件类型
 4. **调试技巧**：开启debug模式查看未匹配的模板替换警告
-5. **优先使用json_field**：对于JSON输出，比regex更简洁可靠
+5. **优先使用json_field**：对于JSON输出，比regex更简洁可靠；嵌套字段用 `field: info.severity`，复杂筛选用 `regex`
 6. **保存字段和事件分离**：需要保存辅助字段时用 `events` 只派发核心事件
-7. **为解析器写回归测试**：把真实 stdout 样例放进 `tests/test_parser_regressions.py`，同时断言 result 和 events
-8. **错误输出不应生成事件**：API/网络错误、usage、not found 等人类可读错误行应解析为空结果
+7. **为解析器写回归测试**：把真实 stdout/JSONL 样例放进 `tests/`，同时断言 result 和 events；外部 CLI 可用 fake executable 验证 execute_and_parse 链路
+8. **错误输出不应生成事件**：API/网络错误、usage、not found、进度条等人类可读错误行应解析为空结果
+9. **规则不会叠加执行**：同一行输出按 rules 顺序命中第一条后立即返回；不要依赖后一条规则补充前一条规则的字段
 
 ---
 
@@ -419,8 +445,13 @@ example.com                  # 默认 DOMAIN
 
 A: 检查以下几点：
 1. match_type是否正确（prefix/json_field/regex）
-2. 匹配条件是否过于严格
-3. 使用debug模式查看每行的解析过程
+2. JSON 字段路径是否正确；嵌套字段应写 `info.severity`，提取值可写 `$.info.severity`
+3. equals/regex 是否过于严格
+4. 使用debug模式查看每行的解析过程
+
+### Q: 多条规则会不会冲突？
+
+A: 一般不会。解析器对每一行输出从上到下尝试规则，第一条匹配成功后立即返回，不会继续执行后续规则。因此 JSON 规则和文本 regex fallback 可以共存：JSON 行命中 json_field，普通文本行命中 regex。需要注意的是，后一条规则不能补充前一条规则的字段。
 
 ### Q: 如何让一条输出产生多个事件？
 

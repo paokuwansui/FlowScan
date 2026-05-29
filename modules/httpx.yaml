@@ -1,36 +1,66 @@
 name: httpx_module
 description: 基于多用途的高速 HTTP 存活探测与基础指纹识别组件
 check:
-  command: ~/go/bin/httpx -version || /usr/local/bin/httpx -version
-  expect_keyword: Current Version
+  command: python3 ./bin/httpx_wrapper.py --help
+  expect_keyword: normalize
   exclude_keyword: not found
 install:
   steps:
-  - go install github.com/projectdiscovery/httpx/cmd/httpx@latest
+  - mkdir -p "$HOME/.local/bin" && GOBIN="$HOME/.local/bin" go install github.com/projectdiscovery/httpx/cmd/httpx@latest
 execute:
   inputs:
   - URL
   - PORT_OPEN
   outputs:
   - LIVE_URL
+  - DOMAIN
+  - SUBDOMAIN
+  - IP
+  - ICON_PATH
+  - ICON_HASH
+  - CERT_ORG
+  - CERT_FINGERPRINT
   timeout: 900
   max_parallel_num: 10
-  command: echo '{{data}}' | ~/go/bin/httpx -tls-probe -json -silent
+  command: echo '{{data}}' | python3 ./bin/httpx_wrapper.py --httpx-bin "$HOME/.local/bin/httpx"
 parser:
   type: rules
   rules:
   - match:
       type: json_field
-      field: url
+      field: LIVE_URL
       equals: null
     extract:
-      LIVE_URL: '{{url}}'
+      LIVE_URL: '{{LIVE_URL}}'
+      DOMAIN: $.DOMAIN[*]
+      SUBDOMAIN: $.SUBDOMAIN[*]
+      IP: $.IP[*]
+      ICON_PATH: '{{ICON_PATH}}'
+      ICON_HASH: '{{ICON_HASH}}'
+      CERT_ORG: $.CERT_ORG[*]
+      CERT_FINGERPRINT: '{{CERT_FINGERPRINT}}'
     events:
-      LIVE_URL: '{{url}}'
+      LIVE_URL: '{{LIVE_URL}}'
+      DOMAIN: $.DOMAIN[*]
+      SUBDOMAIN: $.SUBDOMAIN[*]
+      IP: $.IP[*]
+      ICON_PATH: '{{ICON_PATH}}'
+      ICON_HASH: '{{ICON_HASH}}'
+      CERT_ORG: $.CERT_ORG[*]
+      CERT_FINGERPRINT: '{{CERT_FINGERPRINT}}'
     filters:
       LIVE_URL:
         if_not_empty: true
 save:
   format: json
-  output_path: ./outputs/httpx_alive_{{DOMAIN}}_results.json
+  output_path: ./outputs/web_alive_{{DOMAIN}}_results.json
   mode: append
+event_extractors:
+  LIVE_URL: (?P<value>https?://\S+)
+  DOMAIN: ''
+  SUBDOMAIN: ''
+  IP: (?P<value>(?:\d{1,3}\.){3}\d{1,3})
+  ICON_PATH: ''
+  ICON_HASH: ''
+  CERT_ORG: ''
+  CERT_FINGERPRINT: (?P<value>[A-Fa-f0-9]{64})

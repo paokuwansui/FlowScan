@@ -1,135 +1,144 @@
 #!/usr/bin/env python3
+"""FlowScan FOFA wrapper implemented on top of FoFaX.
+
+The wrapper keeps the historical fofa-flowscan JSONL output contract:
+{"type": "URL|IP|SUBDOMAIN|DOMAIN", "value": "..."}
+
+Input semantics:
+- DOMAIN/SUBDOMAIN-like value -> fofax -q 'domain="value"' -ffi
+- LIVE_URL-like value          -> fofax -uc value -ffi
+- ICON_PATH-like favicon URL   -> fofax -iu value -ffi
+"""
+
 import argparse
-import base64
-import requests
-import re
 import json
 import os
-import time
-api_key = os.environ.get("FOFA_KEY", "")
+import re
+import subprocess
+import sys
+from urllib.parse import urlparse
 
-def sanitize_error_message(err):
+IP_RE = re.compile(r"^(?P<ip>(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d))(?:[:/].*)?$")
+DOMAIN_RE = re.compile(r"^(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}$")
+LOG_RE = re.compile(r"^\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2}\s+\[[A-Z]+\]")
+
+
+def sanitize_error_message(err) -> str:
     text = str(err)
-    return re.sub(r'key=[^&\s)]+', 'key=[REDACTED]', text)
-
-def parse_fofa_set(input_set):
-    result_list = []
-
-    # 正则表达式：用于匹配标准 IPv4 地址
-    ip_pattern = re.compile(
-        r"^(((25[0-5]|2[0-4]\d|((1\d{2})|([1-9]?\d)))\.){3}(25[0-5]|2[0-4]\d|((1\d{2})|([1-9]?\d))))$"
-    )
-
-    for item in input_set:
-        item = item.strip()
-        if not item:
-            continue  # 跳过空字符串
-
-        # 1. 判断是否为 URL（URL 保留端口）
-        if item.startswith("http://") or item.startswith("https://"):
-            item_dict = {"URL": item}
-
-        # 2. 判断是否为 IP 地址
-        elif ip_pattern.match(item.split(":")[0]):
-            item_dict = {"IP": item}
-
-        # 3. 处理域名部分（去掉端口号）
-        else:
-            domain_clean = item.split(":")[0]
-            domain_parts = domain_clean.split(".")
-
-            if len(domain_parts) > 2:
-                item_dict = {"SUBDOMAIN": domain_clean}
-            else:
-                item_dict = {"DOMAIN": domain_clean}
-
-        # 【去重逻辑】：如果这个字典不在结果列表中，才添加进去
-        if item_dict not in result_list:
-            result_list.append(item_dict)
-
-    return result_list
+    text = re.sub(r"(?i)(key|fofakey)=([^&\s)]+)", r"\1=[REDACTED]", text)
+    text = re.sub(r"(?i)(-key|-fofakey)\s+\S+", r"\1 [REDACTED]", text)
+    return text
 
 
-    # 1. 设置命令行参数解析
-parser = argparse.ArgumentParser(description="FOFA API 查询工具")
+def is_url(value: str) -> bool:
+    parsed = urlparse(value)
+    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 
-# 必填参数：查询目标（如 baidu.com）
-parser.add_argument("query", help="FOFA 查询语句或域名")
 
-# 可选参数：自定义返回字段
-default_fields = "host,title,ip,domain,port,protocol,server,link,certs.subject.org,certs.subject.cn,cert.sn"
-parser.add_argument(
-    "--type", default=default_fields, help="自定义返回的 fields 字段"
-)
+def looks_like_icon_url(value: str) -> bool:
+    if not is_url(value):
+        return False
+    parsed = urlparse(value)
+    path = parsed.path.lower()
+    return any(token in path for token in ("favicon", "icon")) or path.endswith((".ico", ".png", ".jpg", ".jpeg", ".svg", ".webp"))
 
-args = parser.parse_args()
 
-if api_key == "":
-    print("[-] 请设置环境变量 FOFA_KEY")
-    exit(2)
+def strip_port(host: str) -> str:
+    host = host.strip().strip("[]")
+    if ":" in host and host.count(":") == 1:
+        return host.rsplit(":", 1)[0]
+    return host
 
-# 2. 将查询语句进行 Base64 编码
-query_bytes = args.query.encode("utf-8")
-base64_bytes = base64.b64encode(query_bytes)
-qbase64_str = base64_bytes.decode("utf-8")
 
-# 3. 构造请求 URL
+def classify_fofax_value(value: str) -> dict[str, str] | None:
+    item = value.strip().strip("'").strip('"')
+    if not item or LOG_RE.match(item):
+        return None
+    if item.startswith(("[", "-", "Usage:", "Flags:", "CONFIGS:", "FILTERS:", "SINGLE ", "MULTIPLE ", "FX ", "OTHER ")):
+        return None
+    if item.startswith(("┌", "├", "└", "│")):
+        return None
+    if " " in item and not item.startswith(("http://", "https://")):
+        return None
 
-url = "https://fofa.info/api/v1/search/all"
+    if is_url(item):
+        return {"type": "URL", "value": item}
 
-params = {
-    "key": api_key,
-    "size": 1000,
-    "fields": args.type,
-    "qbase64": qbase64_str,
-}
+    host = strip_port(item)
+    ip_match = IP_RE.match(item)
+    if ip_match:
+        return {"type": "IP", "value": ip_match.group("ip")}
 
-# 4. 发送 GET 请求并按行打印结果
-try:
-    response = None
-    last_error = None
-    for attempt in range(1, 4):
-        try:
-            response = requests.get(url, params=params, timeout=15)
-            break
-        except requests.exceptions.RequestException as e:
-            last_error = e
-            if attempt < 3:
-                time.sleep(attempt * 2)
-    if response is None:
-        print(f"[-] 请求发生错误: {sanitize_error_message(last_error)}")
-        exit(2)
+    if DOMAIN_RE.match(host):
+        if len(host.split(".")) > 2:
+            return {"type": "SUBDOMAIN", "value": host}
+        return {"type": "DOMAIN", "value": host}
 
-    if response.status_code == 200:
-        # 解析成 JSON 字典
-        res_json = response.json()
+    return None
 
-        # 提取 results 并判断是否存在
-        results = res_json.get("results", [])
 
-        if results:
-            # 遍历列表，按行打印
-            data_set = set()
-            for item in results:
-                data_set.add(item[0])
-                data_set.add(item[2])
-                data_set.add(item[3])
-                data_set.add(item[7])
-                data_set.add(item[9])
-            for i in parse_fofa_set(data_set):
-                # i 的结构如：{'URL': 'https://teoem.vip'}
-                # 使用 next(iter(...)) 动态获取字典的第一个键和值
-                for key, value in i.items():
-                    output_dict = {
-                        "type": key,
-                        "value": value
-                    }
-                    print(json.dumps(output_dict))
-        else:
-            print("[-] 未查询到任何结果或请求报错。")
-            print(sanitize_error_message(response.text))
-    else:
-        print(sanitize_error_message(response.text))
+def parse_fofax_output_lines(lines):
+    seen = set()
+    for line in lines:
+        parsed = classify_fofax_value(line)
+        if not parsed:
+            continue
+        key = (parsed["type"], parsed["value"])
+        if key in seen:
+            continue
+        seen.add(key)
+        yield parsed
 
-except requests.exceptions.RequestException as e:
-    print(f"[-] 请求发生错误: {sanitize_error_message(e)}")
+
+def build_fofax_args(query: str, fetch_size: int = 1000) -> list[str]:
+    value = query.strip()
+    fetch = ["-fs", str(fetch_size), "-ffi"]
+    if looks_like_icon_url(value):
+        return ["-iu", value, *fetch]
+    if is_url(value):
+        return ["-uc", value, *fetch]
+    if value.startswith('fx=') or value.startswith('fx="') or value.startswith("fx='"):
+        return ["-q", value, "-fe", *fetch]
+    if any(op in value for op in ('="', "='", " && ", " || ", "title=", "body=", "host=", "ip=", "app=")):
+        return ["-q", value, *fetch]
+    return ["-q", f'domain="{value}"', *fetch]
+
+
+def run_fofax(fofax_bin: str, query: str, fetch_size: int) -> int:
+    cmd = [fofax_bin]
+    api_key = os.environ.get("FOFA_KEY", "")
+    if api_key:
+        cmd.extend(["-key", api_key])
+    cmd.extend(build_fofax_args(query, fetch_size=fetch_size))
+
+    try:
+        proc = subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=120, check=False)
+    except FileNotFoundError:
+        print(f"[-] 未找到 fofax 二进制: {fofax_bin}", file=sys.stderr)
+        return 127
+    except subprocess.TimeoutExpired as exc:
+        print(f"[-] fofax 执行超时: {sanitize_error_message(exc)}", file=sys.stderr)
+        return 124
+    except Exception as exc:
+        print(f"[-] fofax 执行失败: {sanitize_error_message(exc)}", file=sys.stderr)
+        return 2
+
+    for record in parse_fofax_output_lines(proc.stdout.splitlines()):
+        print(json.dumps(record, ensure_ascii=False))
+
+    if proc.returncode != 0:
+        print(sanitize_error_message(proc.stdout), file=sys.stderr)
+    return proc.returncode
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description="FlowScan FoFaX JSONL wrapper")
+    parser.add_argument("query", help="DOMAIN / LIVE_URL / ICON_PATH / FOFA 查询语句")
+    parser.add_argument("--fofax-bin", default=os.path.expandvars("$HOME/.local/bin/fofax"), help="fofax 二进制路径")
+    parser.add_argument("--fetch-size", "-fs", type=int, default=1000, help="FoFaX fetch size")
+    args = parser.parse_args(argv)
+    return run_fofax(args.fofax_bin, args.query, args.fetch_size)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

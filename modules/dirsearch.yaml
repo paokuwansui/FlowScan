@@ -1,13 +1,14 @@
 name: dirsearch_module
 description: 基于 Python 开发的高并发 Web 敏感目录与隐藏文件爆破组件
 check:
-  command: dirsearch --version
+  command: '"$HOME/.local/bin/dirsearch" --version'
   expect_keyword: dirsearch
   exclude_keyword: not found
 install:
   steps:
-  - python3 -m pip install --break-system-packages dirsearch || python3 -m pip install
-    dirsearch
+  - mkdir -p "$HOME/.local/bin" && (python3 -m pip install --user --break-system-packages
+    dirsearch || python3 -m pip install --user dirsearch || true) && command -v dirsearch
+    >/dev/null 2>&1 && ln -sf "$(command -v dirsearch)" "$HOME/.local/bin/dirsearch"
 execute:
   inputs:
   - LIVE_URL
@@ -15,7 +16,8 @@ execute:
   - URI
   timeout: 1800
   max_parallel_num: 2
-  command: dirsearch -u {{data}} -e * --quiet --no-color
+  command: cd ./outputs && "$HOME/.local/bin/dirsearch" -u {{data}} -e "*" --quiet
+    --no-color
 parser:
   type: rules
   rules:
@@ -35,3 +37,5 @@ save:
   format: json
   output_path: ./outputs/dirsearch_{{DOMAIN}}_results.json
   mode: append
+event_extractors:
+  URI: (?P<value>https?://\S+)

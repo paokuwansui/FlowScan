@@ -2,7 +2,7 @@ import asyncio
 import os
 import logging
 # 引入最新版本的 Orchestrator 主引擎类和 Event 模型
-from runner import Orchestrator
+from runner import Orchestrator, Event
 from loader import loader
 
 # 配置批量调度的日志输出格式
@@ -15,6 +15,7 @@ logging.basicConfig(
 # 统一配置存储路径
 TARGET_FILE = "./target.txt"
 FINISH_FILE = "./finish_target.txt"
+STOP_EVENT_FILE = "./stop_event.txt"
 # Backward-compatible alias for old imports; new code should use TARGET_FILE/FINISH_FILE.
 DOMAIN_FILE = TARGET_FILE
 MODULES_DIR = "./modules"
@@ -47,6 +48,56 @@ def parse_target_line(line: str) -> tuple[str, str]:
     # 默认返回 DOMAIN 类型（向后兼容）
     return "DOMAIN", line
 
+def parse_stop_event_lines(lines) -> set[tuple[str, str]]:
+    """解析 stop_event.txt 行，返回需要终止的事件集合。
+
+    格式和 target.txt 一致，推荐显式写 [TYPE]value，例如：
+    - [URL]http://www.baidu.com
+    - [LIVE_URL]https://www.baidu.com
+    - [DOMAIN]baidu.com
+    """
+    stop_events = set()
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line or line.startswith('#'):
+            continue
+        event_type, event_value = parse_target_line(line)
+        stop_events.add((event_type, event_value))
+    return stop_events
+
+
+def get_stop_events() -> set[tuple[str, str]]:
+    """读取 stop_event.txt 中当前要求终止的事件。"""
+    if not os.path.exists(STOP_EVENT_FILE):
+        return set()
+    with open(STOP_EVENT_FILE, 'r', encoding='utf-8') as f:
+        return parse_stop_event_lines(f)
+
+
+async def stop_event_watcher(engine: Orchestrator, poll_interval: float = 1.0):
+    """实时监听 stop_event.txt，有事件时终止该事件及其 root_target 子事件。
+
+    采用追加/保留均可的语义：文件中存在的 stop 事件会被持续视为取消规则。
+    """
+    applied = set()
+    while True:
+        try:
+            stop_events = await asyncio.to_thread(get_stop_events)
+            for event_type, event_value in sorted(stop_events):
+                key = (event_type, event_value)
+                if key not in applied:
+                    logging.warning(f"🛑 [StopEvent] 收到终止事件: [{event_type}]{event_value}")
+                    applied.add(key)
+                dropped = engine.cancel_event_tree(event_type, event_value)
+                if dropped:
+                    logging.warning(f"🧹 [StopEvent] 已从队列移除 {dropped} 个 [{event_type}]{event_value} 的排队/子事件")
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logging.error(f"❌ [StopEvent] 读取或处理 {STOP_EVENT_FILE} 失败: {e}")
+        await asyncio.sleep(poll_interval)
+
+
 def get_finished_targets() -> set:
     """同步读取已完成的目标文件，并转化为本地 set 集合（带去重、去空行、去注释）"""
     if not os.path.exists(FINISH_FILE):
@@ -75,6 +126,8 @@ async def batch_file_watcher(debug: bool = False, max_concurrent_targets: int = 
     logging.info(f"👀 批量持久化监控器启动！")
     logging.info(f"   目标输入文件: {TARGET_FILE}")
     logging.info(f"   扫描状态记录: {FINISH_FILE}")
+    logging.info(f"   事件终止文件: {STOP_EVENT_FILE}")
+    stop_task = asyncio.create_task(stop_event_watcher(engine))
     if debug:
         logging.info(f"   🐛 Debug模式已开启，模块输出将保存到 ./outputs/logs/")
     logging.info(f"   ⚡ 最大并发目标数: {max_concurrent_targets}")
@@ -112,6 +165,9 @@ async def batch_file_watcher(debug: bool = False, max_concurrent_targets: int = 
                     async with semaphore:  # 限制并发数
                         # 🌟 核心改动：解析目标行，提取事件类型和事件值
                         event_type, event_value = parse_target_line(target_line)
+                        if engine.is_event_canceled(Event(event_type, event_value, "STOP_CHECK", root_target=event_value)):
+                            logging.warning(f"🛑 [StopEvent] 目标 [{event_type}]{event_value} 已在 {STOP_EVENT_FILE} 中，跳过调度。")
+                            return
                         
                         logging.info(f"\n================ 🛠️  开始编排目标: [{event_type}]{event_value} ================")
                         
@@ -151,6 +207,8 @@ async def batch_file_watcher(debug: bool = False, max_concurrent_targets: int = 
     except asyncio.CancelledError:
         pass
     finally:
+        stop_task.cancel()
+        await asyncio.gather(stop_task, return_exceptions=True)
         # 🌟 6. 优雅闭环清场：当用户按下 Ctrl+C 终止程序时，在退出前强制强杀后台常驻的所有 Workers 和 Xray 进程
         await engine.shutdown_engine()
 

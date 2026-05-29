@@ -1,13 +1,12 @@
 name: tlsx_module
 description: TLS/证书信息采集模块，提取证书主体、颁发者、过期时间和 SAN 子域名
 check:
-  command: tlsx -version
+  command: '"$HOME/.local/bin/tlsx" -version'
   expect_keyword: Current Version
   exclude_keyword: not found
 install:
   steps:
-  - go install github.com/projectdiscovery/tlsx/cmd/tlsx@latest
-  - install -m 0755 ~/go/bin/tlsx /usr/local/bin/tlsx
+  - mkdir -p "$HOME/.local/bin" && GOBIN="$HOME/.local/bin" go install github.com/projectdiscovery/tlsx/cmd/tlsx@latest
 execute:
   inputs:
   - LIVE_URL
@@ -17,7 +16,7 @@ execute:
   - SUBDOMAIN
   timeout: 300
   max_parallel_num: 10
-  command: echo '{{data}}' | tlsx -json -silent -san -cn -so -tls-probe
+  command: 'echo "{{data}}" | "$HOME/.local/bin/tlsx" -json -silent -san -cn -so -probe-status'
 parser:
   type: rules
   rules:
@@ -45,3 +44,6 @@ save:
   format: json
   output_path: ./outputs/tlsx_{{DOMAIN}}_certs.json
   mode: append
+event_extractors:
+  CERT_INFO: ''
+  SUBDOMAIN: (?P<value>(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,})

@@ -1,0 +1,39 @@
+name: afrog_module
+description: Afrog 高危/严重漏洞扫描模块，仅对 LIVE_URL 执行 high,critical PoC
+check:
+  command: 'cd temp && "$HOME/.local/bin/afrog" -v || "$HOME/.local/bin/afrog" -h'
+  expect_keyword: afrog
+  exclude_keyword: not found
+install:
+  steps:
+  - mkdir -p "$HOME/.local/bin" "$HOME/.cache/go-tmp" && GOBIN="$HOME/.local/bin" go install -v github.com/zan8in/afrog/v3/cmd/afrog@latest
+execute:
+  inputs:
+  - LIVE_URL
+  outputs:
+  - VULNERABILITY
+  timeout: 1800
+  max_parallel_num: 2
+  command: 'cd temp && "$HOME/.local/bin/afrog" -t {{data}} -S high,critical -silent'
+parser:
+  type: rules
+  rules:
+  - match:
+      type: regex
+      pattern: '^\s*\d+\s+\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s+(?P<AFROG_ID>\S+)\s+(?P<SEVERITY>HIGH|CRITICAL)\s+(?P<MATCHED_AT>https?://\S+)'
+    extract:
+      AFROG_ID: '{{AFROG_ID}}'
+      SEVERITY: '{{SEVERITY}}'
+      MATCHED_AT: '{{MATCHED_AT}}'
+      VULNERABILITY: '[afrog] [{{AFROG_ID}}] [{{SEVERITY}}] {{MATCHED_AT}}'
+    events:
+      VULNERABILITY: '[afrog] [{{AFROG_ID}}] [{{SEVERITY}}] {{MATCHED_AT}}'
+    filters:
+      VULNERABILITY:
+        if_not_empty: true
+save:
+  format: json
+  output_path: ./outputs/afrog_{{DOMAIN}}_vulns.json
+  mode: append
+event_extractors:
+  VULNERABILITY: ''

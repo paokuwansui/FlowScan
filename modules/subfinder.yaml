@@ -1,13 +1,12 @@
 name: subfinder_module
 description: 基于标准Go协议栈的工业级被动子域名探测组件
 check:
-  command: subfinder -version
+  command: '"$HOME/.local/bin/subfinder" -version'
   expect_keyword: Current Version
   exclude_keyword: not found
 install:
   steps:
-  - go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
-  - install -m 0755 ~/go/bin/subfinder /usr/local/bin/subfinder
+  - mkdir -p "$HOME/.local/bin" && GOBIN="$HOME/.local/bin" go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
 execute:
   inputs:
   - DOMAIN
@@ -15,7 +14,7 @@ execute:
   - SUBDOMAIN
   timeout: 900
   max_parallel_num: 5
-  command: subfinder -d {{data}} -silent
+  command: '"$HOME/.local/bin/subfinder" -d {{data}} -silent'
 parser:
   type: rules
   rules:
@@ -29,3 +28,5 @@ save:
   template: '{{SUBDOMAIN}}'
   output_path: ./outputs/subfinder_{{DOMAIN}}_results.txt
   mode: append
+event_extractors:
+  SUBDOMAIN: (?P<value>(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,})

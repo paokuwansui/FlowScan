@@ -1,13 +1,12 @@
 name: katana_module
 description: ProjectDiscovery katana 现代 Web 爬虫模块，发现页面、接口和 JS 链接
 check:
-  command: katana -version
+  command: '"$HOME/.local/bin/katana" -version'
   expect_keyword: Current Version
   exclude_keyword: not found
 install:
   steps:
-  - go install github.com/projectdiscovery/katana/cmd/katana@latest
-  - install -m 0755 ~/go/bin/katana /usr/local/bin/katana
+  - mkdir -p "$HOME/.local/bin" && GOBIN="$HOME/.local/bin" go install github.com/projectdiscovery/katana/cmd/katana@latest
 execute:
   inputs:
   - LIVE_URL
@@ -15,7 +14,7 @@ execute:
   - URL
   timeout: 1800
   max_parallel_num: 3
-  command: katana -u {{data}} -d 3 -jc -kf all -jsonl -silent
+  command: '"$HOME/.local/bin/katana" -u {{data}} -d 3 -jc -kf all -jsonl -silent'
 parser:
   type: rules
   rules:
@@ -36,3 +35,5 @@ save:
   format: json
   output_path: ./outputs/katana_{{DOMAIN}}_urls.json
   mode: append
+event_extractors:
+  URL: (?P<value>https?://\S+)

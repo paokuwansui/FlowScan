@@ -18,6 +18,7 @@ class Event:
         self.value = value        
         self.source = source
         self.root_target = root_target or value  # 根事件的root_target就是自己，子事件会继承
+        self.cancel_token = None
 
     def __repr__(self):
         return f"[{self.source}] ({self.type}) -> {self.value}"
@@ -38,7 +39,26 @@ class PipelineModule:
         execute_cfg = self.cfg.get('execute', {})
         self.timeout = execute_cfg.get('timeout', 900)
         self.max_parallel_num = execute_cfg.get('max_parallel_num', 1)
+        # YAML 驱动的事件值正则抽取/过滤配置。
+        # 空字符串/未配置表示原样输出；非空正则匹配失败则丢弃该事件并 warning。
+        self.event_extractors = self.cfg.get('event_extractors') or execute_cfg.get('event_extractors', {}) or {}
 
+
+    def _match_json_field_condition(self, data: dict, match_cfg: dict) -> bool:
+        """匹配 JSON 字段条件，支持点路径、equals 和 regex。"""
+        field_name = match_cfg.get('field')
+        if not field_name:
+            return False
+        value = self._get_json_path(data, f"$.{field_name}") if '.' in field_name else data.get(field_name)
+        if not self._has_value(value):
+            return False
+        expected_value = match_cfg.get('equals')
+        if expected_value is not None and value != expected_value:
+            return False
+        regex_pattern = match_cfg.get('regex')
+        if regex_pattern and not re.search(regex_pattern, str(value)):
+            return False
+        return True
 
     def _parse_line(self, line: str) -> tuple[dict, list[Event]]:
         """
@@ -83,15 +103,7 @@ class PipelineModule:
                 if line_stripped.startswith('{'):
                     try:
                         data = json.loads(line_stripped)
-                        field_name = match_cfg.get('field')
-                        expected_value = match_cfg.get('equals')
-                        
-                        # 如果equals为null或未设置，只检查字段是否存在
-                        if expected_value is None:
-                            if field_name in data:
-                                matched = True
-                                context.update(data)
-                        elif data.get(field_name) == expected_value:
+                        if self._match_json_field_condition(data, match_cfg):
                             matched = True
                             context.update(data)  # 整个JSON对象都放入context
                     except Exception:
@@ -134,6 +146,16 @@ class PipelineModule:
                         field = condition.get('field')
                         expected = condition.get('equals')
                         if json_data.get(field) != expected:
+                            all_matched = False
+                            break
+
+                    elif cond_type == 'json_field_in':
+                        if json_data is None:
+                            all_matched = False
+                            break
+                        field = condition.get('field')
+                        values = condition.get('values', [])
+                        if json_data.get(field) not in values:
                             all_matched = False
                             break
                     
@@ -432,6 +454,52 @@ class PipelineModule:
             # 解析失败，返回原始字符串（去除空格）
             return [args_str.strip()]
 
+    def _apply_event_extractor(self, event_type: str, value: str):
+        """按 YAML 中 event_extractors 的正则配置抽取/过滤事件值。
+
+        - 未配置或配置为空字符串：原样输出
+        - 配置非空正则：用 re.search 匹配事件值
+          - 有命名分组 value：输出该分组
+          - 否则有普通分组：输出第一个分组
+          - 否则输出完整匹配
+        - 匹配失败：丢弃该事件并打印 warning
+        """
+        pattern = self.event_extractors.get(event_type)
+        if pattern is None or pattern == "":
+            return value
+
+        value_str = str(value)
+        try:
+            matches = list(re.finditer(pattern, value_str))
+        except re.error as e:
+            logging.warning(f"⚠️ [{self.name}] 事件 [{event_type}] 的 event_extractors 正则非法，事件已丢弃: {pattern} ({e})")
+            return None
+
+        if not matches:
+            logging.warning(f"⚠️ [{self.name}] 事件 [{event_type}] 值不匹配 event_extractors，已丢弃: {value_str} | regex={pattern}")
+            return None
+
+        extracted_values = []
+        for match in matches:
+            if "value" in match.groupdict():
+                extracted = match.group("value")
+            elif match.groups():
+                extracted = match.group(1)
+            else:
+                extracted = match.group(0)
+
+            if self._has_value(extracted):
+                extracted_values.append(extracted)
+
+        if not extracted_values:
+            logging.warning(f"⚠️ [{self.name}] 事件 [{event_type}] 正则匹配成功但抽取值为空，已丢弃: {value_str} | regex={pattern}")
+            return None
+
+        # 单个匹配保持向后兼容；多个匹配用于如 DOMAIN 从 SUBDOMAIN 中抽取主域名候选。
+        if len(extracted_values) == 1:
+            return extracted_values[0]
+        return extracted_values
+
     def _generate_events(self, extracted_dict: dict) -> list:
         """🌟 事件生成器：将字典转换为Event对象列表"""
         events = []
@@ -445,9 +513,23 @@ class PipelineModule:
             
             if isinstance(value, list):
                 for item in value:
-                    events.append(Event(event_type, str(item), self.name))
+                    extracted_value = self._apply_event_extractor(event_type, str(item))
+                    if extracted_value is None:
+                        continue
+                    if isinstance(extracted_value, list):
+                        for sub_item in extracted_value:
+                            events.append(Event(event_type, str(sub_item), self.name))
+                    else:
+                        events.append(Event(event_type, str(extracted_value), self.name))
             else:
-                events.append(Event(event_type, str(value), self.name))
+                extracted_value = self._apply_event_extractor(event_type, str(value))
+                if extracted_value is None:
+                    continue
+                if isinstance(extracted_value, list):
+                    for sub_item in extracted_value:
+                        events.append(Event(event_type, str(sub_item), self.name))
+                else:
+                    events.append(Event(event_type, str(extracted_value), self.name))
         
         return events
 
@@ -554,6 +636,9 @@ class PipelineModule:
                             # 🌟 修复Bug 1: 子事件继承父事件的root_target
                             if not hasattr(new_evt, 'root_target') or not new_evt.root_target:
                                 new_evt.root_target = event.root_target if hasattr(event, 'root_target') else event.value
+                            new_evt.cancel_token = getattr(event, 'cancel_token', None) or orchestrator._cancel_token_for(event.type, event.value)
+                            if orchestrator.is_event_canceled(new_evt):
+                                continue
                             # 🌟 新增：传递self作为source_module，让emit_event可以落盘无消费者的事件
                             await orchestrator.emit_event(new_evt, source_module=self)
 
@@ -607,6 +692,8 @@ class Orchestrator:
         self.debug = debug  # 🌟 新增：debug模式开关
         self.daemon_tasks = []
         self.workers = [] 
+        self.cancelled_roots = set()  # {(event_type, event_value)} 被 stop_event.txt 终止的根事件
+        self.running_event_tasks = {}  # {cancel_token: set(asyncio.Task)} 正在运行的事件级模块任务
         
         # 🌟 新增：事件流追踪字典
         self.event_consumers = {}  # {事件类型: [消费该事件的模块名列表]}
@@ -653,6 +740,109 @@ class Orchestrator:
         # 🌟 新增：打印事件流图谱
         self._print_event_flow()
     
+    def _cancel_token_for(self, event_type: str, event_value: str) -> str:
+        return f"{event_type}:{event_value}"
+
+    def is_event_canceled(self, event: Event) -> bool:
+        """判断事件是否属于已终止的根事件或其子事件。"""
+        token = getattr(event, 'cancel_token', None)
+        if token and token in self.cancelled_roots:
+            return True
+        if (event.type, event.value) in self.cancelled_roots:
+            return True
+        root_target = getattr(event, 'root_target', None)
+        if root_target and (event.type, root_target) in self.cancelled_roots:
+            return True
+        if root_target:
+            for canceled_type, canceled_value in self.cancelled_roots:
+                if root_target == canceled_value:
+                    return True
+        return False
+
+    def _drain_canceled_events_from_queue(self) -> int:
+        """从 asyncio.Queue 中剔除已取消事件，并为被剔除项补 task_done。"""
+        kept = []
+        dropped = 0
+        while True:
+            try:
+                event = self.queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+            if self.is_event_canceled(event):
+                dropped += 1
+                self.queue.task_done()
+            else:
+                kept.append(event)
+        for event in kept:
+            self.queue.put_nowait(event)
+        return dropped
+
+    def cancel_event_tree(self, event_type: str, event_value: str) -> int:
+        """终止一个事件及其 root_target 子树，返回从队列移除的事件数量。"""
+        cancel_token = self._cancel_token_for(event_type, event_value)
+        self.cancelled_roots.add((event_type, event_value))
+        self.cancelled_roots.add((event_type, event_value.strip()))
+        running_tasks = list(self.running_event_tasks.get(cancel_token, set()))
+        for task in running_tasks:
+            task.cancel()
+        return self._drain_canceled_events_from_queue()
+
+    def _get_event_flow_roots(self):
+        """返回事件流图谱的根事件。
+
+        根事件不只包含“没有生产者”的内部起点，还包含用户可直接投递的入口
+        事件。否则 DOMAIN/IP/URL/LIVE_URL/SUBDOMAIN 等既可由模块产出、又可由
+        target.txt 直接输入的事件，会因为存在生产者而从链路图中消失。
+        """
+        user_entry_events = ("START", "DOMAIN", "IP", "URL", "LIVE_URL", "SUBDOMAIN", "PORT_OPEN")
+        roots = []
+
+        for event_type in user_entry_events:
+            if event_type in self.event_consumers and event_type not in roots:
+                roots.append(event_type)
+
+        for event_type in sorted(self.event_consumers):
+            if event_type not in self.event_producers or len(self.event_producers[event_type]) == 0:
+                if event_type not in roots:
+                    roots.append(event_type)
+
+        return roots
+
+    def _build_event_flow_lines(self, root_event: str):
+        """从指定根事件构建可打印的事件流转链路行。"""
+        all_modules = self.daemon_modules + self.modules
+        modules_by_name = {mod.name: mod for mod in all_modules}
+        lines = []
+
+        def trace_chain(event_type, indent=0, visited=None):
+            if visited is None:
+                visited = set()
+
+            if event_type in visited:
+                return
+            visited.add(event_type)
+
+            prefix = "   " * indent
+            consumers = self.event_consumers.get(event_type, [])
+            producers = self.event_producers.get(event_type, [])
+            producer_str = f" ← {', '.join(producers)}" if producers else " ← [用户输入]"
+            lines.append(f"{prefix}📍 {event_type}{producer_str}")
+
+            next_event_types = []
+            for consumer in consumers:
+                mod = modules_by_name.get(consumer)
+                if not mod:
+                    continue
+                for output_type in mod.outputs:
+                    if output_type != event_type and output_type not in next_event_types:
+                        next_event_types.append(output_type)
+
+            for output_type in next_event_types:
+                trace_chain(output_type, indent + 1, visited)
+
+        trace_chain(root_event)
+        return lines
+
     def _print_event_flow(self):
         """🌟 打印事件流图谱，展示模块间的事件消费和生产关系"""
         logging.info("\n" + "="*80)
@@ -701,6 +891,16 @@ class Orchestrator:
             else:
                 logging.info(f"   ⬇️  下游: [终端节点 - 无消费者]")
         
+        # 2. 打印完整的事件流转链路
+        logging.info("\n\n🔄 事件流转链路:")
+        logging.info("-"*80)
+        
+        # 找到根事件：包括用户可直接投递的入口事件，以及没有生产者的内部起点
+        root_events = self._get_event_flow_roots()
+        
+        for root_event in root_events:
+            for line in self._build_event_flow_lines(root_event):
+                logging.info(line)
         
         # 3. 打印统计信息
         logging.info("\n\n📈 统计信息:")
@@ -761,6 +961,9 @@ class Orchestrator:
         🌟 新增：如果事件没有消费者，直接落盘而不出队，避免卡死
         """
         unique_key = f"{event.type}:{event.value}"
+        if self.is_event_canceled(event):
+            logging.info(f"🛑 [StopEvent] 丢弃已终止事件: [{event.type}]{event.value}")
+            return
         
         if force:
             self.seen_events.add(unique_key)  # 依旧将其打上标记，防止衍生任务重复处理它
@@ -812,6 +1015,7 @@ class Orchestrator:
         
         # 🌟 修复Bug 1: 直接在Event中携带root_target，避免并发竞态
         init_event = Event(root_type, root_value, "ENGINE_START", root_target=root_value)
+        init_event.cancel_token = self._cancel_token_for(root_type, root_value)
         
         # 🌟 修复核心点 2：下发批量任务的主域名时，将 force 设为 True
         await self.emit_event(init_event, force=True)
@@ -834,6 +1038,9 @@ class Orchestrator:
         while True:
             try:
                 current_event = await self.queue.get()
+                if self.is_event_canceled(current_event):
+                    logging.info(f"🛑 [StopEvent] 跳过已终止事件: [{current_event.type}]{current_event.value}")
+                    continue
                 # 🌟 修复问题9：降低日志频率，改为DEBUG级别
                 if logging.getLogger().level <= logging.DEBUG:
                     logging.debug(f"🔔 [Worker 拿到新事件] -> {current_event}")
@@ -843,10 +1050,15 @@ class Orchestrator:
                     if current_event.type in module.inputs:
                         # 🌟 修复Bug 1: 从event中获取root_target，避免并发竞态
                         root_target = getattr(current_event, 'root_target', 'UNKNOWN')
-                        tasks.append(self._run_module_safe(module, current_event, root_target))
+                        tasks.append(asyncio.create_task(self._run_module_safe(module, current_event, root_target)))
                 
                 if tasks:
-                    await asyncio.gather(*tasks)
+                    for task in tasks:
+                        if not hasattr(current_event, 'cancel_token') or not current_event.cancel_token:
+                            current_event.cancel_token = self._cancel_token_for(current_event.type, current_event.value)
+                        self.running_event_tasks.setdefault(current_event.cancel_token, set()).add(task)
+                        task.add_done_callback(lambda done_task, token=current_event.cancel_token: self.running_event_tasks.get(token, set()).discard(done_task))
+                    await asyncio.gather(*tasks, return_exceptions=True)
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -864,6 +1076,9 @@ class Orchestrator:
                     mod_timeout = module.timeout
                     
                     # 传入 orchestrator 引用，让模块实时发送事件
+                    if self.is_event_canceled(event):
+                        logging.info(f"🛑 [StopEvent] 模块 [{module.name}] 跳过已终止事件: [{event.type}]{event.value}")
+                        return
                     await module.execute_and_parse(event, root_target, 
                                                   timeout=mod_timeout, 
                                                   orchestrator=self,

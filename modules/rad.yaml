@@ -1,21 +1,18 @@
 name: rad_module
 description: 长亭下一代自动化动态爬虫和高级 Web 交互页面点击组件
 check:
-  command: cd temp && rad --help
+  command: 'mkdir -p ./temp/rad && cd ./temp/rad && "$HOME/.local/bin/rad" --help'
   expect_keyword: Rad - A powerful browser crawler
   exclude_keyword: not found
 install:
   steps:
-  - mkdir -p ~/.local/bin && tmpdir=$(mktemp -d) && cd "$tmpdir" && curl -fL https://github.com/chaitin/rad/releases/download/1.0/rad_linux_amd64.zip
-    -o rad.zip && unzip -o rad.zip && install -m 0755 rad_linux_amd64 /usr/local/bin/rad
+  - mkdir -p "$HOME/.local/bin" && tmpdir=$(mktemp -d) && cd "$tmpdir" && curl -fL
+    https://github.com/chaitin/rad/releases/download/1.0/rad_linux_amd64.zip -o rad.zip
+    && unzip -o rad.zip && install -m 0755 rad_linux_amd64 "$HOME/.local/bin/rad"
   - command -v google-chrome >/dev/null 2>&1 || command -v google-chrome-stable >/dev/null
-    2>&1 || wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-    -O /tmp/google-chrome-stable_current_amd64.deb
-  - command -v google-chrome >/dev/null 2>&1 || command -v google-chrome-stable >/dev/null
-    2>&1 || apt install /tmp/google-chrome-stable_current_amd64.deb -y
-  - rm -f /tmp/google-chrome-stable_current_amd64.deb
-  - sed -i 's|exec -a "$0" "$HERE/chrome" "$@"|exec -a "$0" "/usr/bin/google-chrome-stable"
-    "$@" --no-sandbox|' /usr/bin/google-chrome || true
+    2>&1 || command -v chromium >/dev/null 2>&1 || command -v chromium-browser >/dev/null
+    2>&1 || echo "Chrome/Chromium not found; install a browser manually if rad headless
+    mode fails"
 execute:
   inputs:
   - LIVE_URL
@@ -23,7 +20,8 @@ execute:
   - URL
   timeout: 1800
   max_parallel_num: 1
-  command: cd temp && rad -t {{data}} --http-proxy http://127.0.0.1:7777 --no-color --headless
+  command: cd ./temp/rad && "$HOME/.local/bin/rad" -t {{data}}
+    --http-proxy http://127.0.0.1:7777 --no-color --headless
 parser:
   type: rules
   rules:
@@ -40,3 +38,5 @@ save:
   template: '[{{METHOD}}] {{URL}}'
   output_path: ./outputs/rad_{{DOMAIN}}_urls.txt
   mode: append
+event_extractors:
+  URL: (?P<value>https?://\S+)

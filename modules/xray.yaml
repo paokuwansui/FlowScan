@@ -1,14 +1,15 @@
 name: xray_passive_module
 description: 长亭科技 Xray 被动漏洞代理监听组件
 check:
-  command: cd temp && xray version
+  command: 'mkdir -p ./temp/xray && cd ./temp/xray && "$HOME/.local/bin/xray" version'
   expect_keyword: 'Version: 1.9.11'
   exclude_keyword: ''
 install:
   steps:
-  - tmpdir=$(mktemp -d) && cd "$tmpdir" && curl -fL https://github.com/chaitin/xray/releases/download/1.9.11/xray_linux_amd64.zip
+  - mkdir -p "$HOME/.local/bin" && tmpdir=$(mktemp -d) && cd "$tmpdir" && curl -fL
+    https://github.com/chaitin/xray/releases/download/1.9.11/xray_linux_amd64.zip
     -o xray.zip && unzip -o xray.zip && find . -type f -name "xray*" -perm /111 -print
-    -quit | xargs -I{} install -m 0755 {} /usr/local/bin/xray
+    -quit | xargs -I{} install -m 0755 {} "$HOME/.local/bin/xray"
 execute:
   inputs:
   - START
@@ -16,7 +17,8 @@ execute:
   - VULNERABILITY
   timeout: 99999999
   max_parallel_num: 1
-  command: rm -f ./outputs/xray_out.json && cd temp && xray webscan --listen 127.0.0.1:7777 --json-output ../outputs/xray_out.json
+  command: rm -f ./outputs/xray_out.html && cd ./temp/xray
+    && "$HOME/.local/bin/xray" webscan --listen 127.0.0.1:7777 --html-output ../../outputs/xray_out.html
 parser:
   type: rules
   rules:
@@ -29,3 +31,5 @@ save:
   format: json
   output_path: ./outputs/xray_passive_vulns.json
   mode: append
+event_extractors:
+  VULNERABILITY: ''

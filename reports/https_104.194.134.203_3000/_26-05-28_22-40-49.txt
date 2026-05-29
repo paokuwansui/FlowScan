@@ -1,0 +1,3 @@
+# Dirsearch started Thu May 28 22:42:31 2026 as: /usr/lib/python3/dist-packages/dirsearch/dirsearch.py -u https://104.194.134.203:3000 -e PARSER_GUIDE.md README.md __pycache__ batch_main.py bin failed_targets.txt finish_target.txt loader.py modules modules_bak outputs reports runner.py target.txt temp tests wordlists --quiet --no-color
+
+200   161B   https://104.194.134.203:3000/health

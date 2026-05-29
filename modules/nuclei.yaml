@@ -1,14 +1,13 @@
 name: nuclei_module
 description: 基于模板的下一代快速漏洞扫描组件
 check:
-  command: nuclei -version
+  command: '"$HOME/.local/bin/nuclei" -version'
   expect_keyword: nuclei
   exclude_keyword: not found
 install:
   steps:
-  - go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
-  - install -m 0755 ~/go/bin/nuclei /usr/local/bin/nuclei
-  - nuclei -update-templates
+  - mkdir -p "$HOME/.local/bin" && GOBIN="$HOME/.local/bin" go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+  - '"$HOME/.local/bin/nuclei" -update-templates'
 execute:
   inputs:
   - LIVE_URL
@@ -16,7 +15,7 @@ execute:
   - VULNERABILITY
   timeout: 1800
   max_parallel_num: 2
-  command: nuclei -u {{data}} -severity high,critical -jsonl -silent
+  command: '"$HOME/.local/bin/nuclei" -u {{data}} -severity high,critical -jsonl -silent'
 parser:
   type: rules
   rules:
@@ -38,3 +37,5 @@ save:
   format: json
   output_path: ./outputs/nuclei_{{DOMAIN}}_vulns.json
   mode: append
+event_extractors:
+  VULNERABILITY: ''
