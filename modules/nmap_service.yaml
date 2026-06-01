@@ -7,9 +7,9 @@ check:
   exclude_keyword: not found
 install:
   steps:
-  - command -v nmap >/dev/null 2>&1 || { echo "nmap is required; install it with your
-    package manager"; exit 1; }
-  - mkdir -p "$HOME/.local/bin" && install -m 0755 ./bin/nmap_service.py "$HOME/.local/bin/nmap-service-flowscan"
+  - apt update
+  - apt install nmap -y
+  - install -m 0755 ./bin/nmap_service.py "$HOME/.local/bin/nmap-service-flowscan"
 execute:
   inputs:
   - PORT_OPEN
@@ -43,10 +43,6 @@ parser:
         if_not_empty: true
       LIVE_URL:
         if_contains: http
-save:
-  format: json
-  output_path: ./outputs/nmap_service_{{DOMAIN}}_results.json
-  mode: append
 event_extractors:
   SERVICE: ''
   LIVE_URL: (?P<value>https?://\S+)

@@ -344,9 +344,8 @@ class PipelineModule:
                 parts = expression.split('.')
                 var_name = parts[0].strip()
                 
-                # 获取基础值
+                # 获取基础值。缺失变量通常代表该工具本行没有产出这个可选字段，返回空值即可。
                 if var_name not in context:
-                    logging.debug(f"⚠️ [{self.name}] 模板变量不存在: {var_name}")
                     return ""
                 
                 value = context[var_name]
@@ -417,7 +416,6 @@ class PipelineModule:
                     value = context[var_name]
                     return str(value) if not isinstance(value, str) else value
                 else:
-                    logging.debug(f"⚠️ [{self.name}] 模板变量不存在: {var_name}")
                     return ""
         
         # 替换所有占位符
@@ -698,6 +696,8 @@ class Orchestrator:
         # 🌟 新增：事件流追踪字典
         self.event_consumers = {}  # {事件类型: [消费该事件的模块名列表]}
         self.event_producers = {}  # {事件类型: [生产该事件的模块名列表]}
+        self.persisted_events = set()  # 已落盘事件去重集合，独立于调度去重
+        self.persist_lock = asyncio.Lock()  # 统一事件落盘锁，避免并发写文件交叉/重复
 
     def load_modules(self):
         """动态扫描并加载所有 YAML 模块配置文件"""
@@ -954,16 +954,50 @@ class Orchestrator:
             ]
 
     # 🌟 修复核心点 1：增加 force 参数，允许特定情况强行破开去重限制入队
+    async def _persist_event(self, event: Event):
+        """按事件类型统一落盘到 ./outputs/<EVENT_TYPE>，并发安全且去重。"""
+        if not self._has_value(getattr(event, 'value', None)):
+            return
+
+        event_type = str(event.type).strip()
+        event_value = str(event.value).strip()
+        if not event_type or not event_value:
+            return
+
+        unique_key = f"{event_type}:{event_value}"
+        output_path = os.path.join("./outputs", event_type)
+
+        async with self.persist_lock:
+            if unique_key in self.persisted_events:
+                return
+            self.persisted_events.add(unique_key)
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+            def sync_write_event():
+                with open(output_path, 'a', encoding='utf-8') as f:
+                    f.write(event_value + "\n")
+
+            await asyncio.to_thread(sync_write_event)
+
+    def _has_value(self, value) -> bool:
+        if value is None:
+            return False
+        if isinstance(value, str):
+            return value.strip() != ""
+        return True
+
     async def emit_event(self, event: Event, force: bool = False, source_module: PipelineModule = None):
         """
         向事件传送带发布一个资产事件（全局强力拦截去重，支持主入口强投豁免）
-        
-        🌟 新增：如果事件没有消费者，直接落盘而不出队，避免卡死
+
+        所有有效事件都会统一落盘到 ./outputs/<EVENT_TYPE>，再根据消费者关系决定是否入队。
         """
         unique_key = f"{event.type}:{event.value}"
         if self.is_event_canceled(event):
             logging.info(f"🛑 [StopEvent] 丢弃已终止事件: [{event.type}]{event.value}")
             return
+
+        await self._persist_event(event)
         
         if force:
             self.seen_events.add(unique_key)  # 依旧将其打上标记，防止衍生任务重复处理它
@@ -974,20 +1008,9 @@ class Orchestrator:
         has_consumer = event.type in self.event_consumers and len(self.event_consumers[event.type]) > 0
         
         if not has_consumer:
-            # 没有消费者，直接落盘而不出队
             if unique_key not in self.seen_events:
                 self.seen_events.add(unique_key)
-                
-                # 如果有source_module，调用其_save_data方法落盘
-                if source_module:
-                    root_target = getattr(event, 'root_target', 'UNKNOWN')
-                    # 构造一个简单的数据字典用于落盘
-                    data_dict = {event.type: event.value}
-                    await source_module._save_data(root_target, data_dict)
-                    
-                    logging.info(f"💾 [无消费者] 事件 [{event.type}]{event.value} 已直接落盘（无模块消费）")
-                else:
-                    logging.warning(f"⚠️ [无消费者] 事件 [{event.type}]{event.value} 被丢弃（无模块消费且无source_module）")
+                logging.info(f"💾 [事件落盘] 事件 [{event.type}]{event.value} 已落盘（无模块消费）")
             return
         
         # 有消费者，正常入队

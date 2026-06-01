@@ -6,7 +6,7 @@ check:
   exclude_keyword: not found
 install:
   steps:
-  - mkdir -p "$HOME/.local/bin" && GOBIN="$HOME/.local/bin" go install github.com/projectdiscovery/katana/cmd/katana@latest
+  - GOBIN="$HOME/.local/bin" go install github.com/projectdiscovery/katana/cmd/katana@latest
 execute:
   inputs:
   - LIVE_URL
@@ -31,9 +31,5 @@ parser:
     filters:
       URL:
         if_not_empty: true
-save:
-  format: json
-  output_path: ./outputs/katana_{{DOMAIN}}_urls.json
-  mode: append
 event_extractors:
   URL: (?P<value>https?://\S+)

@@ -1,14 +1,13 @@
 name: wafw00f_module
 description: WAF/CDN 识别模块，识别目标前置防护产品
 check:
-  command: '"$HOME/.local/bin/wafw00f" --version'
+  command: 'wafw00f --version'
   expect_keyword: WAFW00F
   exclude_keyword: not found
 install:
   steps:
-  - mkdir -p "$HOME/.local/bin" && (python3 -m pip install --user --break-system-packages
-    wafw00f || python3 -m pip install --user wafw00f || true) && command -v wafw00f
-    >/dev/null 2>&1 && ln -sf "$(command -v wafw00f)" "$HOME/.local/bin/wafw00f"
+  - sudo apt update
+  - sudo apt install wafw00f -y
 execute:
   inputs:
   - LIVE_URL
@@ -17,7 +16,7 @@ execute:
   - FINGERPRINT
   timeout: 300
   max_parallel_num: 5
-  command: '"$HOME/.local/bin/wafw00f" {{data}} -f json -o - --no-colors'
+  command: 'wafw00f {{data}} -f json -o - --no-colors'
 parser:
   type: rules
   rules:
@@ -37,10 +36,6 @@ parser:
     filters:
       WAF:
         if_not_empty: true
-save:
-  format: json
-  output_path: ./outputs/wafw00f_{{DOMAIN}}_results.json
-  mode: append
 event_extractors:
   WAF: ''
   FINGERPRINT: ''

@@ -6,7 +6,7 @@ check:
   exclude_keyword: not found
 install:
   steps:
-  - mkdir -p "$HOME/.local/bin" && GOBIN="$HOME/.local/bin" go install github.com/projectdiscovery/tlsx/cmd/tlsx@latest
+  - GOBIN="$HOME/.local/bin" go install github.com/projectdiscovery/tlsx/cmd/tlsx@latest
 execute:
   inputs:
   - LIVE_URL
@@ -16,7 +16,7 @@ execute:
   - SUBDOMAIN
   timeout: 300
   max_parallel_num: 10
-  command: 'echo "{{data}}" | "$HOME/.local/bin/tlsx" -json -silent -san -cn -so -probe-status'
+  command: 'echo "{{data}}" | "$HOME/.local/bin/tlsx" -json -silent -san -cn -so'
 parser:
   type: rules
   rules:
@@ -40,10 +40,6 @@ parser:
         if_not_empty: true
       SUBDOMAIN:
         if_not_empty: true
-save:
-  format: json
-  output_path: ./outputs/tlsx_{{DOMAIN}}_certs.json
-  mode: append
 event_extractors:
   CERT_INFO: ''
   SUBDOMAIN: (?P<value>(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,})

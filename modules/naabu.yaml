@@ -1,12 +1,13 @@
 name: naabu_module
 description: ProjectDiscovery naabu 高速端口发现模块，产出 PORT_OPEN 事件
 check:
-  command: '"$HOME/.local/bin/naabu" -version'
+  command: 'naabu -version'
   expect_keyword: Current Version
   exclude_keyword: not found
 install:
   steps:
-  - mkdir -p "$HOME/.local/bin" && GOBIN="$HOME/.local/bin" go install github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
+  - sudo apt update
+  - sudo apt install naabu -y
 execute:
   inputs:
   - IP
@@ -15,7 +16,7 @@ execute:
   - PORT_OPEN
   timeout: 1800
   max_parallel_num: 5
-  command: '"$HOME/.local/bin/naabu" -host {{data}} -top-ports 1000 -silent'
+  command: 'naabu -host {{data}} -top-ports 1000 -silent'
 parser:
   type: rules
   rules:
@@ -31,9 +32,5 @@ parser:
     filters:
       PORT_OPEN:
         if_not_empty: true
-save:
-  format: json
-  output_path: ./outputs/naabu_{{DOMAIN}}_ports.json
-  mode: append
 event_extractors:
   PORT_OPEN: (?P<value>[^\s:/]+:\d{1,5})

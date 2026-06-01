@@ -1,13 +1,14 @@
 name: nuclei_module
 description: 基于模板的下一代快速漏洞扫描组件
 check:
-  command: '"$HOME/.local/bin/nuclei" -version'
+  command: 'nuclei -version'
   expect_keyword: nuclei
   exclude_keyword: not found
 install:
   steps:
-  - mkdir -p "$HOME/.local/bin" && GOBIN="$HOME/.local/bin" go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
-  - '"$HOME/.local/bin/nuclei" -update-templates'
+  - sudo apt update
+  - sudo apt install nuclei -y
+  - nuclei -update-templates
 execute:
   inputs:
   - LIVE_URL
@@ -33,9 +34,5 @@ parser:
     filters:
       VULNERABILITY:
         if_not_empty: true
-save:
-  format: json
-  output_path: ./outputs/nuclei_{{DOMAIN}}_vulns.json
-  mode: append
 event_extractors:
   VULNERABILITY: ''

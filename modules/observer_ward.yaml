@@ -1,15 +1,12 @@
 name: observer_ward_module
 description: 跨平台社区化高精度Web指纹及服务识别组件
 check:
-  command: '"$HOME/.local/bin/observer_ward" --help'
+  command: 'observer_ward --help'
   expect_keyword: observer_ward
   exclude_keyword: not found
 install:
   steps:
-  - mkdir -p "$HOME/.local/bin" && command -v observer_ward >/dev/null 2>&1 && ln
-    -sf "$(command -v observer_ward)" "$HOME/.local/bin/observer_ward"
-  - '"$HOME/.local/bin/observer_ward" -u || "$HOME/.local/bin/observer_ward" --update-plugin
-    || true'
+  - cd $HOME/.local/bin && curl -sIL https://github.com/emo-crab/observer_ward/releases/latest | grep -i "location:" | head -n 1 | awk -F'/' '{print $NF}' | tr -d '\r' | xargs -I {} wget "https://github.com/emo-crab/observer_ward/releases/download/{}/observer_ward_{}_x86_64-unknown-linux-musl.tar.gz" && tar -zxvf observer_ward_*_x86_64-unknown-linux-musl.tar.gz && mv x86_64-unknown-linux-musl observer_ward && rm README.md LICENSE observer_ward_*
 execute:
   inputs:
   - LIVE_URL
@@ -17,7 +14,7 @@ execute:
   - FINGERPRINT
   timeout: 900
   max_parallel_num: 10
-  command: '"$HOME/.local/bin/observer_ward" -t {{data}} --format json --silent'
+  command: 'observer_ward -t {{data}} --format json --silent'
 parser:
   type: rules
   rules:
@@ -33,9 +30,5 @@ parser:
     filters:
       FINGERPRINT:
         if_not_empty: true
-save:
-  format: json
-  output_path: ./outputs/fingerprints_{{DOMAIN}}_results.json
-  mode: append
 event_extractors:
   FINGERPRINT: ''

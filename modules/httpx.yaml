@@ -6,7 +6,8 @@ check:
   exclude_keyword: not found
 install:
   steps:
-  - mkdir -p "$HOME/.local/bin" && GOBIN="$HOME/.local/bin" go install github.com/projectdiscovery/httpx/cmd/httpx@latest
+  - GOBIN="$HOME/.local/bin" go install github.com/projectdiscovery/httpx/cmd/httpx@latest
+  - python3 -m pip install --user --break-system-packages tldextract
 execute:
   inputs:
   - URL
@@ -51,10 +52,6 @@ parser:
     filters:
       LIVE_URL:
         if_not_empty: true
-save:
-  format: json
-  output_path: ./outputs/web_alive_{{DOMAIN}}_results.json
-  mode: append
 event_extractors:
   LIVE_URL: (?P<value>https?://\S+)
   DOMAIN: ''

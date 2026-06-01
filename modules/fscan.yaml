@@ -6,7 +6,7 @@ check:
   exclude_keyword: ''
 install:
   steps:
-  - 'mkdir -p "$HOME/.local/bin" && python3 - <<''PY'' | xargs -I{} sh -c ''curl -fL
+  - 'python3 - <<''PY'' | xargs -I{} sh -c ''curl -fL
     "{}" -o "$HOME/.local/bin/fscan" && chmod 0755 "$HOME/.local/bin/fscan"''
 
     import json, urllib.request
@@ -69,10 +69,6 @@ parser:
       equals: dps-shell
     extract:
       VULNERABILITY: '异常Shell监听服务: {{target}} [ {{banner}} ]'
-save:
-  format: json
-  output_path: ./outputs/fscan_GLOBAL_BATCH_vulns.json
-  mode: append
 event_extractors:
   LIVE_URL: (?P<value>https?://\S+)
   PORT_OPEN: (?P<value>[^\s:/]+:\d{1,5})
