@@ -1,12 +1,12 @@
 name: afrog_module
 description: Afrog 高危/严重漏洞扫描模块，仅对 LIVE_URL 执行 high,critical PoC
 check:
-  command: 'cd temp && "afrog" -v || "$HOME/.local/bin/afrog" -h'
+  command: 'cd ./bin/afrog && "afrog" -v || "$HOME/.local/bin/afrog" -h'
   expect_keyword: afrog
   exclude_keyword: not found
 install:
   steps:
-  - GOBIN="$HOME/.local/bin" go install -v github.com/zan8in/afrog/v3/cmd/afrog@latest
+  - mkdir -p "$HOME/.local/bin" "$HOME/.cache/go-tmp" && GOBIN="$HOME/.local/bin" go install -v github.com/zan8in/afrog/v3/cmd/afrog@latest
 execute:
   inputs:
   - LIVE_URL
@@ -14,7 +14,7 @@ execute:
   - VULNERABILITY
   timeout: 1800
   max_parallel_num: 2
-  command: 'cd temp && "afrog" -t {{data}} -S high,critical -silent'
+  command: 'cd ./bin/afrog && afrog -t {{data}} -S high,critical -silent'
 parser:
   type: rules
   rules:

@@ -1,7 +1,7 @@
 name: fscan_module
 description: 一款全方位一键内网/外网漏洞和弱口令综合扫描组件
 check:
-  command: '"$HOME/.local/bin/fscan"'
+  command: fscan
   expect_keyword: Fscan 2
   exclude_keyword: ''
 install:
@@ -34,7 +34,7 @@ execute:
   - VULNERABILITY
   timeout: 1800
   max_parallel_num: 3
-  command: '"$HOME/.local/bin/fscan" -h {{data}} -no -silent'
+  command: 'fscan -h {{data}} -no -silent'
 parser:
   type: rules
   rules:

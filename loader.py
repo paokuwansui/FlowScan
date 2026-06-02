@@ -92,12 +92,12 @@ class ModuleEnvironmentManager:
                 continue
             try:
                 # 🌟 优化点：复用抽象命令执行器，执行编译或下载任务，给足 10 分钟窗口
-                res = self._run_command_sync(step, timeout=600.0)
+                res = self._run_command_sync(step, timeout=900.0)
                 
                 if res.returncode != 0:
                     raise RuntimeError(f"退出码: {res.returncode}，报错回显: {res.stdout.strip()}")
             except subprocess.TimeoutExpired:
-                raise RuntimeError(f"安装步骤 [{step}] 执行超时（600秒）。")
+                raise RuntimeError(f"安装步骤 [{step}] 执行超时（900秒）。")
             except Exception as cmd_err:
                 raise RuntimeError(f"安装步骤 [{step}] 执行失败，原因: {cmd_err}")
             self.command_set.add(step)

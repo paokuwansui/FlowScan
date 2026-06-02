@@ -1,7 +1,7 @@
 name: tlsx_module
 description: TLS/证书信息采集模块，提取证书主体、颁发者、过期时间和 SAN 子域名
 check:
-  command: '"$HOME/.local/bin/tlsx" -version'
+  command: 'tlsx -version'
   expect_keyword: Current Version
   exclude_keyword: not found
 install:
@@ -16,7 +16,7 @@ execute:
   - SUBDOMAIN
   timeout: 300
   max_parallel_num: 10
-  command: 'echo "{{data}}" | "$HOME/.local/bin/tlsx" -json -silent -san -cn -so'
+  command: 'echo "{{data}}" | tlsx -json -silent -san -cn'
 parser:
   type: rules
   rules:

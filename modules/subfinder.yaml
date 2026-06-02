@@ -15,7 +15,7 @@ execute:
   - SUBDOMAIN
   timeout: 900
   max_parallel_num: 5
-  command: '"$HOME/.local/bin/subfinder" -d {{data}} -silent'
+  command: 'subfinder -d {{data}} -silent'
 parser:
   type: rules
   rules:

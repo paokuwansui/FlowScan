@@ -1,7 +1,7 @@
 name: katana_module
 description: ProjectDiscovery katana 现代 Web 爬虫模块，发现页面、接口和 JS 链接
 check:
-  command: '"$HOME/.local/bin/katana" -version'
+  command: 'katana -version'
   expect_keyword: Current Version
   exclude_keyword: not found
 install:
@@ -14,7 +14,7 @@ execute:
   - URL
   timeout: 1800
   max_parallel_num: 3
-  command: '"$HOME/.local/bin/katana" -u {{data}} -d 3 -jc -kf all -jsonl -silent'
+  command: 'katana -u {{data}} -d 3 -jc -kf all -jsonl -silent'
 parser:
   type: rules
   rules:

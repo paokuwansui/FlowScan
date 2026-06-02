@@ -22,6 +22,17 @@ IP_RE = re.compile(r"^(?P<ip>(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\.){3}(?:25[
 DOMAIN_RE = re.compile(r"^(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}$")
 LOG_RE = re.compile(r"^\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2}\s+\[[A-Z]+\]")
 
+# 常见的多级公共后缀，用于准确判定 DOMAIN / SUBDOMAIN
+COMMON_PUBLIC_SUFFIXES = {
+    "com.cn", "net.cn", "org.cn", "gov.cn", "edu.cn", "org.top",
+    "co.uk", "me.uk", "org.uk", "ltd.uk", "plc.uk",
+    "co.jp", "or.jp", "ne.jp", "ac.jp", "go.jp",
+    "com.tw", "org.tw", "edu.tw", "com.hk", "org.hk"
+}
+
+# 过滤黑名单：防止工具自身的 Banner、主页或文档地址被误识别为资产
+IGNORE_DOMAINS = {"fofax.xiecat.fun", "xiecat.fun"}
+
 
 def sanitize_error_message(err) -> str:
     text = str(err)
@@ -50,6 +61,20 @@ def strip_port(host: str) -> str:
     return host
 
 
+def parse_domain_type(host: str) -> str:
+    """精准识别是根域名还是子域名，考虑多级后缀"""
+    parts = host.split(".")
+    if len(parts) <= 2:
+        return "DOMAIN"
+    
+    # 检查最后两级是否属于常见双字后缀（如 com.cn）
+    last_two = ".".join(parts[-2:])
+    if last_two in COMMON_PUBLIC_SUFFIXES:
+        return "DOMAIN" if len(parts) == 3 else "SUBDOMAIN"
+        
+    return "SUBDOMAIN"
+
+
 def classify_fofax_value(value: str) -> dict[str, str] | None:
     item = value.strip().strip("'").strip('"')
     if not item or LOG_RE.match(item):
@@ -61,33 +86,30 @@ def classify_fofax_value(value: str) -> dict[str, str] | None:
     if " " in item and not item.startswith(("http://", "https://")):
         return None
 
+    # 检查是否为 URL
     if is_url(item):
+        parsed = urlparse(item)
+        # 拦截黑名单域名（支持带端口的情况）
+        host_netloc = parsed.netloc.split(":")[0]
+        if host_netloc in IGNORE_DOMAINS:
+            return None
         return {"type": "URL", "value": item}
 
     host = strip_port(item)
+    
+    # 拦截独立出现的黑名单域名
+    if host in IGNORE_DOMAINS:
+        return None
+
     ip_match = IP_RE.match(item)
     if ip_match:
         return {"type": "IP", "value": ip_match.group("ip")}
 
     if DOMAIN_RE.match(host):
-        if len(host.split(".")) > 2:
-            return {"type": "SUBDOMAIN", "value": host}
-        return {"type": "DOMAIN", "value": host}
+        dtype = parse_domain_type(host)
+        return {"type": dtype, "value": host}
 
     return None
-
-
-def parse_fofax_output_lines(lines):
-    seen = set()
-    for line in lines:
-        parsed = classify_fofax_value(line)
-        if not parsed:
-            continue
-        key = (parsed["type"], parsed["value"])
-        if key in seen:
-            continue
-        seen.add(key)
-        yield parsed
 
 
 def build_fofax_args(query: str, fetch_size: int = 1000) -> list[str]:
@@ -112,22 +134,40 @@ def run_fofax(fofax_bin: str, query: str, fetch_size: int) -> int:
     cmd.extend(build_fofax_args(query, fetch_size=fetch_size))
 
     try:
-        proc = subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=120, check=False)
+        # 改用 Popen 流式读取，防止大文本输出导致缓冲区满而死锁
+        proc = subprocess.Popen(
+            cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+        )
     except FileNotFoundError:
         print(f"[-] 未找到 fofax 二进制: {fofax_bin}", file=sys.stderr)
         return 127
+    except Exception as exc:
+        print(f"[-] fofax 启动失败: {sanitize_error_message(exc)}", file=sys.stderr)
+        return 2
+
+    seen = set()
+    try:
+        # 流式按行解析，优化内存并杜绝卡死
+        for line in proc.stdout:
+            parsed = classify_fofax_value(line)
+            if not parsed:
+                continue
+            key = (parsed["type"], parsed["value"])
+            if key in seen:
+                continue
+            seen.add(key)
+            print(json.dumps(parsed, ensure_ascii=False), flush=True)
+            
+        proc.wait(timeout=120)
     except subprocess.TimeoutExpired as exc:
+        proc.kill()
         print(f"[-] fofax 执行超时: {sanitize_error_message(exc)}", file=sys.stderr)
         return 124
     except Exception as exc:
-        print(f"[-] fofax 执行失败: {sanitize_error_message(exc)}", file=sys.stderr)
+        proc.kill()
+        print(f"[-] 运行运行时异常: {sanitize_error_message(exc)}", file=sys.stderr)
         return 2
 
-    for record in parse_fofax_output_lines(proc.stdout.splitlines()):
-        print(json.dumps(record, ensure_ascii=False))
-
-    if proc.returncode != 0:
-        print(sanitize_error_message(proc.stdout), file=sys.stderr)
     return proc.returncode
 
 

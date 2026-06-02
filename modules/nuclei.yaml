@@ -16,7 +16,7 @@ execute:
   - VULNERABILITY
   timeout: 1800
   max_parallel_num: 2
-  command: '"$HOME/.local/bin/nuclei" -u {{data}} -severity high,critical -jsonl -silent'
+  command: 'nuclei -u {{data}} -severity high,critical -jsonl -silent'
 parser:
   type: rules
   rules:

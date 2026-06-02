@@ -16,7 +16,7 @@ execute:
   - PORT_OPEN
   timeout: 1800
   max_parallel_num: 5
-  command: 'naabu -host {{data}} -top-ports 1000 -silent'
+  command: 'naabu -host {{data}} -silent -p -'
 parser:
   type: rules
   rules:

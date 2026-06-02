@@ -1,12 +1,12 @@
 name: fofa_module
 description: 基于 FoFaX 的网络空间测绘查询模块，支持 DOMAIN、LIVE_URL 和 ICON_PATH 反查
 check:
-  command: 'python3 ./bin/fofa_query.py --help && test -x "$HOME/.local/bin/fofax"'
+  command: 'if [ -z "$FOFA_KEY" ]; then echo "Error: FOFA_KEY is empty"; exit 1; fi && python3 ./bin/fofa_query.py --help && test -x "$HOME/.local/bin/fofax"'
   expect_keyword: 'FlowScan FoFaX JSONL wrapper'
   exclude_keyword: unable to open X server
 install:
   steps:
-  - tmpdir=$(mktemp -d) && cd "$tmpdir" && curl -fsSL https://api.github.com/repos/xiecat/fofax/releases/latest | python3 -c "import json,sys; data=json.load(sys.stdin); assets=data.get('assets',[]); matches=[a['browser_download_url'] for a in assets if 'linux' in a['name'].lower() and ('amd64' in a['name'].lower() or 'x86_64' in a['name'].lower())]; print(matches[0] if matches else assets[0]['browser_download_url'])" | xargs -I{} sh -c 'curl -fL "{}" -o fofax_pkg && (tar -xzf fofax_pkg || unzip -o fofax_pkg || mv fofax_pkg fofax) && find . -type f \( -name "fofax" -o -name "fofax_linux*" \) -perm /111 -print -quit | xargs -I%% install -m 0755 %% "$HOME/.local/bin/fofax"'
+  - mkdir -p "$HOME/.local/bin" && tmpdir=$(mktemp -d) && cd "$tmpdir" && curl -fsSL https://api.github.com/repos/xiecat/fofax/releases/latest | python3 -c "import json,sys; data=json.load(sys.stdin); assets=data.get('assets',[]); matches=[a['browser_download_url'] for a in assets if 'linux' in a['name'].lower() and ('amd64' in a['name'].lower() or 'x86_64' in a['name'].lower())]; print(matches[0] if matches else assets[0]['browser_download_url'])" | xargs -I{} sh -c 'curl -fL "{}" -o fofax_pkg && (tar -xzf fofax_pkg || unzip -o fofax_pkg || mv fofax_pkg fofax) && find . -type f \( -name "fofax" -o -name "fofax_linux*" \) -perm /111 -print -quit | xargs -I%% install -m 0755 %% "$HOME/.local/bin/fofax"'
 execute:
   inputs:
   - DOMAIN
