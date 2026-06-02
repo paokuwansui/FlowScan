@@ -3,7 +3,7 @@ description: WAF/CDN 识别模块，识别目标前置防护产品
 check:
   command: 'wafw00f --version'
   expect_keyword: WAFW00F
-  exclude_keyword: not found
+  exclude_keyword:
 install:
   steps:
   - sudo apt update
