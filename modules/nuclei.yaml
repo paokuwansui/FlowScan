@@ -14,7 +14,7 @@ execute:
   - LIVE_URL
   outputs:
   - VULNERABILITY
-  timeout: 1800
+  timeout: 7200
   max_parallel_num: 2
   command: 'nuclei -u {{data}} -severity high,critical -jsonl -silent'
 parser:
