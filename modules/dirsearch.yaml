@@ -15,7 +15,7 @@ execute:
   - URI
   timeout: 1800
   max_parallel_num: 2
-  command: cd ./outputs && dirsearch -u {{data}} -e "*" --quiet --no-color
+  command: cd ./outputs && dirsearch -u {{data}} -e "*" -x 404 --exclude-sizes 0B --quiet --no-color
 parser:
   type: rules
   rules:
