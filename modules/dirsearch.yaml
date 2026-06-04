@@ -13,7 +13,7 @@ execute:
   - LIVE_URL
   outputs:
   - URI
-  timeout: 1800
+  timeout: 3600
   max_parallel_num: 2
   command: cd ./outputs && dirsearch -u {{data}} -e "*" -x 404 --exclude-sizes 0B --quiet --no-color
 parser:

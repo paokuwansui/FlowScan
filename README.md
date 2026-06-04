@@ -64,6 +64,9 @@ python batch_main.py --concurrent 10
 # Debug 模式（保存模块输出）
 python batch_main.py --debug
 
+# 指定 Worker、最大进程数和 seen_events 清理阈值
+python batch_main.py -c 5 --workers 25 --max-processes 20 --seen-events-limit 1000000
+
 # 组合使用
 python batch_main.py -d -c 5
 ```
@@ -75,6 +78,9 @@ python batch_main.py -d -c 5
 | 参数 | 简写 | 说明 | 默认值 |
 |------|------|------|--------|
 | `--concurrent N` | `-c N` | 最大并发目标数 | 1 |
+| `--workers N` | - | 事件消费 Worker 数量 | 25 |
+| `--max-processes N` | - | 全局最大并发底层扫描器进程数 | 20 |
+| `--seen-events-limit N` | - | `seen_events` 去重集合清理阈值，超过后保留约一半 | 1000000 |
 | `--debug` | `-d` | 开启 debug 模式 | false |
 
 ### 并发模式推荐配置
@@ -496,19 +502,25 @@ save:
 ```python
 engine = Orchestrator(
     MODULES_DIR,
-    max_workers=10,      # Worker 数量
-    max_processes=5,     # 最大并发进程数
-    debug=debug_mode
+    max_workers=25,              # Worker 数量，可通过 --workers 指定
+    max_processes=20,            # 最大并发进程数，可通过 --max-processes 指定
+    debug=debug_mode,
+    seen_events_limit=1000000    # 去重集合清理阈值，可通过 --seen-events-limit 指定
 )
 ```
 
 ### 修改事件去重阈值
 
-在 `runner.py` 的 `scan_target` 方法中：
+启动时通过参数指定：
+
+```bash
+python batch_main.py --seen-events-limit 1000000
+```
+
+或在直接实例化 `Orchestrator` 时传入：
 
 ```python
-if len(self.seen_events) > 10000:  # 调整阈值
-    # LRU 清理逻辑
+engine = Orchestrator("./modules", seen_events_limit=1000000)
 ```
 
 ---

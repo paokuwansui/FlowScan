@@ -110,17 +110,32 @@ def append_to_finish_file(target_line: str):
     with open(FINISH_FILE, 'a', encoding='utf-8') as f:
         f.write(target_line + "\n")
 
-async def batch_file_watcher(debug: bool = False, max_concurrent_targets: int = 1):
+async def batch_file_watcher(
+    debug: bool = False,
+    max_concurrent_targets: int = 1,
+    max_workers: int = 25,
+    max_processes: int = 20,
+    seen_events_limit: int = 1000000,
+):
     """
     常驻循环：不断读取 target.txt，通过 finish_target.txt 过滤，动态引入最新引擎执行
     
     Args:
         debug: 是否开启debug模式，将模块完整输出保存到logs文件夹
         max_concurrent_targets: 同时并发的目标任务数量（默认1，建议5-10）
+        max_workers: 事件消费 Worker 数量（默认25）
+        max_processes: 全局最大底层扫描器进程数（默认20）
+        seen_events_limit: seen_events 去重集合清理阈值（默认1000000）
     """
     # 🌟 1. 实例化核心 YAML 编排引擎并进行【全局环境初始化】
-    # 这一步会自动加载组件、拉起 10 个 Workers，并让背景常驻服务（如 Xray）有且仅启动 1 次！
-    engine = Orchestrator(MODULES_DIR, max_workers=10, max_processes=5, debug=debug)
+    # 这一步会自动加载组件、拉起 Workers，并让背景常驻服务（如 Xray）有且仅启动 1 次！
+    engine = Orchestrator(
+        MODULES_DIR,
+        max_workers=max_workers,
+        max_processes=max_processes,
+        debug=debug,
+        seen_events_limit=seen_events_limit,
+    )
     await engine.setup_engine()
     
     logging.info(f"👀 批量持久化监控器启动！")
@@ -131,6 +146,9 @@ async def batch_file_watcher(debug: bool = False, max_concurrent_targets: int = 
     if debug:
         logging.info(f"   🐛 Debug模式已开启，模块输出将保存到 ./outputs/logs/")
     logging.info(f"   ⚡ 最大并发目标数: {max_concurrent_targets}")
+    logging.info(f"   👷 Worker 数量: {max_workers}")
+    logging.info(f"   🚀 最大并发进程数: {max_processes}")
+    logging.info(f"   🧠 seen_events 清理阈值: {seen_events_limit}")
 
     try:
         # 2. 核心常驻业务循环
@@ -213,25 +231,29 @@ async def batch_file_watcher(debug: bool = False, max_concurrent_targets: int = 
         await engine.shutdown_engine()
 
 if __name__ == "__main__":
-    import sys
-    
-    # 🌟 支持通过命令行参数 --debug 开启debug模式
-    debug_mode = "--debug" in sys.argv or "-d" in sys.argv
-    
-    # 🌟 支持通过命令行参数 --concurrent N 设置并发目标数
-    max_concurrent = 1  # 默认值为1（保持向后兼容）
-    for i, arg in enumerate(sys.argv):
-        if arg in ("--concurrent", "-c") and i + 1 < len(sys.argv):
-            try:
-                max_concurrent = int(sys.argv[i + 1])
-                if max_concurrent < 1:
-                    max_concurrent = 1
-                break
-            except ValueError:
-                pass
+    import argparse
+
+    parser = argparse.ArgumentParser(description="FlowScan 批量安全扫描编排入口")
+    parser.add_argument("-d", "--debug", action="store_true", help="开启 debug 模式，保存模块完整输出")
+    parser.add_argument("-c", "--concurrent", type=int, default=1, help="最大并发目标数，默认 1")
+    parser.add_argument("--workers", type=int, default=25, help="事件消费 Worker 数量，默认 25")
+    parser.add_argument("--max-processes", type=int, default=20, help="全局最大并发底层扫描器进程数，默认 20")
+    parser.add_argument("--seen-events-limit", type=int, default=1000000, help="seen_events 去重集合清理阈值，默认 1000000")
+    args = parser.parse_args()
+
+    max_concurrent = max(1, args.concurrent)
+    max_workers = max(1, args.workers)
+    max_processes = max(1, args.max_processes)
+    seen_events_limit = max(1, args.seen_events_limit)
     
     try:
         loader()
-        asyncio.run(batch_file_watcher(debug=debug_mode, max_concurrent_targets=max_concurrent))
+        asyncio.run(batch_file_watcher(
+            debug=args.debug,
+            max_concurrent_targets=max_concurrent,
+            max_workers=max_workers,
+            max_processes=max_processes,
+            seen_events_limit=seen_events_limit,
+        ))
     except KeyboardInterrupt:
         logging.info("\n🛑 收到终止信号，批量监控器已安全退出。")

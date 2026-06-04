@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FlowScan RUN_LOG 图结构查看器</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121a2d;
+      --panel2: #182238;
+      --text: #e7eefc;
+      --muted: #91a4c6;
+      --line: #33476d;
+      --accent: #60a5fa;
+      --green: #34d399;
+      --orange: #f59e0b;
+      --red: #fb7185;
+      --purple: #a78bfa;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top left, #172554 0, var(--bg) 36%, #050816 100%);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+    header {
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      border-bottom: 1px solid rgba(148,163,184,.22);
+      background: rgba(10, 16, 32, .86);
+      backdrop-filter: blur(10px);
+    }
+    h1 { margin: 0; font-size: 18px; letter-spacing: .2px; }
+    .sub { color: var(--muted); font-size: 12px; margin-top: 3px; }
+    .app {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      height: calc(100vh - 64px);
+    }
+    aside {
+      overflow: auto;
+      background: rgba(18, 26, 45, .92);
+      border-right: 1px solid rgba(148,163,184,.18);
+      padding: 14px;
+    }
+    main {
+      position: relative;
+      overflow: hidden;
+    }
+    .toolbar {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      z-index: 5;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid rgba(148,163,184,.18);
+      border-radius: 14px;
+      background: rgba(11, 16, 32, .82);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 30px rgba(0,0,0,.24);
+    }
+    button, input, select {
+      color: var(--text);
+      background: var(--panel2);
+      border: 1px solid rgba(148,163,184,.25);
+      border-radius: 10px;
+      padding: 8px 10px;
+      outline: none;
+    }
+    input[type="file"] { max-width: 230px; }
+    input[type="text"] { min-width: 220px; }
+    button {
+      cursor: pointer;
+      transition: transform .08s ease, border-color .12s ease, background .12s ease;
+    }
+    button:hover { border-color: var(--accent); background: #1e2b48; }
+    button:active { transform: translateY(1px); }
+    .btn-primary { background: #1d4ed8; border-color: #3b82f6; }
+    .card {
+      background: rgba(24, 34, 56, .76);
+      border: 1px solid rgba(148,163,184,.18);
+      border-radius: 14px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      color: #dbeafe;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .stat {
+      padding: 10px;
+      border-radius: 12px;
+      background: rgba(15, 23, 42, .7);
+      border: 1px solid rgba(148,163,184,.12);
+    }
+    .stat b { display: block; font-size: 20px; color: #fff; }
+    .stat span { color: var(--muted); font-size: 12px; }
+    .legend { display: grid; gap: 8px; color: var(--muted); font-size: 13px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .dot-target { background: var(--green); }
+    .dot-module { background: var(--orange); }
+    .dot-value { background: var(--accent); }
+    .list { display: grid; gap: 8px; }
+    .row {
+      padding: 9px;
+      border-radius: 10px;
+      background: rgba(15, 23, 42, .62);
+      border: 1px solid transparent;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--muted);
+      word-break: break-all;
+    }
+    .row:hover { border-color: rgba(96,165,250,.6); color: var(--text); }
+    .row strong { color: var(--text); font-size: 13px; }
+    #canvasWrap {
+      position: absolute;
+      inset: 0;
+      overflow: auto;
+      background-image:
+        linear-gradient(rgba(148,163,184,.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148,163,184,.06) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+    svg { display: block; min-width: 100%; min-height: 100%; }
+    .edge { stroke: rgba(148,163,184,.54); stroke-width: 1.6; fill: none; marker-end: url(#arrow); }
+    .edge.hit { stroke: var(--red); stroke-width: 3; }
+    .node rect {
+      stroke: rgba(226,232,240,.34);
+      stroke-width: 1.2;
+      filter: drop-shadow(0 8px 14px rgba(0,0,0,.28));
+    }
+    .node text { fill: #f8fafc; font-size: 12px; dominant-baseline: middle; pointer-events: none; }
+    .node .small { fill: rgba(226,232,240,.72); font-size: 10px; }
+    .node.highlight rect { stroke: var(--red); stroke-width: 3; }
+    .empty {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      text-align: center;
+      padding: 40px;
+    }
+    .details {
+      max-height: 300px;
+      overflow: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #cbd5e1;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .warn { color: var(--orange); }
+    .error { color: var(--red); }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>FlowScan RUN_LOG 图结构查看器</h1>
+      <div class="sub">展示 RUN_LOG 中 target → module_event → value 的事件关系图</div>
+    </div>
+    <div class="sub">提示：直接 file:// 打开时请选择 RUN_LOG 文件；通过 HTTP 服务打开时可自动加载 ./outputs/RUN_LOG</div>
+  </header>
+
+  <div class="app">
+    <aside>
+      <div class="card">
+        <h2>加载 RUN_LOG</h2>
+        <input id="fileInput" type="file" accept=".log,.json,.jsonl,.txt,RUN_LOG" />
+        <div style="height:8px"></div>
+        <button class="btn-primary" id="autoLoadBtn">自动读取 ./outputs/RUN_LOG</button>
+        <div id="loadMsg" class="sub" style="margin-top:8px">尚未加载</div>
+      </div>
+
+      <div class="card">
+        <h2>筛选 / 查询</h2>
+        <input id="searchBox" type="text" placeholder="搜索 target/module/event/value" style="width:100%" />
+        <div style="height:8px"></div>
+        <select id="layoutSelect" style="width:100%">
+          <option value="dag">按层级布局 root → leaf</option>
+          <option value="rows">按 RUN_LOG 行顺序布局</option>
+        </select>
+        <div style="height:8px"></div>
+        <button id="fitBtn">适配视图</button>
+        <button id="clearBtn">清空高亮</button>
+      </div>
+
+      <div class="card">
+        <h2>统计</h2>
+        <div class="stats">
+          <div class="stat"><b id="statRecords">0</b><span>RUN_LOG 记录</span></div>
+          <div class="stat"><b id="statNodes">0</b><span>节点</span></div>
+          <div class="stat"><b id="statEdges">0</b><span>边</span></div>
+          <div class="stat"><b id="statModules">0</b><span>模块</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>图例</h2>
+        <div class="legend">
+          <div class="legend-item"><span class="dot dot-target"></span>输入 target / 上游事件值</div>
+          <div class="legend-item"><span class="dot dot-module"></span>模块产生动作 module_event</div>
+          <div class="legend-item"><span class="dot dot-value"></span>输出事件 value</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>匹配记录</h2>
+        <div id="recordList" class="list"><div class="sub">加载后显示</div></div>
+      </div>
+
+      <div class="card">
+        <h2>详情</h2>
+        <div id="details" class="details">点击节点或记录查看详情。</div>
+      </div>
+    </aside>
+
+    <main>
+      <div class="toolbar">
+        <button id="zoomInBtn">放大</button>
+        <button id="zoomOutBtn">缩小</button>
+        <button id="resetZoomBtn">重置缩放</button>
+        <span class="sub">节点可点击；搜索会高亮相关节点和边。</span>
+      </div>
+      <div id="canvasWrap">
+        <div id="empty" class="empty">
+          <div>
+            <h2>请选择 outputs/RUN_LOG 文件</h2>
+            <p>RUN_LOG 每行应为 JSON：{"target":"127.0.0.1","module_name":"fscan_module","event_name":"PORT_OPEN","value":"127.0.0.1:80"}</p>
+          </div>
+        </div>
+        <svg id="graphSvg" width="1400" height="900"></svg>
+      </div>
+    </main>
+  </div>
+
+<script>
+const state = {
+  records: [],
+  graph: { nodes: [], edges: [] },
+  scale: 1,
+  highlight: new Set(),
+  edgeHighlight: new Set(),
+};
+
+const el = (id) => document.getElementById(id);
+const svg = el('graphSvg');
+const canvasWrap = el('canvasWrap');
+
+function normalizeModuleName(name) {
+  name = String(name || 'UNKNOWN').trim() || 'UNKNOWN';
+  return name.endsWith('_module') ? name.slice(0, -'_module'.length) : name;
+}
+
+function safeText(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function shortText(text, max = 34) {
+  text = String(text ?? '');
+  return text.length > max ? text.slice(0, max - 1) + '…' : text;
+}
+
+function parseRunLog(text) {
+  const records = [];
+  const warnings = [];
+  text.split(/\r?\n/).forEach((line, idx) => {
+    const raw = line.trim();
+    if (!raw) return;
+    try {
+      const obj = JSON.parse(raw);
+      if (!obj || typeof obj !== 'object') {
+        warnings.push(`第 ${idx + 1} 行不是 JSON 对象`);
+        return;
+      }
+      const rec = {
+        line_no: idx + 1,
+        target: String(obj.target ?? '').trim(),
+        module_name: String(obj.module_name ?? '').trim(),
+        event_name: String(obj.event_name ?? '').trim(),
+        value: String(obj.value ?? '').trim(),
+        raw: obj,
+      };
+      if (!rec.value) {
+        warnings.push(`第 ${idx + 1} 行缺少 value，已跳过`);
+        return;
+      }
+      records.push(rec);
+    } catch (e) {
+      warnings.push(`第 ${idx + 1} 行 JSON 解析失败: ${e.message}`);
+    }
+  });
+  return { records, warnings };
+}
+
+function nodeId(type, value) {
+  return `${type}:${value}`;
+}
+
+function actionId(rec) {
+  return `action:${rec.line_no}:${rec.target}:${rec.module_name}:${rec.event_name}:${rec.value}`;
+}
+
+function buildGraph(records) {
+  const nodeMap = new Map();
+  const edges = [];
+
+  function ensureNode(id, type, label, meta = {}) {
+    if (!nodeMap.has(id)) nodeMap.set(id, { id, type, label, meta, in: 0, out: 0, x: 0, y: 0, w: 220, h: 54 });
+    return nodeMap.get(id);
+  }
+
+  records.forEach((rec) => {
+    const targetNode = ensureNode(nodeId('value', rec.target), 'target', rec.target || '(empty target)', { kind: 'target_value' });
+    const moduleLabel = `${normalizeModuleName(rec.module_name)}_${rec.event_name || 'UNKNOWN'}`;
+    const moduleNode = ensureNode(actionId(rec), 'module', moduleLabel, { record: rec });
+    const valueNode = ensureNode(nodeId('value', rec.value), 'value', rec.value, { kind: 'event_value' });
+
+    const e1 = { id: `e:${rec.line_no}:in`, from: targetNode.id, to: moduleNode.id, record: rec };
+    const e2 = { id: `e:${rec.line_no}:out`, from: moduleNode.id, to: valueNode.id, record: rec };
+    edges.push(e1, e2);
+    targetNode.out += 1; moduleNode.in += 1; moduleNode.out += 1; valueNode.in += 1;
+  });
+
+  return { nodes: Array.from(nodeMap.values()), edges };
+}
+
+function layoutGraph(graph, mode) {
+  if (mode === 'rows') return layoutRows(graph);
+  return layoutDag(graph);
+}
+
+function layoutRows(graph) {
+  const nodesById = new Map(graph.nodes.map(n => [n.id, n]));
+  const actionNodes = graph.nodes.filter(n => n.type === 'module').sort((a,b) => a.meta.record.line_no - b.meta.record.line_no);
+  const usedTargets = new Set();
+  const usedValues = new Set();
+  const rowH = 105;
+  let y = 120;
+  actionNodes.forEach(action => {
+    const rec = action.meta.record;
+    const t = nodesById.get(nodeId('value', rec.target));
+    const v = nodesById.get(nodeId('value', rec.value));
+    if (t && !usedTargets.has(t.id)) { t.x = 60; t.y = y; usedTargets.add(t.id); }
+    action.x = 390; action.y = y;
+    if (v && !usedValues.has(v.id)) { v.x = 720; v.y = y; usedValues.add(v.id); }
+    y += rowH;
+  });
+  graph.nodes.forEach((n, i) => { if (!n.y) { n.x = 1020; n.y = 120 + i * 70; } });
+}
+
+function layoutDag(graph) {
+  const nodesById = new Map(graph.nodes.map(n => [n.id, n]));
+  const incoming = new Map(graph.nodes.map(n => [n.id, 0]));
+  const outgoing = new Map(graph.nodes.map(n => [n.id, []]));
+  graph.edges.forEach(e => {
+    incoming.set(e.to, (incoming.get(e.to) || 0) + 1);
+    outgoing.get(e.from).push(e.to);
+  });
+
+  const roots = graph.nodes.filter(n => (incoming.get(n.id) || 0) === 0).map(n => n.id);
+  const depth = new Map();
+  const queue = roots.length ? [...roots] : graph.nodes.map(n => n.id);
+  queue.forEach(id => depth.set(id, 0));
+
+  while (queue.length) {
+    const id = queue.shift();
+    const d = depth.get(id) || 0;
+    for (const to of outgoing.get(id) || []) {
+      if (!depth.has(to) || depth.get(to) < d + 1) {
+        depth.set(to, d + 1);
+        queue.push(to);
+      }
+    }
+  }
+
+  const layers = new Map();
+  graph.nodes.forEach(n => {
+    const d = depth.get(n.id) ?? 0;
+    if (!layers.has(d)) layers.set(d, []);
+    layers.get(d).push(n);
+  });
+
+  const colW = 320;
+  const rowH = 95;
+  for (const [d, nodes] of layers.entries()) {
+    nodes.sort((a, b) => a.label.localeCompare(b.label));
+    nodes.forEach((n, i) => {
+      n.x = 70 + d * colW;
+      n.y = 120 + i * rowH;
+    });
+  }
+}
+
+function renderGraph() {
+  const graph = state.graph;
+  const mode = el('layoutSelect').value;
+  layoutGraph(graph, mode);
+
+  const maxX = Math.max(1200, ...graph.nodes.map(n => n.x + n.w + 120));
+  const maxY = Math.max(800, ...graph.nodes.map(n => n.y + n.h + 120));
+  svg.setAttribute('width', maxX);
+  svg.setAttribute('height', maxY);
+
+  const nodesById = new Map(graph.nodes.map(n => [n.id, n]));
+  const edgeHtml = graph.edges.map(e => {
+    const a = nodesById.get(e.from);
+    const b = nodesById.get(e.to);
+    if (!a || !b) return '';
+    const x1 = a.x + a.w;
+    const y1 = a.y + a.h / 2;
+    const x2 = b.x;
+    const y2 = b.y + b.h / 2;
+    const mid = Math.max(40, (x2 - x1) / 2);
+    const path = `M ${x1} ${y1} C ${x1 + mid} ${y1}, ${x2 - mid} ${y2}, ${x2} ${y2}`;
+    const hit = state.edgeHighlight.has(e.id) ? ' hit' : '';
+    return `<path class="edge${hit}" d="${path}" />`;
+  }).join('\n');
+
+  const nodeHtml = graph.nodes.map(n => {
+    const fill = n.type === 'module' ? '#b45309' : (n.type === 'target' ? '#047857' : '#1d4ed8');
+    const stroke = n.type === 'module' ? '#fbbf24' : (n.type === 'target' ? '#6ee7b7' : '#93c5fd');
+    const highlighted = state.highlight.has(n.id) ? ' highlight' : '';
+    const label = safeText(shortText(n.label, 32));
+    const sub = n.type === 'module'
+      ? `line ${n.meta.record.line_no}`
+      : `${n.in} in / ${n.out} out`;
+    return `
+      <g class="node${highlighted}" data-node-id="${safeText(n.id)}" transform="translate(${n.x},${n.y})">
+        <rect width="${n.w}" height="${n.h}" rx="13" fill="${fill}" stroke="${stroke}"></rect>
+        <text x="14" y="23">${label}</text>
+        <text class="small" x="14" y="40">${safeText(sub)}</text>
+      </g>`;
+  }).join('\n');
+
+  svg.innerHTML = `
+    <defs>
+      <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+        <path d="M0,0 L0,6 L9,3 z" fill="rgba(148,163,184,.75)"></path>
+      </marker>
+    </defs>
+    <g transform="scale(${state.scale})">
+      ${edgeHtml}
+      ${nodeHtml}
+    </g>`;
+
+  svg.querySelectorAll('.node').forEach(g => {
+    g.addEventListener('click', () => showNodeDetails(g.getAttribute('data-node-id')));
+  });
+
+  el('empty').style.display = graph.nodes.length ? 'none' : 'flex';
+  updateStats();
+}
+
+function updateStats() {
+  const modules = new Set(state.records.map(r => r.module_name));
+  el('statRecords').textContent = state.records.length;
+  el('statNodes').textContent = state.graph.nodes.length;
+  el('statEdges').textContent = state.graph.edges.length;
+  el('statModules').textContent = modules.size;
+}
+
+function renderRecordList(records) {
+  const box = el('recordList');
+  if (!records.length) {
+    box.innerHTML = '<div class="sub">无匹配记录</div>';
+    return;
+  }
+  box.innerHTML = records.slice(0, 200).map((r, i) => `
+    <div class="row" data-idx="${i}">
+      <strong>${safeText(r.target)} ${safeText(normalizeModuleName(r.module_name))}_${safeText(r.event_name)}</strong><br>
+      ${safeText(r.value)}<br>
+      <span>line ${r.line_no}</span>
+    </div>`).join('') + (records.length > 200 ? `<div class="sub">仅显示前 200 条，共 ${records.length} 条</div>` : '');
+  box.querySelectorAll('.row').forEach((row, i) => {
+    row.addEventListener('click', () => {
+      const rec = records[i];
+      highlightByRecord(rec);
+      el('details').textContent = JSON.stringify(rec.raw, null, 2);
+      renderGraph();
+    });
+  });
+}
+
+function highlightByRecord(rec) {
+  state.highlight.clear();
+  state.edgeHighlight.clear();
+  state.highlight.add(nodeId('value', rec.target));
+  state.highlight.add(actionId(rec));
+  state.highlight.add(nodeId('value', rec.value));
+  state.graph.edges.forEach(e => { if (e.record === rec) state.edgeHighlight.add(e.id); });
+}
+
+function showNodeDetails(id) {
+  const node = state.graph.nodes.find(n => n.id === id);
+  if (!node) return;
+  state.highlight.clear();
+  state.edgeHighlight.clear();
+  state.highlight.add(id);
+  state.graph.edges.forEach(e => {
+    if (e.from === id || e.to === id) {
+      state.edgeHighlight.add(e.id);
+      state.highlight.add(e.from);
+      state.highlight.add(e.to);
+    }
+  });
+  const related = state.records.filter(r =>
+    r.target === node.label || r.value === node.label || actionId(r) === id
+  );
+  el('details').textContent = JSON.stringify({ node, related_records: related.map(r => r.raw) }, null, 2);
+  renderGraph();
+}
+
+function applySearch() {
+  const q = el('searchBox').value.trim().toLowerCase();
+  state.highlight.clear();
+  state.edgeHighlight.clear();
+  let matched = state.records;
+  if (q) {
+    matched = state.records.filter(r => [r.target, r.module_name, r.event_name, r.value].some(v => String(v).toLowerCase().includes(q)));
+    matched.forEach(r => {
+      state.highlight.add(nodeId('value', r.target));
+      state.highlight.add(actionId(r));
+      state.highlight.add(nodeId('value', r.value));
+      state.graph.edges.forEach(e => { if (e.record === r) state.edgeHighlight.add(e.id); });
+    });
+  }
+  renderRecordList(matched);
+  renderGraph();
+}
+
+function loadText(text, label) {
+  const { records, warnings } = parseRunLog(text);
+  state.records = records;
+  state.graph = buildGraph(records);
+  state.highlight.clear();
+  state.edgeHighlight.clear();
+  state.scale = 1;
+  el('loadMsg').innerHTML = `${safeText(label)}：加载 ${records.length} 条记录` + (warnings.length ? `<br><span class="warn">警告 ${warnings.length} 条，详见详情</span>` : '');
+  el('details').textContent = warnings.length ? warnings.join('\n') : '加载成功。点击节点或记录查看详情。';
+  renderRecordList(records);
+  renderGraph();
+  setTimeout(fitView, 50);
+}
+
+async function autoLoad() {
+  try {
+    const res = await fetch('./outputs/RUN_LOG?ts=' + Date.now());
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    loadText(text, './outputs/RUN_LOG');
+  } catch (e) {
+    el('loadMsg').innerHTML = `<span class="error">自动读取失败：${safeText(e.message)}。如果你是 file:// 打开，请手动选择 outputs/RUN_LOG 文件。</span>`;
+  }
+}
+
+function fitView() {
+  const w = svg.getAttribute('width') || 1200;
+  const h = svg.getAttribute('height') || 800;
+  const sx = (canvasWrap.clientWidth - 40) / Number(w);
+  const sy = (canvasWrap.clientHeight - 110) / Number(h);
+  state.scale = Math.max(0.2, Math.min(1.2, sx, sy));
+  renderGraph();
+  canvasWrap.scrollTo(0, 0);
+}
+
+el('fileInput').addEventListener('change', async (ev) => {
+  const file = ev.target.files && ev.target.files[0];
+  if (!file) return;
+  const text = await file.text();
+  loadText(text, file.name);
+});
+el('autoLoadBtn').addEventListener('click', autoLoad);
+el('searchBox').addEventListener('input', applySearch);
+el('layoutSelect').addEventListener('change', () => { renderGraph(); setTimeout(fitView, 20); });
+el('fitBtn').addEventListener('click', fitView);
+el('clearBtn').addEventListener('click', () => { state.highlight.clear(); state.edgeHighlight.clear(); el('searchBox').value = ''; renderRecordList(state.records); renderGraph(); });
+el('zoomInBtn').addEventListener('click', () => { state.scale = Math.min(3, state.scale * 1.2); renderGraph(); });
+el('zoomOutBtn').addEventListener('click', () => { state.scale = Math.max(0.15, state.scale / 1.2); renderGraph(); });
+el('resetZoomBtn').addEventListener('click', () => { state.scale = 1; renderGraph(); });
+
+renderGraph();
+</script>
+</body>
+</html>

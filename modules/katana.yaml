@@ -14,7 +14,7 @@ execute:
   - URL
   timeout: 1800
   max_parallel_num: 3
-  command: 'katana -u {{data}} -d 3 -jc -kf all -jsonl -silent'
+  command: 'katana -u {{data}} -d 3 -jc -kf all -jsonl -silent -proxy http://127.0.0.1:7777'
 parser:
   type: rules
   rules:

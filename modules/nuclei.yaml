@@ -16,7 +16,7 @@ execute:
   - VULNERABILITY
   timeout: 7200
   max_parallel_num: 2
-  command: 'nuclei -u {{data}} -severity high,critical -c 100 -bulk-size 50 -rl 300 -timeout 5 -retries 1 -jsonl -silent'
+  command: 'nuclei -u {{data}} -severity high,critical -c 100 -mhe 150 -bulk-size 50 -rl 300 -timeout 5 -retries 1 -jsonl -silent'
 parser:
   type: rules
   rules:

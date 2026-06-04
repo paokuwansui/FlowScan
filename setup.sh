@@ -3,7 +3,7 @@
 # ====================================================================
 # 脚本功能: 自动配置环境依赖
 # ====================================================================
-sudo apt update && sudo apt install -y git python3 python3-pip python-is-python3 golang-go
+sudo apt update && sudo apt install -y git python3 python3-pip python-is-python3 golang-go unzip
 mkdir -p "$HOME/.local/bin"
 mkdir -p "$HOME/go/tmp"
 git clone https://github.com/0xGuigui/Katoolin3.git

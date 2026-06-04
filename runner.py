@@ -19,6 +19,10 @@ class Event:
         self.source = source
         self.root_target = root_target or value  # 根事件的root_target就是自己，子事件会继承
         self.cancel_token = None
+        # 记录产生该事件时对应的输入目标值，用于 outputs/RUN_LOG 追溯。
+        # 例如 fscan 对 127.0.0.1 扫描产生 [PORT_OPEN]127.0.0.1:80，
+        # 则 input_target=127.0.0.1。
+        self.input_target = value
 
     def __repr__(self):
         return f"[{self.source}] ({self.type}) -> {self.value}"
@@ -634,6 +638,7 @@ class PipelineModule:
                             # 🌟 修复Bug 1: 子事件继承父事件的root_target
                             if not hasattr(new_evt, 'root_target') or not new_evt.root_target:
                                 new_evt.root_target = event.root_target if hasattr(event, 'root_target') else event.value
+                            new_evt.input_target = event.value
                             new_evt.cancel_token = getattr(event, 'cancel_token', None) or orchestrator._cancel_token_for(event.type, event.value)
                             if orchestrator.is_event_canceled(new_evt):
                                 continue
@@ -678,13 +683,22 @@ class PipelineModule:
 # 2. 编排总控引擎（纯粹的结果导向型，全局跨域绝对去重）
 # ==========================================
 class Orchestrator:
-    def __init__(self, modules_dir: str, max_workers: int = 10, max_processes: int = 5, debug: bool = False):
+    def __init__(
+        self,
+        modules_dir: str,
+        max_workers: int = 25,
+        max_processes: int = 20,
+        debug: bool = False,
+        seen_events_limit: int = 1000000,
+    ):
         self.modules_dir = modules_dir
         self.queue = asyncio.Queue()  
         self.modules = []            
         self.daemon_modules = []     
         self.seen_events = set()     
         self.max_workers = max_workers
+        self.max_processes = max_processes
+        self.seen_events_limit = max(1, int(seen_events_limit))
         self.process_semaphore = asyncio.Semaphore(max_processes)
         self.module_semaphores = {}  # 🌟 新增：模块级信号量字典 {module_name: Semaphore}
         self.debug = debug  # 🌟 新增：debug模式开关
@@ -955,7 +969,11 @@ class Orchestrator:
 
     # 🌟 修复核心点 1：增加 force 参数，允许特定情况强行破开去重限制入队
     async def _persist_event(self, event: Event):
-        """按事件类型统一落盘到 ./outputs/<EVENT_TYPE>，并发安全且去重。"""
+        """按事件类型统一落盘到 ./outputs/<EVENT_TYPE>，并同步写 RUN_LOG。
+
+        事件文件和 RUN_LOG 共用同一个 persist_lock，避免并发写入时出现交叉、重复
+        或 RUN_LOG 与事件文件不一致的问题。
+        """
         if not self._has_value(getattr(event, 'value', None)):
             return
 
@@ -966,6 +984,7 @@ class Orchestrator:
 
         unique_key = f"{event_type}:{event_value}"
         output_path = os.path.join("./outputs", event_type)
+        run_log_path = os.path.join("./outputs", "RUN_LOG")
 
         async with self.persist_lock:
             if unique_key in self.persisted_events:
@@ -976,6 +995,14 @@ class Orchestrator:
             def sync_write_event():
                 with open(output_path, 'a', encoding='utf-8') as f:
                     f.write(event_value + "\n")
+                run_log = {
+                    "target": str(getattr(event, 'input_target', event_value)),
+                    "module_name": str(getattr(event, 'source', 'ROOT')),
+                    "event_name": event_type,
+                    "value": event_value,
+                }
+                with open(run_log_path, 'a', encoding='utf-8') as f:
+                    f.write(json.dumps(run_log, ensure_ascii=False) + "\n")
 
             await asyncio.to_thread(sync_write_event)
 
@@ -1045,12 +1072,16 @@ class Orchestrator:
         
         await self.queue.join()
         
-        # 🌟 修复Bug 3: 使用LRU策略清理，避免重复扫描
-        if len(self.seen_events) > 10000:
-            logging.info(f"🧹 清理事件去重集合（保留最近的5000条），当前大小: {len(self.seen_events)}")
+        # 🌟 使用可配置阈值清理事件去重集合，避免长期运行内存无限增长
+        if len(self.seen_events) > self.seen_events_limit:
+            keep_count = max(1, self.seen_events_limit // 2)
+            logging.info(
+                f"🧹 清理事件去重集合（保留约{keep_count}条），"
+                f"当前大小: {len(self.seen_events)}，阈值: {self.seen_events_limit}"
+            )
             # 转换为列表，删除最早的一半
             items = list(self.seen_events)
-            to_remove = items[:len(items)//2]
+            to_remove = items[:max(0, len(items) - keep_count)]
             for item in to_remove:
                 self.seen_events.discard(item)
         
@@ -1130,8 +1161,8 @@ class Orchestrator:
 # 3. 入口点激活（完美的纯顺序批量处理）
 # ==========================================
 async def main():
-    # 实例化引擎：开10个多事件消费并发，限制操作系统最多只有5个底层的扫描器跑着
-    engine = Orchestrator("./modules", max_workers=10, max_processes=5)
+    # 实例化引擎：默认 25 个事件消费 Worker，最多 20 个底层扫描器进程
+    engine = Orchestrator("./modules")
     
     # 启动环境（Xray 在这里启动，自始至终只拉起这 1 次）
     await engine.setup_engine()

@@ -13,7 +13,7 @@ execute:
   - DOMAIN
   outputs:
   - SUBDOMAIN
-  command: 'dnsx -d {{data}} -w ./wordlists/subdomains.txt -t 200 -silent -auto-wildcard'
+  command: 'dnsx -d {{data}} -w ./wordlists/subdomains.txt -t 200 -silent -wt 5'
   timeout: 1800
   max_parallel_num: 3
 parser:
