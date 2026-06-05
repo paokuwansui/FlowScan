@@ -6,14 +6,13 @@ check:
   exclude_keyword: not found
 install:
   steps:
-  - sudo apt update
-  - sudo apt install dnsx -y
+  - GOBIN="$HOME/.local/bin" go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest
 execute:
   inputs:
   - DOMAIN
   outputs:
   - SUBDOMAIN
-  command: 'dnsx -d {{data}} -w ./wordlists/subdomains.txt -t 200 -silent -wt 5'
+  command: 'dnsx -d {{data}} -w ./wordlists/subdomains.txt -t 200 -silent -auto-wildcard'
   timeout: 1800
   max_parallel_num: 3
 parser:

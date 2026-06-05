@@ -28,8 +28,10 @@ parser:
       SIZE: '{{SIZE.strip()}}'
     events:
       URI: '{{URI}}'
+      URL: '{{URI}}'
     filters:
       URI:
         if_not_empty: true
 event_extractors:
   URI: (?P<value>https?://\S+)
+  URL: (?P<value>https?://\S+/)

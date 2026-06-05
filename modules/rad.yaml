@@ -24,7 +24,7 @@ parser:
   rules:
   - match:
       type: regex
-      pattern: ^\[(?P<METHOD>[A-Z]+)\]\s+(?P<URL>https?://\S+)$
+      pattern: ^(?P<METHOD>[A-Z]+)\s+(?P<URL>https?://\S+)
     extract:
       METHOD: '{{METHOD}}'
       URL: '{{URL}}'

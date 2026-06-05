@@ -8,6 +8,11 @@ Input semantics:
 - DOMAIN/SUBDOMAIN-like value -> fofax -q 'domain="value"' -ffi
 - LIVE_URL-like value          -> fofax -uc value -ffi
 - ICON_PATH-like favicon URL   -> fofax -iu value -ffi
+- FOFA expression / fx query   -> fofax -q value [-fe] -ffi
+
+Output policy semantics:
+- mode="truncate": output at most policy["limit"] unique parsed results.
+- mode="drop_all": if unique parsed results exceed policy["limit"], output nothing.
 """
 
 import argparse
@@ -17,6 +22,20 @@ import re
 import subprocess
 import sys
 from urllib.parse import urlparse
+
+# 查询策略配置：按“接收到的查询事件类型”控制最多输出数量和超量处理方式。
+# mode 支持：
+# - truncate：截断输出，最多输出 limit 条。
+# - drop_all：只要去重后的有效结果数量大于 limit，则本次查询结果全部丢弃，一条也不返回。
+QUERY_POLICIES = {
+    "DOMAIN": {"limit": 1000, "mode": "truncate"},     # 域名或子域名查询事件
+    "URL": {"limit": 500, "mode": "truncate"},         # URL 存活查询事件
+    "ICON": {"limit": 300, "mode": "drop_all"},        # 图标 Hash / favicon 匹配事件
+    "ADVANCED": {"limit": 1000, "mode": "truncate"},   # 高级 FOFA 语法/表达式查询事件
+}
+
+DEFAULT_QUERY_POLICY = {"limit": 1000, "mode": "truncate"}
+VALID_POLICY_MODES = {"truncate", "drop_all"}
 
 IP_RE = re.compile(r"^(?P<ip>(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d))(?:[:/].*)?$")
 DOMAIN_RE = re.compile(r"^(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}$")
@@ -66,13 +85,50 @@ def parse_domain_type(host: str) -> str:
     parts = host.split(".")
     if len(parts) <= 2:
         return "DOMAIN"
-    
+
     # 检查最后两级是否属于常见双字后缀（如 com.cn）
     last_two = ".".join(parts[-2:])
     if last_two in COMMON_PUBLIC_SUFFIXES:
         return "DOMAIN" if len(parts) == 3 else "SUBDOMAIN"
-        
+
     return "SUBDOMAIN"
+
+
+def get_query_mode(query: str) -> str:
+    """根据接收到的原始查询值识别查询事件类型，用于选择 QUERY_POLICIES。"""
+    value = query.strip()
+    if looks_like_icon_url(value):
+        return "ICON"
+    if is_url(value):
+        return "URL"
+    if is_advanced_fofa_query(value):
+        return "ADVANCED"
+    return "DOMAIN"
+
+
+def is_advanced_fofa_query(value: str) -> bool:
+    """识别 FOFA 高级语法/表达式查询。"""
+    if value.startswith(('fx=', 'fx="', "fx='")):
+        return True
+    return any(op in value for op in ('="', "='", " && ", " || ", "title=", "body=", "host=", "ip=", "app="))
+
+
+def get_query_policy(query_mode: str) -> dict[str, int | str]:
+    """读取并校验查询策略；配置错误时回退到安全的默认截断策略。"""
+    raw_policy = QUERY_POLICIES.get(query_mode, DEFAULT_QUERY_POLICY)
+
+    try:
+        limit = int(raw_policy.get("limit", DEFAULT_QUERY_POLICY["limit"]))
+    except (TypeError, ValueError):
+        limit = int(DEFAULT_QUERY_POLICY["limit"])
+    if limit < 0:
+        limit = 0
+
+    mode = str(raw_policy.get("mode", DEFAULT_QUERY_POLICY["mode"])).strip()
+    if mode not in VALID_POLICY_MODES:
+        mode = str(DEFAULT_QUERY_POLICY["mode"])
+
+    return {"limit": limit, "mode": mode}
 
 
 def classify_fofax_value(value: str) -> dict[str, str] | None:
@@ -96,7 +152,7 @@ def classify_fofax_value(value: str) -> dict[str, str] | None:
         return {"type": "URL", "value": item}
 
     host = strip_port(item)
-    
+
     # 拦截独立出现的黑名单域名
     if host in IGNORE_DOMAINS:
         return None
@@ -121,12 +177,43 @@ def build_fofax_args(query: str, fetch_size: int = 1000) -> list[str]:
         return ["-uc", value, *fetch]
     if value.startswith('fx=') or value.startswith('fx="') or value.startswith("fx='"):
         return ["-q", value, "-fe", *fetch]
-    if any(op in value for op in ('="', "='", " && ", " || ", "title=", "body=", "host=", "ip=", "app=")):
+    if is_advanced_fofa_query(value):
         return ["-q", value, *fetch]
     return ["-q", f'domain="{value}"', *fetch]
 
 
+def emit_with_policy(parsed: dict[str, str], policy: dict[str, int | str], state: dict) -> None:
+    """按策略处理一条去重后的有效结果。drop_all 模式会延迟到查询结束后再输出。"""
+    limit = int(policy["limit"])
+    mode = str(policy["mode"])
+
+    state["count"] += 1
+
+    if mode == "truncate":
+        if state["count"] <= limit:
+            print(json.dumps(parsed, ensure_ascii=False), flush=True)
+        return
+
+    if mode == "drop_all":
+        if state["count"] <= limit:
+            state["buffer"].append(parsed)
+        else:
+            state["dropped"] = True
+            state["buffer"].clear()
+
+
+def flush_drop_all_buffer(policy: dict[str, int | str], state: dict) -> None:
+    """drop_all 模式下，如果最终未超过 limit，则统一输出缓存结果。"""
+    if policy["mode"] != "drop_all" or state.get("dropped"):
+        return
+    for parsed in state.get("buffer", []):
+        print(json.dumps(parsed, ensure_ascii=False), flush=True)
+
+
 def run_fofax(fofax_bin: str, query: str, fetch_size: int) -> int:
+    query_mode = get_query_mode(query)
+    policy = get_query_policy(query_mode)
+
     cmd = [fofax_bin]
     api_key = os.environ.get("FOFA_KEY", "")
     if api_key:
@@ -146,6 +233,8 @@ def run_fofax(fofax_bin: str, query: str, fetch_size: int) -> int:
         return 2
 
     seen = set()
+    state = {"count": 0, "buffer": [], "dropped": False}
+
     try:
         # 流式按行解析，优化内存并杜绝卡死
         for line in proc.stdout:
@@ -156,8 +245,8 @@ def run_fofax(fofax_bin: str, query: str, fetch_size: int) -> int:
             if key in seen:
                 continue
             seen.add(key)
-            print(json.dumps(parsed, ensure_ascii=False), flush=True)
-            
+            emit_with_policy(parsed, policy, state)
+
         proc.wait(timeout=120)
     except subprocess.TimeoutExpired as exc:
         proc.kill()
@@ -168,6 +257,7 @@ def run_fofax(fofax_bin: str, query: str, fetch_size: int) -> int:
         print(f"[-] 运行运行时异常: {sanitize_error_message(exc)}", file=sys.stderr)
         return 2
 
+    flush_drop_all_buffer(policy, state)
     return proc.returncode
 
 

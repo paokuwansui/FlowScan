@@ -6,8 +6,7 @@ check:
   exclude_keyword: not found
 install:
   steps:
-  - sudo apt update
-  - sudo apt install dnsx -y
+  - GOBIN="$HOME/.local/bin" go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest
 execute:
   inputs:
   - SUBDOMAIN
