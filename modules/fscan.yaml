@@ -1,11 +1,12 @@
 name: fscan_module
-description: 一款全方位一键内网/外网漏洞和弱口令综合扫描组件
+description: Fscan 服务探测/漏洞/弱口令 — 接 rustscan 的 PORT_OPEN 端口进行针对性 JSON 输出检测
 check:
-  command: fscan
-  expect_keyword: Fscan 2
-  exclude_keyword: ''
+  command: $HOME/.local/bin/fscan -h 2>&1 || true
+  expect_keyword: Usage
+  exclude_keyword: not found
 install:
   steps:
+  - mkdir -p "$HOME/.local/bin"
   - 'python3 - <<''PY'' | xargs -I{} sh -c ''curl -fL
     "{}" -o "$HOME/.local/bin/fscan" && chmod 0755 "$HOME/.local/bin/fscan"''
 
@@ -24,52 +25,89 @@ install:
     print(matches[0] if matches else "")
 
     PY'
-execute:
-  inputs:
-  - IP
-  - SUBDOMAIN
-  outputs:
-  - LIVE_URL
+  install_timeout_seconds: 900
+runtime:
+  max_concurrency: 2
+  exec_timeout_seconds: 600
+allowed_output_events:
+- FINGERPRINT
+- LIVE_URL
+- VULNERABILITY
+io_contract:
+  input_events:
   - PORT_OPEN
-  - VULNERABILITY
-  timeout: 1800
-  max_parallel_num: 3
-  command: 'fscan -h {{data}} -no -silent'
-parser:
-  type: rules
-  rules:
-  - match:
-      type: prefix
-      value: '[+]'
-    extract:
-      VULNERABILITY: '{{rest}}'
-  - match:
-      type: json_field
-      field: type
-      equals: PORT
-    extract:
-      PORT_OPEN: '{{host}}:{{port}}'
-  - match:
-      type: multi_match
-      conditions:
-      - type: json_field_equals
-        field: type
-        equals: SERVICE
-      - type: json_field_in
-        field: service
-        values:
-        - http
-        - https
-        - ssl
-    extract:
-      LIVE_URL: '{{service.replace(''ssl'',''https'')}}://{{host}}:{{port}}'
-  - match:
-      type: json_field
-      field: service
-      equals: dps-shell
-    extract:
-      VULNERABILITY: '异常Shell监听服务: {{target}} [ {{banner}} ]'
-event_extractors:
-  LIVE_URL: (?P<value>https?://\S+)
-  PORT_OPEN: (?P<value>[^\s:/]+:\d{1,5})
-  VULNERABILITY: ''
+  input_transform_code: |
+    import re, shlex
+
+    value = data["value"].strip()
+    if not value:
+        return []
+
+    # 格式: "127.0.0.1:[22,80,443]"
+    m = re.match(r"(\d+\.\d+\.\d+\.\d+):\[([0-9,\s]+)\]", value)
+    if m:
+        host = m.group(1)
+        ports = [p.strip() for p in m.group(2).split(",") if p.strip()]
+        ports_str = ",".join(ports)
+        return [{"host": host, "ports": ports_str, "host_q": shlex.quote(host), "ports_q": shlex.quote(ports_str)}]
+
+    return []
+execution:
+  command: $HOME/.local/bin/fscan -h {{host_q}} -p {{ports_q}} -np -no -silent -t 3000 -num 100 -time 3 -f json -full 2>/dev/null
+  output_parse_code: |
+    import json
+
+    results = []
+    seen = set()
+
+    def add(k, v):
+        v = str(v or "").strip()
+        if not v:
+            return
+        key = (k, v)
+        if key not in seen:
+            seen.add(key)
+            results.append({k: v})
+
+    for line in data["stdout"].splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            item = json.loads(line)
+        except Exception:
+            continue
+
+        ftype = str(item.get("type") or "").upper()
+        host = str(item.get("host") or "")
+        port = str(item.get("port") or "")
+        port_str = "%s:%s" % (host, port) if host and port else ""
+        target = str(item.get("target") or "")
+        svc_name = str(item.get("service") or "")
+        banner = str(item.get("banner") or "")
+        version = str(item.get("version") or "")
+        os_info = str(item.get("os") or "")
+
+        if ftype == "VULN":
+            add("VULNERABILITY", line)
+
+        elif ftype == "SERVICE":
+            # 服务信息 → FINGERPRINT
+            detail_parts = [svc_name, version, os_info]
+            detail = " ".join([x for x in detail_parts if x])
+            if detail:
+                add("FINGERPRINT", "tcp/%s => %s" % (port_str, detail))
+            # 技术栈 → FINGERPRINT
+            if version:
+                add("FINGERPRINT", "%s %s @ %s" % (svc_name, version, port_str))
+            if os_info:
+                add("FINGERPRINT", "%s @ %s" % (os_info, port_str))
+            if banner:
+                add("FINGERPRINT", "banner:%s @ %s" % (banner[:120], port_str))
+            # Web URL
+            if svc_name in ("http", "http-alt", "http-proxy"):
+                add("LIVE_URL", "http://%s:%s" % (host, port))
+            elif svc_name in ("https", "ssl/http", "ssl"):
+                add("LIVE_URL", "https://%s:%s" % (host, port))
+
+    return results

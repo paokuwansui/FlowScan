@@ -1,0 +1,58 @@
+# FlowScan3 主配置
+redis:
+  host: 127.0.0.1
+  port: 6379
+  password: "fjasflksaglhglfuiaefnaksl47283198234"
+  db: 0
+
+web_config:
+  host: 0.0.0.0
+  port: 8080
+  username: admin
+  password: admin
+  session_ttl: 3600
+  secret_key: flowscan3-session-secret-change-in-production
+
+# 外部 xray 被动代理监听地址；FlowScan3 不再拉起 xray 常驻进程。
+# rad 等模块可通过 {{config.http-proxy}} 读取该配置。
+http-proxy: http://127.0.0.1:7777
+
+worker:
+  idle_sleep_seconds: 1.0
+  scan_batch_size: 200
+  max_local_pending: 40
+
+fofa:
+  api_key: YOUR_FOFA_API_KEY
+  base_url: https://fofa.info
+  query_policies:
+    DOMAIN:
+      limit: 1000
+      mode: truncate
+    SUBDOMAIN:
+      limit: 1000
+      mode: truncate
+    CERT:
+      limit: 1000
+      mode: truncate
+    URL:
+      limit: 1000
+      mode: truncate
+    IP:
+      limit: 300
+      mode: drop_all
+    ICON:
+      limit: 300
+      mode: drop_all
+
+ai_analysis:
+  base_url: https://api.openai.com/v1
+  api_key: YOUR_OPENAI_COMPATIBLE_API_KEY
+  model: gpt-4o-mini
+  timeout_seconds: 120
+  max_events: 200
+  # system_prompt 未设置时自动从 prompts/ai_analysis.txt 读取
+  # system_prompt: |
+  #   自定义提示词（覆盖 prompts/ai_analysis.txt）
+  log_api_key: flowscan3-agent-log-key-change-me
+  loop_interval_minutes: 0

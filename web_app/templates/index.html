@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}仪表盘{% endblock %}
+{% block content %}
+<div class="dashboard">
+    <h1>系统仪表盘</h1>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value {% if redis_ok %}green{% else %}red{% endif %}">
+                {{ "在线" if redis_ok else "离线" }}
+            </div>
+            <div class="stat-label">Redis 状态</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-value">{{ event_count }}</div>
+            <div class="stat-label">事件总数</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-value">{{ node_count }}</div>
+            <div class="stat-label">活跃节点</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-value">{{ tool_count }}</div>
+            <div class="stat-label">已注册工具</div>
+        </div>
+    </div>
+
+    {% if queue_stats %}
+    <div class="section">
+        <h2>事件队列状态</h2>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>事件类型</th>
+                    <th>生产总数</th>
+                    <th>待处理数量</th>
+                    <th>消费者信息</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for q in queue_stats %}
+                <tr>
+                    <td>{{ q.type }}</td>
+                    <td>{{ q.total_produced }}</td>
+                    <td>{{ q.count }}</td>
+                    <td>
+                        {% if q.has_consumer %}
+                        {% for c in q.consumers %}
+                        <div style="margin-bottom:4px;">
+                            <span class="badge badge-tool">{{ c.tool }}</span>
+                            <span style="color:var(--text-muted);font-size:0.75rem;">待处理 {{ c.pending }}</span>
+                            {% if c.produces %}
+                            <span style="color:var(--text-muted);font-size:0.75rem;">→</span>
+                            {% for p in c.produces %}
+                            <span class="badge badge-event">{{ p }}</span>
+                            {% endfor %}
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <span class="badge" style="background:rgba(248,81,73,0.15);color:var(--danger);">无消费者</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="3" class="empty">无事件队列</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

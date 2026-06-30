@@ -1,0 +1,70 @@
+name: tlsx_module
+description: Tlsx TLS 证书信息提取 — 获取证书 SAN/CN/组织/指纹
+check:
+  command: $HOME/.local/bin/tlsx -version
+  expect_keyword: Current Version
+  exclude_keyword: not found
+install:
+  steps:
+  - mkdir -p "$HOME/.local/bin" "$HOME/.cache/go-tmp"
+  - GOBIN="$HOME/.local/bin" GOCACHE="$HOME/.cache/go-tmp" go install -v github.com/projectdiscovery/tlsx/cmd/tlsx@latest
+  install_timeout_seconds: 1200
+runtime:
+  max_concurrency: 6
+  exec_timeout_seconds: 120
+allowed_output_events:
+- CERT_INFO
+- SUBDOMAIN
+- FINGERPRINT
+io_contract:
+  input_events:
+  - LIVE_URL
+  - SUBDOMAIN
+  input_transform_code: |
+    import shlex
+    from urllib.parse import urlparse
+    value = data["value"].strip()
+    if "://" in value:
+        p = urlparse(value)
+        host = p.hostname or ""
+        port = str(p.port or 443)
+    else:
+        host = value.split("/")[0].split(":")[0]
+        port = "443"
+    if not host:
+        return []
+    return [{"host": host, "host_q": shlex.quote(host), "port": port, "port_q": shlex.quote(port)}]
+execution:
+  command: $HOME/.local/bin/tlsx -u {{host_q}} -p {{port_q}} -json -silent -san -cn -cert -tls-version -cipher -timeout
+    5 -c 80 2>/dev/null
+  output_parse_code: |
+    import json
+    results = []
+    seen = set()
+    def add(k, v):
+        if isinstance(v, list):
+            for x in v:
+                add(k, x)
+            return
+        if v is None:
+            return
+        v = str(v).strip().strip(".")
+        if not v or v == "*":
+            return
+        key = (k, v)
+        if key not in seen:
+            seen.add(key)
+            results.append({k: v})
+    for line in data["stdout"].splitlines():
+        try:
+            item = json.loads(line.strip())
+        except Exception:
+            continue
+        add("SUBDOMAIN", item.get("subject_an") or item.get("san") or item.get("dns_names"))
+        add("SUBDOMAIN", item.get("subject_cn") or item.get("cn"))
+        for key in ("issuer_cn", "issuer_org", "subject_org", "tls_version", "cipher"):
+            if item.get(key):
+                add("CERT_INFO", "%s=%s" % (key, item.get(key)))
+        fp = item.get("fingerprint_hash") if isinstance(item.get("fingerprint_hash"), dict) else {}
+        add("FINGERPRINT", "cert_sha256=%s" % fp.get("sha256")) if fp.get("sha256") else None
+    return results

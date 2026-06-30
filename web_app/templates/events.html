@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}事件管理{% endblock %}
+{% block content %}
+<div class="section">
+    <h1>事件管理</h1>
+
+    <div class="stats-grid" style="grid-template-columns:1fr 1fr;">
+        <div class="stat-card">
+            <div class="stat-value">{{ events|length }}</div>
+            <div class="stat-label">当前显示</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ event_types|length }}</div>
+            <div class="stat-label">事件类型数</div>
+        </div>
+    </div>
+
+    {# ── 状态操作 ── #}
+    <div class="card">
+        <h3>事件状态管理</h3>
+        <p class="help-text">
+            <strong>保存</strong>：导出 Redis 中所有 <code>fs3:*</code> 键（含事件、队列、工具、统计、日志等）为 JSON 文件。<br>
+            <strong>恢复</strong>：上传 JSON 文件，<em>先清空</em> Redis 中所有 <code>fs3:*</code> 键，再全量恢复。
+            仅支持全量导出格式（含 <code>"keys"</code> 字段的 JSON）。<br>
+            <strong>一键清空</strong>：删除 Redis 中所有 <code>fs3:event / fs3:events:type / fs3:done / fs3:lock / fs3:pending / fs3:consumers / fs3:running</code> 等事件相关状态。
+        </p>
+        <div class="form-row" style="align-items:center;gap:10px;flex-wrap:wrap;">
+            <form method="POST" action="{{ url_for('events_save_state') }}" style="display:inline;margin:0;">
+                <button type="submit" class="btn btn-primary">保存当前状态</button>
+            </form>
+            <form method="POST" action="{{ url_for('events_restore_state') }}" enctype="multipart/form-data" style="display:inline;margin:0;">
+                <input type="file" name="state_file" accept=".json" required
+                       style="padding:6px 8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:0.85rem;max-width:220px;">
+                <button type="submit" class="btn btn-warning" onclick="return confirm('确认恢复状态？\n\n该操作会先清空 Redis 中所有 fs3:* 数据，再用上传文件全量恢复。')"
+                        style="background:rgba(210,153,34,0.18);color:#d29922;border:1px solid rgba(210,153,34,0.35);">从文件恢复状态</button>
+            </form>
+            <form method="POST" action="{{ url_for('events_clear') }}" style="display:inline;margin:0;">
+                <button type="submit" class="btn btn-danger" onclick="return confirm('确认清空所有事件？该操作会删除 fs3:event / fs3:events:type / fs3:done / fs3:lock 等事件相关状态。')">一键清空所有事件</button>
+            </form>
+        </div>
+    </div>
+
+    {# ── 批量注入 ── #}
+    <div class="card">
+        <h3>批量添加事件</h3>
+        <p class="help-text">每行一个事件，格式：<code>[事件类型]事件值</code> 或直接输入值（默认 DOMAIN 类型）</p>
+        <form method="POST" action="{{ url_for('events_inject') }}">
+            <div class="form-group">
+                <textarea name="events_batch" rows="6"
+                    placeholder="[DOMAIN]example.com&#10;api.example.com（自动识别为 DOMAIN）&#10;[SUBDOMAIN]api-internal.example.com&#10;[IP]1.1.1.1&#10;[PORT_OPEN]10.0.0.1:80"
+                    style="width:100%;font-family:monospace;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:10px;resize:vertical;tab-size:2;"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">批量注入</button>
+        </form>
+    </div>
+
+    {# ── 批量移除 ── #}
+    <div class="card">
+        <h3>批量移除事件</h3>
+
+        {# 搜索事件 #}
+        <div style="margin-bottom:12px;">
+            <form method="GET" action="{{ url_for('events') }}" style="display:flex;gap:8px;align-items:center;">
+                <input type="text" name="search_val" placeholder="按事件值搜索…"
+                       value="{{ search_val or '' }}"
+                       style="flex:1;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:0.9rem;font-family:monospace;">
+                <button type="submit" class="btn btn-sm btn-primary">搜索</button>
+                {% if search_val %}
+                <a href="{{ url_for('events') }}" class="btn btn-sm btn-secondary">清除</a>
+                {% endif %}
+            </form>
+        </div>
+
+        {# 搜索结果 #}
+        {% if search_val %}
+        <div style="margin-bottom:12px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+            <div style="padding:6px 10px;background:var(--surface);font-size:0.8rem;color:var(--text-muted);border-bottom:1px solid var(--border);">
+                搜索 &quot;{{ search_val }}&quot; — {{ events|length }} 个结果
+            </div>
+            {% for evt in events %}
+            <div style="display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--surface);border-bottom:1px solid var(--border);font-size:0.82rem;">
+                <span class="badge badge-event" style="min-width:80px;">{{ evt.event_type }}</span>
+                <span style="flex:1;font-family:monospace;font-size:0.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ evt.value[:80] }}</span>
+                <span class="fp-cell">{{ evt.fingerprint[:12] }}..</span>
+                <a href="{{ url_for('event_query', path=evt.fingerprint) }}" class="btn btn-sm btn-secondary" style="padding:3px 8px;font-size:0.75rem;">路径</a>
+                <form method="POST" action="{{ url_for('events_remove') }}" style="display:inline;margin:0;">
+                    <input type="hidden" name="fingerprints" value="[{{ evt.event_type }}]{{ evt.value }}">
+                    <button type="submit" class="btn btn-sm btn-danger" style="padding:3px 8px;font-size:0.75rem;"
+                            onclick="return confirm('移除 [{{ evt.event_type }}]{{ evt.value[:24] }}..？')">删除</button>
+                </form>
+            </div>
+            {% else %}
+            <div class="empty-state" style="padding:20px;">未找到匹配事件</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {# 手动输入 #}
+        <form method="POST" action="{{ url_for('events_remove') }}">
+            <div class="form-group">
+                <textarea name="fingerprints" rows="3"
+                    placeholder="[事件类型]事件值，每行一个&#10;也支持直接粘贴 SHA256 指纹"
+                    style="width:100%;font-family:monospace;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:10px;resize:vertical;"></textarea>
+            </div>
+            <div class="form-row" style="align-items:center;">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-muted);font-size:0.85rem;">
+                    <input type="checkbox" name="cascade" value="1" checked>
+                    同时移除子事件（默认勾选）
+                </label>
+                <button type="submit" class="btn btn-danger">批量移除</button>
+            </div>
+        </form>
+    </div>
+
+    {# ── 事件列表（搜索时不显示） ── #}
+    {% if not search_val %}
+    <div class="card">
+        <h3>事件列表</h3>
+        <div class="filter-bar">
+            <form method="GET" action="{{ url_for('events') }}">
+                <select name="type" onchange="this.form.submit()">
+                    <option value="">全部类型</option>
+                    {% for et in event_types %}
+                    <option value="{{ et }}" {% if et == current_type %}selected{% endif %}>{{ et }}</option>
+                    {% endfor %}
+                </select>
+                <span class="count-info">显示 {{ events|length }} 个</span>
+            </form>
+        </div>
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>事件类型</th>
+                    <th>事件值</th>
+                    <th>来源</th>
+                    <th>指纹</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for evt in events %}
+                <tr>
+                    <td><span class="badge badge-event">{{ evt.event_type }}</span></td>
+                    <td class="value-cell">{{ evt.value[:80] }}{% if evt.value|length > 80 %}...{% endif %}</td>
+                    <td>{{ evt.source_tool or '-' }}</td>
+                    <td class="fp-cell">{{ evt.fingerprint[:16] }}...</td>
+                    <td>
+                        <a href="{{ url_for('event_query', path=evt.fingerprint) }}" class="btn btn-sm btn-secondary">路径</a>
+                        <form method="POST" action="{{ url_for('events_remove') }}" style="display:inline;">
+                            <input type="hidden" name="fingerprints"
+                                   value="[{{ evt.event_type }}]{{ evt.value }}">
+                            <button type="submit" class="btn btn-sm btn-danger"
+                                    onclick="return confirm('移除事件 [{{ evt.event_type }}]{{ evt.value[:30] }}...？')">删除</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="empty">暂无事件</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

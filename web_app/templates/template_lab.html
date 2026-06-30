@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}模板编辑测试{% endblock %}
+{% block content %}
+<div class="section template-lab">
+    <h1>模板编辑测试</h1>
+
+    <div class="stats-grid" style="grid-template-columns:1fr 1fr 1fr;">
+        <div class="stat-card">
+            <div class="stat-value">{{ module_files|length }}</div>
+            <div class="stat-label">模块 YAML</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ selected or '-' }}</div>
+            <div class="stat-label">当前文件</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="lab-status">待测试</div>
+            <div class="stat-label">最近状态</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>选择 / 保存 YAML</h3>
+        <form method="GET" action="{{ url_for('template_lab') }}" class="form-row" style="align-items:center;gap:8px;margin-bottom:10px;">
+            <select name="file" onchange="this.form.submit()" style="min-width:240px;">
+                {% for item in module_files %}
+                <option value="{{ item.filename }}" {% if item.filename == selected %}selected{% endif %}>{{ item.filename }}</option>
+                {% endfor %}
+            </select>
+            <a href="{{ url_for('template_lab') }}" class="btn btn-sm btn-secondary">刷新列表</a>
+        </form>
+        <form method="POST" action="{{ url_for('template_lab_save') }}" id="save-form">
+            <div class="form-row" style="align-items:center;gap:8px;margin-bottom:8px;">
+                <input type="text" name="filename" id="filename" value="{{ selected }}" placeholder="example.yaml"
+                       style="min-width:260px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:monospace;">
+                <button type="submit" class="btn btn-primary">保存到本地</button>
+                <button type="button" class="btn btn-secondary" onclick="downloadYaml()">下载当前内容</button>
+            </div>
+            <textarea name="yaml_text" id="yaml_text" rows="26" spellcheck="false"
+                      style="width:100%;font-family:monospace;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:12px;resize:vertical;tab-size:2;line-height:1.45;">{{ yaml_text }}</textarea>
+        </form>
+    </div>
+
+    <div class="card">
+        <h3>测试参数</h3>
+        <div class="form-row" style="gap:10px;align-items:center;flex-wrap:wrap;">
+            <label>输入事件类型
+                <input type="text" id="event_type" value="{{ default_event_type }}" style="width:150px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:monospace;">
+            </label>
+            <label>目标值
+                <input type="text" id="target" value="{{ default_target }}" style="width:280px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:monospace;">
+            </label>
+            <label>超时秒数
+                <input type="number" id="timeout" value="900" min="1" max="3600" style="width:90px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:monospace;">
+            </label>
+            <label>安装步骤
+                <input type="number" id="install_step" value="0" min="0" style="width:90px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:monospace;">
+            </label>
+        </div>
+        <p class="help-text">安装步骤填 0 表示执行全部步骤；扫描会真实执行渲染后的命令。</p>
+        <div class="form-row" style="gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-secondary" onclick="runLab('validate')">校验 YAML</button>
+            <button class="btn btn-secondary" onclick="runLab('transform')">预览输入/命令</button>
+            <button class="btn btn-secondary" onclick="runLab('check')">执行安装验证命令</button>
+            <button class="btn btn-danger" onclick="confirmRun('install', '确认执行 install.steps？这会真实安装工具。')">执行安装命令</button>
+            <button class="btn btn-danger" onclick="confirmRun('scan', '确认对目标执行扫描命令？')">给定目标扫描</button>
+            <button class="btn btn-secondary" onclick="runLab('parse')">解析样例输出</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>样例输出解析</h3>
+        <p class="help-text">把工具 stdout 粘贴到这里，点击“解析样例输出”测试 output_parse_code。</p>
+        <textarea id="stdout" rows="8" spellcheck="false"
+                  placeholder="粘贴工具输出 stdout..."
+                  style="width:100%;font-family:monospace;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:10px;resize:vertical;"></textarea>
+    </div>
+
+    <div class="card">
+        <h3>测试结果</h3>
+        <pre id="lab-output" style="white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px;min-height:220px;color:var(--text);font-family:monospace;">等待执行...</pre>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function payload(action) {
+    return {
+        action: action,
+        yaml_text: document.getElementById('yaml_text').value,
+        event_type: document.getElementById('event_type').value,
+        target: document.getElementById('target').value,
+        stdout: document.getElementById('stdout').value,
+        timeout: document.getElementById('timeout').value,
+        install_step: document.getElementById('install_step').value,
+    };
+}
+
+function setStatus(text, ok) {
+    const node = document.getElementById('lab-status');
+    node.textContent = text;
+    node.className = ok ? 'green' : 'red';
+}
+
+function runLab(action) {
+    const output = document.getElementById('lab-output');
+    output.textContent = '执行中：' + action + ' ...';
+    setStatus('执行中', true);
+    fetch('{{ url_for('template_lab_api_run') }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload(action)),
+    })
+    .then(resp => resp.json())
+    .then(data => {
+        setStatus(data.ok ? '成功' : '失败', data.ok);
+        output.textContent = JSON.stringify(data, null, 2);
+    })
+    .catch(err => {
+        setStatus('异常', false);
+        output.textContent = String(err);
+    });
+}
+
+function confirmRun(action, message) {
+    if (confirm(message)) {
+        runLab(action);
+    }
+}
+
+function downloadYaml() {
+    const name = document.getElementById('filename').value || 'module.yaml';
+    const blob = new Blob([document.getElementById('yaml_text').value], {type: 'text/yaml;charset=utf-8'});
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(link.href);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,59 @@
+name: rad_module
+description: Rad 爬虫 — 使用本项目 bin/rad，配合 config.http-proxy 做被动代理转发，发现更多端点
+check:
+  command: cd ./bin/rad && ./rad --help
+  expect_keyword: Rad - A powerful browser crawler
+  exclude_keyword: not found
+install:
+  steps:
+  - mkdir -p ./bin/rad/
+  - cd ./bin/rad && curl -fL https://github.com/chaitin/rad/releases/download/1.0/rad_linux_amd64.zip -o rad.zip && unzip -o rad.zip && mv rad_linux_amd64 rad && chmod +x rad && rm -f rad.zip
+  - "wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
+  - "apt install ./google-chrome-stable_current_amd64.deb -y"
+  - "rm -f ./google-chrome-stable_current_amd64.deb"
+  - "sed -i 's|exec -a \"$0\" \"$HERE/chrome\" \"$@\"|exec -a \"$0\" \"/usr/bin/google-chrome-stable\" \"$@\" --no-sandbox|' /usr/bin/google-chrome"
+
+  install_timeout_seconds: 900
+runtime:
+  max_concurrency: 1
+  exec_timeout_seconds: 900
+allowed_output_events:
+- URL
+- JS_URL
+io_contract:
+  input_events:
+  - LIVE_URL
+  input_transform_code: |
+    import shlex
+    value = data["value"].strip()
+    if not value.startswith(("http://", "https://")):
+        value = "http://" + value
+    proxy = str(config.get("http-proxy", "")).strip()
+    proxy_part = "--http-proxy " + shlex.quote(proxy) if proxy else ""
+    return [{"target": value, "target_q": shlex.quote(value), "proxy_part": proxy_part}]
+execution:
+  command: $HOME/.local/bin/rad -t {{target_q}} {{proxy_part}}
+  output_parse_code: |
+    import json, re
+    results = []
+    seen = set()
+    def add(k, v):
+        v = str(v or "").strip().rstrip("\"'<>),")
+        if not v.startswith(("http://", "https://")):
+            return
+        key = (k, v)
+        if key not in seen:
+            seen.add(key)
+            results.append({k: v})
+    for line in data["stdout"].splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            item = json.loads(line)
+            url = item.get("url") or item.get("request", {}).get("url") or ""
+            add("JS_URL" if url.lower().split('?')[0].endswith('.js') else "URL", url)
+        except:
+            for url in re.findall(r"https?://[^\\s'\\\"<>]+", line):
+                add("JS_URL" if url.lower().split('?')[0].endswith('.js') else "URL", url)
+    return results

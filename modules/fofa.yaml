@@ -1,54 +1,215 @@
 name: fofa_module
-description: 基于 FoFaX 的网络空间测绘查询模块，支持 DOMAIN、LIVE_URL 和 ICON_PATH 反查
+description: FoFaX 搜索引擎查询 — 正则拆分输入为 IP/域名/子域名/URL/图标，tldextract 处理双后缀 TLD，逐类型查询并标记来源，按策略截断或丢弃
 check:
-  command: 'if [ -z "$FOFA_KEY" ]; then echo "Error: FOFA_KEY is empty"; exit 1; fi && python3 ./bin/fofa_query.py --help && test -x "$HOME/.local/bin/fofax"'
-  expect_keyword: 'FlowScan FoFaX JSONL wrapper'
-  exclude_keyword: unable to open X server
+  command: grep -E "YOUR_FOFA_API_KEY" config.yaml && exit 1 || fofax --version
+  expect_keyword: fofaX
+  exclude_keyword: not found
 install:
   steps:
-  - mkdir -p "$HOME/.local/bin" && tmpdir=$(mktemp -d) && cd "$tmpdir" && curl -fsSL https://api.github.com/repos/xiecat/fofax/releases/latest | python3 -c "import json,sys; data=json.load(sys.stdin); assets=data.get('assets',[]); matches=[a['browser_download_url'] for a in assets if 'linux' in a['name'].lower() and ('amd64' in a['name'].lower() or 'x86_64' in a['name'].lower())]; print(matches[0] if matches else assets[0]['browser_download_url'])" | xargs -I{} sh -c 'curl -fL "{}" -o fofax_pkg && (tar -xzf fofax_pkg || unzip -o fofax_pkg || mv fofax_pkg fofax) && find . -type f \( -name "fofax" -o -name "fofax_linux*" \) -perm /111 -print -quit | xargs -I%% install -m 0755 %% "$HOME/.local/bin/fofax"'
-execute:
-  inputs:
-  - DOMAIN
-  - LIVE_URL
-  - ICON_PATH
-  outputs:
+  - mkdir -p "$HOME/.local/bin" && tmpdir=$(mktemp -d) && cd "$tmpdir" && curl -fsSL https://api.github.com/repos/xiecat/fofax/releases/latest
+    | python3 -c "import json,sys; data=json.load(sys.stdin); assets=data.get('assets',[]); matches=[a['browser_download_url']
+    for a in assets if 'linux' in a['name'].lower() and ('amd64' in a['name'].lower() or 'x86_64' in a['name'].lower())];
+    print(matches[0] if matches else assets[0]['browser_download_url'])" | xargs -I{} sh -c 'curl -fL "{}" -o fofax_pkg &&
+    (tar -xzf fofax_pkg || unzip -o fofax_pkg || mv fofax_pkg fofax) && find . -type f \( -name "fofax" -o -name "fofax_linux*"
+    \) -perm /111 -print -quit | xargs -I%% install -m 0755 %% "$HOME/.local/bin/fofax"'
+  install_timeout_seconds: 900
+runtime:
+  max_concurrency: 1
+  exec_timeout_seconds: 180
+allowed_output_events:
+- DOMAIN
+- SUBDOMAIN
+- IP
+- URL
+- LIVE_URL
+io_contract:
+  input_events:
   - DOMAIN
   - SUBDOMAIN
   - IP
   - URL
-  timeout: 900
-  max_parallel_num: 20
-  command: 'FOFA_KEY="$FOFA_KEY" python3 ./bin/fofa_query.py --fofax-bin "$HOME/.local/bin/fofax" {{data}}'
-parser:
-  type: rules
-  rules:
-  - match:
-      type: json_field
-      field: type
-      equals: URL
-    extract:
-      URL: '{{value}}'
-  - match:
-      type: json_field
-      field: type
-      equals: IP
-    extract:
-      IP: '{{value}}'
-  - match:
-      type: json_field
-      field: type
-      equals: SUBDOMAIN
-    extract:
-      SUBDOMAIN: '{{value}}'
-  - match:
-      type: json_field
-      field: type
-      equals: DOMAIN
-    extract:
-      DOMAIN: '{{value}}'
-event_extractors:
-  DOMAIN: (?P<value>(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,})
-  SUBDOMAIN: (?P<value>(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,})
-  IP: (?P<value>(?:\d{1,3}\.){3}\d{1,3})
-  URL: (?P<value>https?://\S+)
+  - LIVE_URL
+  - ICON_HASH
+  - ICON_PATH
+  input_transform_code: |
+    import re
+    import shlex
+    import tldextract
+    from urllib.parse import urlparse
+
+    value = data["value"].strip()
+    etype = data.get("event_type", "")
+    if not value:
+        return []
+
+    params = []
+    seen_queries = set()
+
+    def emit(query_type, fofax_args):
+        key = (query_type, fofax_args)
+        if key not in seen_queries:
+            seen_queries.add(key)
+            params.append({"query_type": query_type, "fofax_args": fofax_args})
+
+    # ── 1. 直接事件类型处理 ──
+    if etype == "ICON_HASH":
+        emit("ICON", f'-q icon={shlex.quote(value)} -fs 100 -ffi -j -silent')
+        return params
+
+    if etype == "ICON_PATH":
+        emit("ICON", f'-if {shlex.quote(value)} -fs 100 -ffi -j -silent')
+        return params
+
+    if etype == "IP" and re.fullmatch(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", value):
+        emit("IP", f'-q ip={shlex.quote(value)} -fs 100 -ffi -j -silent')
+        return params
+
+    # ── 2. 正则拆分：提取 IP、URL ──
+    ips = re.findall(r'\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b', value)
+    urls_raw = re.findall(r'https?://[^\s<>"\')\]]+', value)
+
+    cleaned = value
+    for url in urls_raw:
+        cleaned = cleaned.replace(url, ' ')
+    for ip in ips:
+        cleaned = cleaned.replace(ip, ' ')
+
+    # ── 3. IP 查询 ──
+    for ip in sorted(set(ips)):
+        emit("IP", f'-q ip={shlex.quote(ip)} -fs 100 -ffi -j -silent')
+
+    # ── 4. URL 查询（host / icon / cert / domain 拆分）───
+    seen_hosts = set()
+    for url in sorted(set(urls_raw)):
+        try:
+            parsed = urlparse(url)
+            hostname = (parsed.hostname or "").lower()
+        except Exception:
+            continue
+        if not hostname or hostname in seen_hosts:
+            continue
+        seen_hosts.add(hostname)
+
+        emit("URL", f'-q host={shlex.quote(hostname)} -fs 100 -ffi -j -silent')
+
+        path_lower = (parsed.path or "").lower()
+        if path_lower.endswith(('.ico', '.png', '.svg', '.jpg', '.jpeg', '.gif', '.bmp')):
+            emit("ICON", f'-iu {shlex.quote(url)} -fs 100 -ffi -j -silent')
+
+        if parsed.scheme == "https":
+            emit("CERT", f'-uc {shlex.quote(url)} -fs 100 -ffi -j -silent')
+
+        # tldextract 拆分子域名/域名
+        ext = tldextract.extract(hostname)
+        registered = ext.registered_domain
+        if registered:
+            emit("DOMAIN", f'-q domain={shlex.quote(registered)} || host={shlex.quote(registered)} -fs 100 -ffi -j -silent')
+        if ext.subdomain and registered:
+            emit("SUBDOMAIN", f'-q host={shlex.quote(hostname)} -fs 100 -ffi -j -silent')
+
+    # ── 5. 剩余文本提取域名（DOMAIN / SUBDOMAIN 类型输入）───
+    for match in re.finditer(r'\b(([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,})\b', cleaned):
+        domain_str = match.group(1).strip('.').lower()
+        if not domain_str or domain_str in seen_hosts:
+            continue
+        if re.fullmatch(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', domain_str):
+            continue
+        seen_hosts.add(domain_str)
+
+        ext = tldextract.extract(domain_str)
+        registered = ext.registered_domain
+        sub = ext.subdomain
+
+        if registered:
+            emit("DOMAIN", f'-q domain={shlex.quote(registered)} || host={shlex.quote(registered)} -fs 100 -ffi -j -silent')
+        if sub and registered:
+            emit("SUBDOMAIN", f'-q host={shlex.quote(domain_str)} -fs 100 -ffi -j -silent')
+        elif registered and domain_str == registered:
+            emit("SUBDOMAIN", f'-q host={shlex.quote(domain_str)} -fs 100 -ffi -j -silent')
+
+    return params
+execution:
+  command: fofax {{fofax_args}} 2>/dev/null | sed "s/^/[{{query_type}}] /"
+  output_parse_code: |
+    import json, re
+    from urllib.parse import urlparse
+
+    policies_raw = config.get("fofa", {}).get("query_policies")
+    if policies_raw is None:
+        policies = {}
+    else:
+        try:
+            policies = dict(policies_raw)
+        except Exception:
+            policies = {}
+    TYPE_PREFIX = re.compile(r'^\[(\w+)\]\s*')
+    IP_RE = re.compile(r"^\d+\.\d+\.\d+\.\d+$")
+
+    def extract_events(json_text):
+        """从一行 fofax JSON 提取事件 list[dict]"""
+        results = []
+        seen = set()
+        def add(k, v):
+            v = str(v or "").strip().strip(".")
+            if not v:
+                return
+            key = (k, v)
+            if key not in seen:
+                seen.add(key)
+                results.append({k: v})
+
+        host = url = ip = ""
+        try:
+            item = json.loads(json_text)
+            url = item.get("url") or item.get("host") or item.get("fullhost") or item.get("fullHost") or ""
+            ip = item.get("ip") or ""
+            host = item.get("domain") or item.get("hostname") or ""
+        except Exception:
+            parts = json_text.split()
+            url = parts[0] if parts else ""
+
+        if url.startswith(("http://", "https://")):
+            add("URL", url)
+            add("LIVE_URL", url)
+            host = host or (urlparse(url).hostname or "")
+        if host and "." in host and not IP_RE.match(host):
+            add("SUBDOMAIN", host)
+            hparts = host.split('.')
+            if len(hparts) >= 2:
+                add("DOMAIN", '.'.join(hparts[-2:]))
+        if ip and IP_RE.match(ip):
+            add("IP", ip)
+        return results
+
+    # ── Phase 1: 按 query_type 分组收集 ──
+    typed_items = {}  # query_type → list of {event_type: value}
+    for line in data["stdout"].splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        m = TYPE_PREFIX.match(line)
+        query_type = m.group(1) if m else "UNKNOWN"
+        json_text = line[m.end():].strip().strip(',') if m else line.strip(',')
+        events = extract_events(json_text)
+        if events:
+            typed_items.setdefault(query_type, []).extend(events)
+
+    # ── Phase 2: 按策略过滤 ──
+    final = []
+    for qtype, items in typed_items.items():
+        policy = policies.get(qtype, {})
+        limit = int(policy.get("limit", 1000) or 1000)
+        mode = str(policy.get("mode", "")).strip().lower()
+
+        if mode == "drop_all" and len(items) > limit:
+            # 全量丢弃：此类型不输出任何事件
+            continue
+
+        count = 0
+        for item in items:
+            if mode == "truncate" and count >= limit:
+                break
+            final.append(item)
+            count += 1
+
+    return final

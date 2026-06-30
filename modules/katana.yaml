@@ -1,35 +1,86 @@
 name: katana_module
-description: ProjectDiscovery katana 现代 Web 爬虫模块，发现页面、接口和 JS 链接
+description: Katana 爬虫 — 深度爬取 URL/JS/表单/端点，URL_INFO 汇总
 check:
-  command: 'katana -version'
+  command: $HOME/.local/bin/katana -version
   expect_keyword: Current Version
   exclude_keyword: not found
 install:
   steps:
-  - GOBIN="$HOME/.local/bin" go install github.com/projectdiscovery/katana/cmd/katana@latest
-execute:
-  inputs:
+  - mkdir -p "$HOME/.local/bin" "$HOME/.cache/go-tmp"
+  - GOBIN="$HOME/.local/bin" GOCACHE="$HOME/.cache/go-tmp" go install -v github.com/projectdiscovery/katana/cmd/katana@latest
+  install_timeout_seconds: 1200
+runtime:
+  max_concurrency: 3
+  exec_timeout_seconds: 300
+allowed_output_events:
+- URL
+- JS_URL
+- URL_INFO
+io_contract:
+  input_events:
   - LIVE_URL
-  outputs:
-  - URL
-  timeout: 1800
-  max_parallel_num: 3
-  command: 'katana -u {{data}} -d 3 -jc -kf all -jsonl -silent -proxy http://127.0.0.1:7777'
-parser:
-  type: rules
-  rules:
-  - match:
-      type: json_field
-      field: request
-      equals: null
-    extract:
-      METHOD: $.request.method
-      URL: $.request.endpoint
-      STATUS_CODE: $.response.status_code
-    events:
-      URL: '{{URL}}'
-    filters:
-      URL:
-        if_not_empty: true
-event_extractors:
-  URL: (?P<value>https?://\S+)
+  input_transform_code: |
+    import shlex
+    value = data["value"].strip()
+    if not value.startswith(("http://", "https://")):
+        value = "http://" + value
+    return [{"target": value, "target_q": shlex.quote(value)}]
+execution:
+  command: $HOME/.local/bin/katana -u {{target_q}} -silent -jsonl -depth 3 -js-crawl -known-files all -form-extraction -concurrency 10 -rate-limit 60 -timeout 8 -omit-raw -omit-body -no-color 2>/dev/null
+  output_parse_code: |
+    import json
+    results = []
+    seen = set()
+    seen_url_info = set()
+
+    def add(k, v):
+        v = str(v or "").strip()
+        if not v:
+            return
+        key = (k, v)
+        if key not in seen:
+            seen.add(key)
+            results.append({k: v})
+
+    for line in data["stdout"].splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            item = json.loads(line)
+        except:
+            continue
+
+        req = item.get("request", {}) if isinstance(item.get("request"), dict) else {}
+        resp = item.get("response", {}) if isinstance(item.get("response"), dict) else {}
+        url = req.get("endpoint") or item.get("url") or item.get("endpoint") or ""
+        if not url or not url.startswith(("http://", "https://")):
+            continue
+
+        method = req.get("method") or ""
+        status = resp.get("status_code")
+        ct = resp.get("content_type") or ""
+        source = item.get("source") or ""
+
+        # ── URL ──
+        add("URL", url)
+
+        # ── JS_URL ──
+        if url.lower().split("?")[0].endswith(".js"):
+            add("JS_URL", url)
+
+        # ── URL_INFO 汇总 ──
+        if url not in seen_url_info:
+            seen_url_info.add(url)
+            parts = [url]
+            if method:
+                parts.append("method=%s" % method)
+            if status:
+                parts.append("status=%s" % status)
+            if ct:
+                parts.append("content_type=%s" % ct)
+            if source:
+                parts.append("source=%s" % source)
+            add("URL_INFO", " | ".join(parts))
+
+    return results

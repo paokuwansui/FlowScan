@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}执行日志{% endblock %}
+{% block content %}
+<div class="section">
+    <h1>执行日志</h1>
+    <p class="help-text">所有 Worker 节点的执行记录，最新的在最上方</p>
+
+    <div class="card">
+        <div class="log-controls">
+            <form method="GET" action="{{ url_for('logs') }}">
+                <label>显示条数:</label>
+                <select name="limit" onchange="this.form.submit()">
+                    <option value="50" {% if limit == 50 %}selected{% endif %}>50</option>
+                    <option value="100" {% if limit == 100 %}selected{% endif %}>100</option>
+                    <option value="200" {% if limit == 200 %}selected{% endif %}>200</option>
+                    <option value="500" {% if limit == 500 %}selected{% endif %}>500</option>
+                </select>
+            </form>
+            <div>
+                <a href="{{ url_for('logs_download', limit=limit) }}" class="btn btn-sm btn-primary">下载</a>
+                <button class="btn btn-sm btn-secondary" onclick="location.reload()">刷新</button>
+            </div>
+        </div>
+
+        <div class="log-container">
+            {% for log in logs %}
+            <div class="log-entry">
+                <span class="log-time">{{ "%.2f"|format(log.ts) }}</span>
+                <span class="log-msg">{{ log.msg }}</span>
+            </div>
+            {% else %}
+            <div class="empty-state">暂无日志</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

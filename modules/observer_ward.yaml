@@ -1,34 +1,91 @@
 name: observer_ward_module
-description: 跨平台社区化高精度Web指纹及服务识别组件
+description: ObserverWard 指纹识别 — 识别 Web 应用指纹/技术栈，URL_INFO 汇总
 check:
-  command: 'observer_ward --help'
+  command: $HOME/.local/bin/observer_ward --help
   expect_keyword: observer_ward
   exclude_keyword: not found
 install:
   steps:
+  - mkdir -p "$HOME/.local/bin"
   - cd $HOME/.local/bin && curl -sIL https://github.com/emo-crab/observer_ward/releases/latest | grep -i "location:" | head -n 1 | awk -F'/' '{print $NF}' | tr -d '\r' | xargs -I {} wget "https://github.com/emo-crab/observer_ward/releases/download/{}/observer_ward_{}_x86_64-unknown-linux-musl.tar.gz" && tar -zxvf observer_ward_*_x86_64-unknown-linux-musl.tar.gz && mv x86_64-unknown-linux-musl observer_ward && rm README.md LICENSE observer_ward_*
-execute:
-  inputs:
+  install_timeout_seconds: 900
+runtime:
+  max_concurrency: 4
+  exec_timeout_seconds: 180
+allowed_output_events:
+- FINGERPRINT
+- URL_INFO
+io_contract:
+  input_events:
   - LIVE_URL
-  outputs:
-  - FINGERPRINT
-  timeout: 900
-  max_parallel_num: 10
-  command: 'observer_ward -t {{data}} --format json --silent'
-parser:
-  type: rules
-  rules:
-  - match:
-      type: json_field
-      field: success
-      equals: true
-    extract:
-      TARGET: '{{target}}'
-      FINGERPRINT: $.matched[*].result.name[*]
-    events:
-      FINGERPRINT: '{{target}} | {{FINGERPRINT}}'
-    filters:
-      FINGERPRINT:
-        if_not_empty: true
-event_extractors:
-  FINGERPRINT: ''
+  input_transform_code: |
+    import shlex
+    value = data["value"].strip()
+    if not value.startswith(("http://", "https://")):
+        value = "http://" + value
+    return [{"target": value, "target_q": shlex.quote(value)}]
+execution:
+  command: $HOME/.local/bin/observer_ward -t {{target_q}} --format json --thread 20 --timeout 8 --silent --no-color 2>/dev/null
+  output_parse_code: |
+    import json
+    results = []
+    seen = set()
+    seen_url_info = set()
+
+    def add(k, v):
+        if isinstance(v, list):
+            for x in v:
+                add(k, x)
+            return
+        if isinstance(v, dict):
+            v = v.get("name") or v.get("fingerprint") or v.get("technology") or str(v)
+        v = str(v or "").strip()
+        if not v:
+            return
+        key = (k, v)
+        if key not in seen:
+            seen.add(key)
+            results.append({k: v})
+
+    for line in data["stdout"].splitlines():
+        line = line.strip().rstrip(",")
+        if not line or line in ("[", "]"):
+            continue
+        try:
+            item = json.loads(line)
+        except:
+            continue
+
+        target = item.get("target") or item.get("url") or ""
+        fingerprints = []
+        for key in ("fingerprint", "fingerprints", "name", "matched", "cms", "title"):
+            val = item.get(key)
+            if val:
+                if isinstance(val, list):
+                    fingerprints.extend(str(v) for v in val)
+                else:
+                    fingerprints.append(str(val))
+
+        techs = []
+        for key in ("technology", "technologies", "tags"):
+            val = item.get(key)
+            if val:
+                if isinstance(val, list):
+                    techs.extend(str(v) for v in val)
+                else:
+                    techs.append(str(val))
+
+        for fp in fingerprints:
+            add("FINGERPRINT", "%s @ %s" % (fp, target) if target else fp)
+
+        # ── URL_INFO ──
+        if target and target not in seen_url_info:
+            seen_url_info.add(target)
+            parts = [target]
+            if fingerprints:
+                parts.append("fingerprint=%s" % ",".join(fingerprints[:5]))
+            if techs:
+                parts.append("tech=%s" % ",".join(techs[:5]))
+            add("URL_INFO", " | ".join(parts))
+
+    return results

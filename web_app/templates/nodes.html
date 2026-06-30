@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}节点 & 工具{% endblock %}
+{% block content %}
+<div class="section">
+    <h1>节点状态</h1>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value">{{ nodes|length }}</div>
+            <div class="stat-label">活跃 Worker 节点</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ tools|length }}</div>
+            <div class="stat-label">已注册工具</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>活跃节点</h3>
+        <table class="table nodes-table">
+            <thead>
+                <tr>
+                    <th style="width:22%;">节点 ID</th>
+                    <th style="width:10%;">主机</th>
+                    <th style="width:6%;">PID</th>
+                    <th style="width:14%;">启动时间</th>
+                    <th style="width:26%;">工具列表</th>
+                    <th style="width:22%;">事件类型</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for node in nodes %}
+                <tr>
+                    <td><span class="badge badge-node">{{ node.node_id }}</span></td>
+                    <td>{{ node.host or '-' }}</td>
+                    <td>{{ node.pid or '-' }}</td>
+                    <td class="time-cell">{{ "%.2f"|format(node.started_at|float) if node.started_at else '-' }}</td>
+                    <td class="node-cell">
+                        {% if node.tools %}
+                        {% for t in node.tools.split(',') %}
+                        <span class="badge badge-tool" style="font-size:0.65rem;margin:1px;">{{ t }}</span>
+                        {% endfor %}
+                        {% else %}-{% endif %}
+                    </td>
+                    <td class="node-cell">
+                        {% if node.event_types %}
+                        {% for et in node.event_types.split(',') %}
+                        <span class="badge badge-event" style="font-size:0.65rem;margin:1px;">{{ et }}</span>
+                        {% endfor %}
+                        {% else %}-{% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="empty">无活跃节点</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

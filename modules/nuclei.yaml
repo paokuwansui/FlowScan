@@ -1,38 +1,48 @@
 name: nuclei_module
-description: 基于模板的下一代快速漏洞扫描组件
+description: Nuclei 漏洞扫描 — 对存活 URL 运行 high/critical 模板，VULNERABILITY 透传原始 JSON
 check:
-  command: 'nuclei -version'
-  expect_keyword: nuclei
+  command: nuclei -version
+  expect_keyword: Nuclei
   exclude_keyword: not found
 install:
   steps:
   - sudo apt update
   - sudo apt install nuclei -y
   - nuclei -update-templates
-execute:
-  inputs:
+  install_timeout_seconds: 1200
+runtime:
+  max_concurrency: 2
+  exec_timeout_seconds: 900
+allowed_output_events:
+- VULNERABILITY
+io_contract:
+  input_events:
   - LIVE_URL
-  outputs:
-  - VULNERABILITY
-  timeout: 7200
-  max_parallel_num: 2
-  command: 'nuclei -u {{data}} -severity high,critical -c 100 -mhe 150 -bulk-size 50 -rl 300 -timeout 5 -retries 1 -jsonl -silent'
-parser:
-  type: rules
-  rules:
-  - match:
-      type: json_field
-      field: template-id
-      equals: null
-    extract:
-      TEMPLATE_ID: '{{template-id}}'
-      SEVERITY: $.info.severity
-      MATCHED_AT: '{{matched-at}}'
-      VULNERABILITY: '[{{TEMPLATE_ID}}] [{{SEVERITY}}] {{MATCHED_AT}}'
-    events:
-      VULNERABILITY: '[{{TEMPLATE_ID}}] [{{SEVERITY}}] {{MATCHED_AT}}'
-    filters:
-      VULNERABILITY:
-        if_not_empty: true
-event_extractors:
-  VULNERABILITY: ''
+  input_transform_code: |
+    import shlex
+    value = data["value"].strip()
+    if not value.startswith(("http://", "https://")):
+        value = "http://" + value
+    return [{"target": value, "target_q": shlex.quote(value)}]
+execution:
+  command: nuclei -u {{target_q}} -severity high,critical -j -silent -or -ot -rate-limit 25 -c 15 -retries 1 -timeout 10 -ni 2>/dev/null
+  output_parse_code: |
+    import json
+    results = []
+    seen = set()
+
+    for line in data["stdout"].splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            json.loads(line)
+        except:
+            continue
+        # VULNERABILITY 透传原始 JSON 行，不做解析
+        key = ("VULNERABILITY", line)
+        if key not in seen:
+            seen.add(key)
+            results.append({"VULNERABILITY": line})
+
+    return results

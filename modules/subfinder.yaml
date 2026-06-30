@@ -1,28 +1,34 @@
 name: subfinder_module
-description: 基于标准Go协议栈的工业级被动子域名探测组件
+description: Subfinder 子域名枚举 — 从根域名被动发现子域名
 check:
-  command: 'subfinder -version'
+  command: $HOME/.local/bin/subfinder -version
   expect_keyword: Current Version
   exclude_keyword: not found
 install:
   steps:
-  - sudo apt update
-  - sudo apt install subfinder -y
-execute:
-  inputs:
+  - mkdir -p "$HOME/.local/bin" "$HOME/.cache/go-tmp"
+  - GOBIN="$HOME/.local/bin" GOCACHE="$HOME/.cache/go-tmp" go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+  install_timeout_seconds: 1200
+runtime:
+  max_concurrency: 3
+  exec_timeout_seconds: 300
+allowed_output_events:
+- SUBDOMAIN
+io_contract:
+  input_events:
   - DOMAIN
-  outputs:
-  - SUBDOMAIN
-  timeout: 900
-  max_parallel_num: 5
-  command: 'subfinder -d {{data}} -silent'
-parser:
-  type: rules
-  rules:
-  - match:
-      type: regex
-      pattern: ^(?P<SUBDOMAIN>[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})$
-    extract:
-      SUBDOMAIN: '{{SUBDOMAIN}}'
-event_extractors:
-  SUBDOMAIN: (?P<value>(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,})
+  input_transform_code: |
+    import shlex
+    domain = data["value"].strip().strip(".").lower()
+    return [{"domain": domain, "domain_q": shlex.quote(domain)}] if domain and "." in domain else []
+execution:
+  command: $HOME/.local/bin/subfinder -d {{domain_q}} -silent -all -recursive -timeout 25 -rl 20 2>/dev/null
+  output_parse_code: |
+    results = []
+    seen = set()
+    for line in data["stdout"].splitlines():
+        host = line.strip().lower().strip(".")
+        if host and "." in host and host not in seen:
+            seen.add(host)
+            results.append({"SUBDOMAIN": host})
+    return results

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}AI 日记{% endblock %}
+{% block content %}
+<div class="section">
+    <h1>AI 分析日记</h1>
+
+    <div class="stats-grid" style="grid-template-columns:1fr 1fr;">
+        <div class="stat-card">
+            <div class="stat-value">{{ count }}</div>
+            <div class="stat-label">日记总数</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="log-priorities"></div>
+            <div class="stat-label">高优先级条目</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>日记列表（最新在前）</h3>
+        <p class="help-text">
+            这些日记由 AI 分析自动生成，记录扫描结果中需要重点关注的目标。
+            其他 Agent 可通过 <code>/ai-logs?api_key=xxx&amp;format=json</code> 访问原始数据。
+        </p>
+
+        {% if logs %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>时间</th>
+                    <th>级别</th>
+                    <th>优先级</th>
+                    <th>目标</th>
+                    <th>消息</th>
+                    <th>ID</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td style="white-space:nowrap;font-size:0.78rem;color:var(--text-muted);">
+                        {{ log.created_at_iso or '-' }}
+                    </td>
+                    <td>
+                        {% if log.level == 'error' %}
+                        <span class="badge" style="background:rgba(248,81,73,0.15);color:var(--danger);">ERROR</span>
+                        {% elif log.level == 'warn' %}
+                        <span class="badge" style="background:rgba(210,153,34,0.15);color:#d29922;">WARN</span>
+                        {% else %}
+                        <span class="badge" style="background:rgba(88,166,255,0.15);color:var(--primary);">INFO</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if log.priority == 'high' %}
+                        <span class="badge" style="background:rgba(248,81,73,0.15);color:var(--danger);">HIGH</span>
+                        {% elif log.priority == 'medium' %}
+                        <span class="badge" style="background:rgba(210,153,34,0.15);color:#d29922;">MEDIUM</span>
+                        {% else %}
+                        <span class="badge" style="background:rgba(88,166,255,0.15);color:var(--primary);">LOW</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-family:monospace;font-size:0.82rem;">{{ log.target or '-' }}</td>
+                    <td class="value-cell" style="max-width:400px;">{{ log.message[:200] }}</td>
+                    <td class="fp-cell">{{ log.log_id }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">暂无 AI 日记，执行 AI 分析并让 AI 输出 log 动作即可生成。</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 计算高优先级日志数
+var highCount = 0;
+{% for log in logs %}
+{% if log.priority == 'high' %}
+highCount++;
+{% endif %}
+{% endfor %}
+document.getElementById('log-priorities').textContent = highCount;
+</script>
+{% endblock %}

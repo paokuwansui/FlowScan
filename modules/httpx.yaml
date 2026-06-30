@@ -1,63 +1,204 @@
 name: httpx_module
-description: 基于多用途的高速 HTTP 存活探测与基础指纹识别组件
+description: httpx HTTP 探活 — 探测 URL/端口存活，提取标题/技术栈/状态码/图标/证书等汇总为 URL_INFO，403 单独输出
 check:
-  command: python3 ./bin/httpx_wrapper.py --help
-  expect_keyword: normalize
+  command: $HOME/.local/bin/httpx -version
+  expect_keyword: Current Version
   exclude_keyword: not found
 install:
   steps:
-  - GOBIN="$HOME/.local/bin" go install github.com/projectdiscovery/httpx/cmd/httpx@latest
-  - python3 -m pip install --user --break-system-packages tldextract
-execute:
-  inputs:
+  - mkdir -p "$HOME/.local/bin" "$HOME/.cache/go-tmp"
+  - GOBIN="$HOME/.local/bin" GOCACHE="$HOME/.cache/go-tmp" go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
+  install_timeout_seconds: 1200
+runtime:
+  max_concurrency: 8
+  exec_timeout_seconds: 180
+allowed_output_events:
+- LIVE_URL
+- URL_INFO
+- 403_URL
+- DOMAIN
+- SUBDOMAIN
+- IP
+io_contract:
+  input_events:
   - URL
   - PORT_OPEN
-  outputs:
   - LIVE_URL
-  - DOMAIN
-  - SUBDOMAIN
-  - IP
-  - ICON_PATH
-  - ICON_HASH
-  - CERT_ORG
-  - CERT_FINGERPRINT
-  timeout: 900
-  max_parallel_num: 10
-  command: echo '{{data}}' | python3 ./bin/httpx_wrapper.py --httpx-bin "$HOME/.local/bin/httpx"
-parser:
-  type: rules
-  rules:
-  - match:
-      type: json_field
-      field: LIVE_URL
-      equals: null
-    extract:
-      LIVE_URL: '{{LIVE_URL}}'
-      DOMAIN: $.DOMAIN[*]
-      SUBDOMAIN: $.SUBDOMAIN[*]
-      IP: $.IP[*]
-      ICON_PATH: '{{ICON_PATH}}'
-      ICON_HASH: '{{ICON_HASH}}'
-      CERT_ORG: $.CERT_ORG[*]
-      CERT_FINGERPRINT: '{{CERT_FINGERPRINT}}'
-    events:
-      LIVE_URL: '{{LIVE_URL}}'
-      DOMAIN: $.DOMAIN[*]
-      SUBDOMAIN: $.SUBDOMAIN[*]
-      IP: $.IP[*]
-      ICON_PATH: '{{ICON_PATH}}'
-      ICON_HASH: '{{ICON_HASH}}'
-      CERT_ORG: $.CERT_ORG[*]
-      CERT_FINGERPRINT: '{{CERT_FINGERPRINT}}'
-    filters:
-      LIVE_URL:
-        if_not_empty: true
-event_extractors:
-  LIVE_URL: (?P<value>https?://\S+)
-  DOMAIN: ''
-  SUBDOMAIN: '(?P<value>(?!\*)[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*\.[A-Za-z]{2,})'
-  IP: (?P<value>(?:\d{1,3}\.){3}\d{1,3})
-  ICON_PATH: ''
-  ICON_HASH: ''
-  CERT_ORG: ''
-  CERT_FINGERPRINT: (?P<value>[A-Fa-f0-9]{64})
+  input_transform_code: |
+    import shlex, re
+
+    value = data["value"].strip()
+    etype = data["event_type"]
+    if not value:
+        return []
+
+    # PORT_OPEN 新格式: "127.0.0.1:[22,80,443,8080]"
+    if etype == "PORT_OPEN":
+        m = re.match(r"(\d+\.\d+\.\d+\.\d+):\[([0-9,\s]+)\]", value)
+        if m:
+            host = m.group(1)
+            ports = [p.strip() for p in m.group(2).split(",") if p.strip()]
+            result = []
+            for port in ports:
+                scheme = "https" if port in ("443", "8443", "9443") else "http"
+                target = "%s://%s:%s" % (scheme, host, port)
+                result.append({"target": target, "target_q": shlex.quote(target)})
+            return result
+        if ":" in value:
+            host, port = value.rsplit(":", 1)
+            host = host.strip("[]")
+            if port in ("443", "8443"):
+                target = "https://%s:%s" % (host, port)
+            elif port:
+                target = "http://%s:%s" % (host, port)
+            else:
+                target = value
+            return [{"target": target, "target_q": shlex.quote(target)}]
+        return []
+
+    target = value
+    if not target.startswith(("http://", "https://")):
+        target = "http://" + target
+    return [{"target": target, "target_q": shlex.quote(target)}]
+execution:
+  command: $HOME/.local/bin/httpx -u {{target_q}} -silent -json -status-code -title -tech-detect -content-type -web-server -ip -cname -favicon -tls-probe -tls-grab -extract-fqdn -timeout 8 -retries 1 -threads 20 -rate-limit 60 2>/dev/null
+  output_parse_code: |
+    import json, re
+
+    results = []
+    seen_url = set()
+    seen_event = set()
+
+    def add(k, v):
+        if v is None:
+            return
+        v = str(v).strip().strip(".")
+        if not v or v == "*":
+            return
+        key = (k, v)
+        if key not in seen_event:
+            seen_event.add(key)
+            results.append({k: v})
+
+    def add_list(k, items):
+        if items is None:
+            return
+        try:
+            for x in items:
+                add(k, x)
+        except:
+            pass
+
+    for line in data["stdout"].splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            item = json.loads(line)
+        except:
+            continue
+
+        url = item.get("url") or item.get("input") or ""
+        host = item.get("host") or ""
+        status = item.get("status_code")
+        title = item.get("title") or ""
+        tech_list = item.get("tech")
+        try:
+            tech_list = list(tech_list) if tech_list else []
+        except:
+            tech_list = []
+        icon_hash = item.get("favicon") or ""
+        ip_addr = item.get("host_ip") or ""
+        a_records = item.get("a")
+        try:
+            a_records = list(a_records) if a_records else []
+        except:
+            a_records = []
+        cname_list = item.get("cname")
+        try:
+            cname_list = list(cname_list) if cname_list else []
+        except:
+            cname_list = []
+        server = item.get("webserver") or item.get("web-server") or ""
+        ct = item.get("content_type") or ""
+        tls = item.get("tls")
+        try:
+            tls = dict(tls) if tls else {}
+        except:
+            tls = {}
+        cdn_name = item.get("cdn_name") or ""
+        cdn_type = item.get("cdn_type") or ""
+
+        # ── 基础事件 ──
+        if url:
+            add("LIVE_URL", url)
+
+        if host and "." in host and not re.match(r"^\d+\.\d+\.\d+\.\d+$", host):
+            add("SUBDOMAIN", host)
+            parts = host.split(".")
+            if len(parts) >= 2:
+                add("DOMAIN", ".".join(parts[-2:]))
+
+        if ip_addr:
+            add("IP", ip_addr)
+        add_list("IP", a_records)
+        add_list("SUBDOMAIN", cname_list)
+
+        tls_san = tls.get("subject_an")
+        try:
+            tls_san = list(tls_san) if tls_san else []
+        except:
+            tls_san = []
+        add_list("SUBDOMAIN", tls_san)
+
+        # ── 403 事件 ──
+        if status == 403:
+            add("403_URL", url or "")
+
+        # ── URL_INFO 汇总 ──
+        if url and url not in seen_url:
+            seen_url.add(url)
+            parts = [url]
+            if status:
+                parts.append("status=%s" % status)
+            if title:
+                parts.append("title=%s" % title)
+            if tech_list:
+                parts.append("tech=%s" % ",".join(str(t) for t in tech_list))
+            if icon_hash:
+                parts.append("icon=%s" % icon_hash)
+            if server:
+                parts.append("server=%s" % server)
+            if ct:
+                parts.append("content_type=%s" % ct)
+            if ip_addr:
+                parts.append("ip=%s" % ip_addr)
+            if a_records:
+                parts.append("a=%s" % ",".join(str(x) for x in a_records))
+            if cname_list:
+                parts.append("cname=%s" % ",".join(str(x) for x in cname_list))
+            if cdn_name:
+                parts.append("cdn=%s" % cdn_name)
+                if cdn_type:
+                    parts.append("cdn_type=%s" % cdn_type)
+            cert_cn = tls.get("subject_cn") or ""
+            if cert_cn:
+                parts.append("cert_cn=%s" % cert_cn)
+            cert_org = tls.get("subject_org") or ""
+            if cert_org:
+                parts.append("cert_org=%s" % cert_org)
+            fp = tls.get("fingerprint_hash")
+            try:
+                fp = dict(fp) if fp else {}
+            except:
+                fp = {}
+            cert_sha256 = fp.get("sha256") or ""
+            if cert_sha256:
+                parts.append("cert_sha256=%s" % cert_sha256)
+
+            key = ("URL_INFO", " | ".join(parts))
+            if key not in seen_event:
+                seen_event.add(key)
+                results.append({"URL_INFO": key[1]})
+
+    return results

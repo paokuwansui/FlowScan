@@ -1,0 +1,43 @@
+name: rustscan_module
+description: RustScan 全端口扫描 — 对 IP 执行极速 SYN 扫描（默认 1-65535，无 ping，纯 SYN 无需特权）
+check:
+  command: rustscan --version 2>&1 || true
+  expect_keyword: rustscan
+  exclude_keyword: not found
+install:
+  steps:
+  - sudo apt update 
+  - sudo apt install rustscan -y 2>/dev/null
+  install_timeout_seconds: 1800
+runtime:
+  max_concurrency: 4
+  exec_timeout_seconds: 300
+allowed_output_events:
+- PORT_OPEN
+io_contract:
+  input_events:
+  - IP
+  input_transform_code: |
+    import shlex
+    value = data["value"].strip()
+    if not value:
+        return []
+    return [{"target": value, "target_q": shlex.quote(value)}]
+execution:
+  command: rustscan -a {{target_q}} -r 1-65535 --scripts none -b 4500 -t 1500 -u 15000 -g 2>/dev/null
+  output_parse_code: |
+    def check(output_str):
+      try:
+        ip_part, ports_part = output_str.split(" -> ")
+        ports_list = [int(port.strip()) for port in ports_part.strip("[]").split(",")]
+        full_ports_set = set(range(1, 65536))
+        if set(ports_list) == full_ports_set:
+            return "" 
+        else:
+            return output_str.replace(" -> ", ":")
+      except Exception as e:
+        return ""
+    if check(data["stdout"]):
+      return [{"PORT_OPEN":data["stdout"].replace(" -> ",":")}]
+    else:
+      return []

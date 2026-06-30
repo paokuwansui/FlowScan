@@ -1,0 +1,55 @@
+name: dnsx_resolve_module
+description: Dnsx 解析 — 将子域名解析为 IP/CNAME，供端口和资产链路继续消费
+check:
+  command: 'dnsx -version && cdncheck --version'
+  expect_keyword: Current version
+  exclude_keyword: not found
+install:
+  steps:
+  - mkdir -p "$HOME/.local/bin" "$HOME/.cache/go-tmp"
+  - GOBIN="$HOME/.local/bin" GOCACHE="$HOME/.cache/go-tmp" go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest
+  - GOBIN="$HOME/.local/bin" GOCACHE="$HOME/.cache/go-tmp" go install -v github.com/projectdiscovery/cdncheck/cmd/cdncheck@latest
+  install_timeout_seconds: 1200
+runtime:
+  max_concurrency: 8
+  exec_timeout_seconds: 120
+allowed_output_events:
+- IP
+- CNAME
+- SUBDOMAIN
+io_contract:
+  input_events:
+  - SUBDOMAIN
+  input_transform_code: |
+    import shlex
+    host = data["value"].strip().strip(".").lower()
+    return [{"subdomain": host, "subdomain_q": shlex.quote(host)}] if host and "." in host else []
+execution:
+  command: $HOME/.local/bin/dnsx -d {{subdomain_q}} -a -cname -silent 2>/dev/null | $HOME/.local/bin/cdncheck -e -silent
+  output_parse_code: |
+    import json, re, ipaddress
+    results = []
+    seen = set()
+    def add(k, v):
+        if isinstance(v, list):
+            for x in v:
+                add(k, x)
+            return
+        if v is None:
+            return
+        v = str(v).strip().strip(".")
+        if not v:
+            return
+        key = (k, v)
+        if key not in seen:
+            seen.add(key)
+            results.append({k: v})
+    for line in data["stdout"].splitlines():
+        try:
+            item = json.loads(line.strip())
+        except Exception:
+            continue
+        add("SUBDOMAIN", item.get("host") or item.get("input"))
+        add("IP", item.get("a"))
+        add("CNAME", item.get("cname"))
+    return results

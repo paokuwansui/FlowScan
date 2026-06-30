@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}执行流程{% endblock %}
+{% block content %}
+<div class="section">
+    <h1>执行流程</h1>
+    <p class="text-muted">按工具 YAML 的输入/输出事件契约绘制工具间流程；边上的文字是上游工具输出、下游工具消费的事件类型。</p>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value" id="flow-tool-count">{{ graph.stats.tool_count }}</div>
+            <div class="stat-label">工具节点</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="flow-event-count">{{ graph.stats.event_type_count }}</div>
+            <div class="stat-label">事件类型</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="flow-edge-count">{{ graph.stats.edge_count }}</div>
+            <div class="stat-label">产消费边</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="flow-total-count">{{ graph.stats.event_total }}</div>
+            <div class="stat-label">累计事件</div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+        <button class="btn btn-sm btn-primary" onclick="refreshFlow()">刷新状态</button>
+        <button class="btn btn-sm" onclick="network.fit({animation:true})">适配视图</button>
+        <span class="badge badge-tool">工具节点</span>
+        <span style="color:#8b949e;font-size:0.85rem;">暗色节点 = disabled / 占位模块</span>
+        <span style="color:#3fb950;font-size:0.85rem;">绿色事件点 = 高扇出事件或未被消费的输出事件</span>
+        <span style="color:#58a6ff;font-size:0.85rem;">边 = 事件流向</span>
+        <span style="color:var(--text-muted);font-size:0.85rem;">节点标签 R/P = Running/Pending</span>
+        <span style="color:var(--text-muted);font-size:0.85rem;">鼠标悬停工具节点只显示 YAML 执行命令</span>
+    </div>
+
+    <div id="flow-graph" style="width:100%;height:calc(100vh - 270px);min-height:560px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vis-network.min.js') }}"></script>
+<style>
+#flow-graph canvas { display: block; }
+.vis-network:focus { outline: none; }
+</style>
+<script>
+var graph = {{ graph | tojson | safe }};
+var nodes = new vis.DataSet(graph.nodes || []);
+var edges = new vis.DataSet(graph.edges || []);
+var container = document.getElementById('flow-graph');
+var options = {
+    groups: {
+        tool: {
+            shape: 'box',
+            color: { background: '#161b22', border: '#58a6ff', highlight: { background: '#1c2333', border: '#79c0ff' } },
+            font: { color: '#e6edf3', size: 13, face: 'monospace' },
+            margin: { top: 8, bottom: 8, left: 12, right: 12 }
+        },
+        disabled: {
+            shape: 'box',
+            color: { background: '#2d1f1f', border: '#8b949e', highlight: { background: '#362626', border: '#f85149' } },
+            font: { color: '#8b949e', size: 13, face: 'monospace' },
+            margin: { top: 8, bottom: 8, left: 12, right: 12 }
+        },
+        event: {
+            shape: 'dot',
+            color: { background: '#12251b', border: '#3fb950', highlight: { background: '#163520', border: '#56d364' } },
+            font: { color: '#e6edf3', size: 12, face: 'monospace' },
+            margin: 8
+        }
+    },
+    edges: {
+        color: { color: '#58a6ff', highlight: '#79c0ff', hover: '#79c0ff' },
+        font: { color: '#c9d1d9', size: 11, face: 'sans-serif', align: 'middle', strokeWidth: 3, strokeColor: '#0d1117' },
+        width: 1.4,
+        arrows: { to: { enabled: true, scaleFactor: 0.65 } },
+        smooth: { type: 'dynamic', roundness: 0.25 }
+    },
+    layout: {
+        improvedLayout: true,
+        randomSeed: 7
+    },
+    physics: {
+        enabled: true,
+        solver: 'forceAtlas2Based',
+        forceAtlas2Based: {
+            gravitationalConstant: -70,
+            centralGravity: 0.012,
+            springLength: 150,
+            springConstant: 0.045,
+            damping: 0.45,
+            avoidOverlap: 0.8
+        },
+        stabilization: {
+            enabled: true,
+            iterations: 350,
+            updateInterval: 25,
+            fit: true
+        },
+        minVelocity: 0.75
+    },
+    interaction: {
+        hover: true,
+        tooltipDelay: 160,
+        zoomView: true,
+        dragView: true,
+        dragNodes: true,
+        multiselect: false
+    }
+};
+var network = new vis.Network(container, { nodes: nodes, edges: edges }, options);
+network.once('stabilizationIterationsDone', function() {
+    network.setOptions({ physics: false });
+    network.fit({ animation: true });
+});
+setTimeout(function() {
+    network.setOptions({ physics: false });
+    network.fit();
+}, 1200);
+network.on('dragEnd', function(params) {
+    if (!params.nodes || params.nodes.length === 0) return;
+    var positions = network.getPositions(params.nodes);
+    params.nodes.forEach(function(nodeId) {
+        if (!positions[nodeId]) return;
+        nodes.update({ id: nodeId, x: positions[nodeId].x, y: positions[nodeId].y, fixed: { x: true, y: true } });
+    });
+});
+
+function updateStats(stats) {
+    document.getElementById('flow-tool-count').innerText = stats.tool_count || 0;
+    document.getElementById('flow-event-count').innerText = stats.event_type_count || 0;
+    document.getElementById('flow-edge-count').innerText = stats.edge_count || 0;
+    document.getElementById('flow-total-count').innerText = stats.event_total || 0;
+}
+
+function refreshFlow() {
+    fetch('{{ url_for('flow_api') }}')
+        .then(function(resp) { return resp.json(); })
+        .then(function(data) {
+            network.setOptions({ physics: { enabled: true } });
+            nodes.clear();
+            edges.clear();
+            nodes.add(data.nodes || []);
+            edges.add(data.edges || []);
+            updateStats(data.stats || {});
+            network.stabilize(250);
+            setTimeout(function() {
+                network.setOptions({ physics: false });
+                network.fit({ animation: true });
+            }, 700);
+        })
+        .catch(function(err) { alert('刷新失败: ' + err); });
+}
+</script>
+{% endblock %}

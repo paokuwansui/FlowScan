@@ -1,0 +1,416 @@
+{% extends "base.html" %}
+{% block title %}事件图谱{% endblock %}
+{% block content %}
+<div class="eq-layout-tree">
+    {# 左侧搜索面板 #}
+    <div class="eq-sidebar">
+        <h3>搜索</h3>
+        <div style="margin-bottom:12px;">
+            <input type="text" id="graph-search-input" placeholder="输入事件值搜索…"
+                   style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:0.85rem;">
+        </div>
+        <button class="btn btn-sm btn-primary" onclick="searchGraph()" style="width:100%;">搜索并定位</button>
+        <div id="search-results" style="margin-top:8px;"></div>
+        <hr style="border-color:var(--border);margin:12px 0;">
+        <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6;">
+            <p><strong>操作说明</strong></p>
+            <p>• 节点 = 事件值</p>
+            <p>• 边上文字 = 工具名 → 事件类型</p>
+            <p>• 点击节点展开子事件</p>
+            <p>• 右侧面板 = 直接子事件</p>
+            <p>• 点击右侧子事件聚焦定位</p>
+            <p>• 拖拽空白平移，滚轮缩放</p>
+        </div>
+    </div>
+
+    {# 中间图谱 #}
+    <div class="eq-main">
+        <div id="graph-container" style="width:100%;height:calc(100vh - 120px);background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);"></div>
+    </div>
+
+    {# 右侧子事件列表面板 #}
+    <div class="eq-detail" id="detail-panel">
+        <div class="eq-detail-empty" id="detail-empty">← 点击图谱节点<br>查看直接子事件</div>
+        <div id="detail-content" style="display:none;">
+            <div class="eq-detail-header">
+                <div class="eq-detail-type" id="detail-type"></div>
+                <div class="eq-detail-value" id="detail-value"></div>
+            </div>
+            <div id="detail-children"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vis-network.min.js') }}"></script>
+<style>
+#graph-container canvas { display: block; }
+.vis-network:focus { outline: none; }
+</style>
+<script>
+// ── 全局状态 ──
+var nodes = new vis.DataSet([]);
+var edges = new vis.DataSet([]);
+var expanded = {};  // fp → true
+var nodeFpMap = {}; // nodeId → fp
+var fpNodeMap = {}; // fp → nodeId
+var nextId = 1;
+var selectedFp = null;  // 当前选中节点的 fp
+
+var container = document.getElementById('graph-container');
+var options = {
+    nodes: {
+        shape: 'box',
+        color: { background: '#161b22', border: '#30363d', highlight: { background: '#1c2333', border: '#58a6ff' } },
+        font: { color: '#e6edf3', size: 13, face: 'monospace' },
+        borderWidth: 1.5,
+        borderWidthSelected: 2.5,
+        margin: { top: 6, bottom: 6, left: 10, right: 10 },
+        shadow: { enabled: false },
+    },
+    edges: {
+        color: { color: '#30363d', highlight: '#58a6ff', hover: '#58a6ff' },
+        font: { color: '#8b949e', size: 11, face: 'sans-serif', align: 'middle', strokeWidth: 0 },
+        width: 1.5,
+        arrows: { to: { enabled: true, scaleFactor: 0.6 } },
+        smooth: { type: 'curvedCW', roundness: 0.15 },
+    },
+    physics: {
+        solver: 'forceAtlas2Based',
+        forceAtlas2Based: { gravitationalConstant: -40, centralGravity: 0.005, springLength: 180, springConstant: 0.02 },
+        stabilization: { iterations: 200 },
+    },
+    interaction: {
+        hover: true,
+        tooltipDelay: 200,
+        zoomView: true,
+        dragView: true,
+        multiselect: false,
+    },
+    layout: { improvedLayout: true },
+};
+var network = new vis.Network(container, { nodes: nodes, edges: edges }, options);
+
+// 加载根事件
+var roots = {{ roots | tojson | safe }};
+roots.forEach(function(r) { addNode(r, null, null); });
+
+// 稳定后自适应
+network.once('stabilizationIterationsDone', function() { network.fit(); });
+setTimeout(function() { network.fit(); }, 500);
+
+// ── 添加节点 ──
+function addNode(eventMeta, parentId, edgeLabel) {
+    var fp = eventMeta.fingerprint;
+    if (fpNodeMap[fp]) return fpNodeMap[fp];
+
+    var id = nextId++;
+    var label = (eventMeta.value || '').slice(0, 50);
+    if ((eventMeta.value || '').length > 50) label += '..';
+    var title = '<b>' + (eventMeta.event_type || '') + '</b><br>' + (eventMeta.value || '') + '<br><small>fp: ' + (fp || '').slice(0,16) + '..</small>';
+    var color = parentId ? '#1a2332' : '#16212e';
+    nodes.add({ id: id, label: label, title: title, color: { background: color, border: '#30363d' }, shape: 'box', size: 10 });
+    nodeFpMap[id] = fp;
+    fpNodeMap[fp] = id;
+
+    if (parentId && edgeLabel) {
+        var eid = 'e' + id;
+        edges.add({ id: eid, from: parentId, to: id, label: edgeLabel, title: edgeLabel });
+    }
+    return id;
+}
+
+// ── 点击节点：展开 + 右侧面板显示子事件 ──
+network.on('click', function(params) {
+    if (params.nodes.length === 0) return;
+    var nodeId = params.nodes[0];
+    var fp = nodeFpMap[nodeId];
+    if (!fp) return;
+
+    // 更新选中状态
+    selectNode(fp, nodeId);
+
+    // 如果未展开则展开
+    if (!expanded[fp]) {
+        expandAndSelect(fp, nodeId);
+    }
+});
+
+// ── 选中节点并加载右侧面板 ──
+function selectNode(fp, nodeId) {
+    selectedFp = fp;
+    loadDetailPanel(fp);
+
+    // 高亮节点
+    if (nodeId || fpNodeMap[fp]) {
+        network.selectNodes([nodeId || fpNodeMap[fp]]);
+    }
+}
+
+// ── 加载右侧子事件面板 ──
+function loadDetailPanel(fp) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/event-tree/children/' + fp, true);
+    xhr.onload = function() {
+        if (xhr.status !== 200) return;
+        var groups = JSON.parse(xhr.responseText);
+        if (!groups) groups = [];
+
+        // 获取当前事件信息
+        var eventMeta = null;
+        if (fpNodeMap[fp]) {
+            // 从图中取不到完整 meta，直接用 API 返回的
+        }
+
+        // 更新 header：从搜索结果或 roots 中匹配
+        updateDetailHeader(fp, groups);
+
+        // 渲染子事件列表
+        renderDetailChildren(fp, groups);
+    };
+    xhr.send();
+}
+
+// ── 更新右侧面板 header ──
+function updateDetailHeader(fp, groups) {
+    // 尝试从已加载的数据中获取事件类型和值
+    var typeText = '';
+    var valueText = '';
+
+    // 从 root 数据中找
+    for (var i = 0; i < roots.length; i++) {
+        if (roots[i].fingerprint === fp) {
+            typeText = roots[i].event_type || '';
+            valueText = roots[i].value || '';
+            break;
+        }
+    }
+
+    // 从子事件组中推断（父事件信息不直接返回，显示 fp 摘要）
+    if (!typeText) {
+        typeText = '事件';
+    }
+    if (!valueText) {
+        valueText = 'fp: ' + (fp || '').slice(0, 16) + '...';
+    }
+
+    document.getElementById('detail-type').textContent = typeText;
+    document.getElementById('detail-value').textContent = valueText;
+    document.getElementById('detail-empty').style.display = 'none';
+    document.getElementById('detail-content').style.display = '';
+
+    // 存储当前选中的 meta 用于后续子事件点击
+    window._selectedEventMeta = { fingerprint: fp, event_type: typeText, value: valueText };
+}
+
+// ── 渲染右侧子事件列表 ──
+function renderDetailChildren(parentFp, groups) {
+    var container = document.getElementById('detail-children');
+    if (!groups || groups.length === 0) {
+        container.innerHTML = '<div class="eq-detail-empty" style="font-size:0.78rem;padding:20px 0;">无直接子事件</div>';
+        return;
+    }
+
+    var html = '';
+    groups.forEach(function(group) {
+        html += '<div class="eq-detail-group">';
+        html += '<div class="eq-detail-group-title">' + group.event_type + ' (' + group.count + ')</div>';
+        group.events.forEach(function(evt) {
+            var val = (evt.value || '').slice(0, 60);
+            if ((evt.value || '').length > 60) val += '..';
+            var tool = evt.tool || evt.source || '';
+            html += '<div class="eq-detail-child" onclick="focusChild(\'' + evt.fp + '\', \'' + parentFp + '\')" data-fp="' + evt.fp + '">';
+            html += '<span class="eq-detail-child-value">' + escapeHtml(val) + '</span>';
+            if (tool) {
+                html += '<span class="eq-detail-child-meta">by ' + escapeHtml(tool) + '</span>';
+            }
+            html += '</div>';
+        });
+        html += '</div>';
+    });
+    container.innerHTML = html;
+}
+
+// ── 点击右侧子事件：在图中定位聚焦 ──
+function focusChild(childFp, parentFp) {
+    // 高亮右侧当前点击项
+    var prev = document.querySelector('.eq-detail-child.selected');
+    if (prev) prev.classList.remove('selected');
+    var current = document.querySelector('.eq-detail-child[data-fp="' + childFp + '"]');
+    if (current) current.classList.add('selected');
+
+    // 如果子事件已在图中 → 直接选中聚焦
+    if (fpNodeMap[childFp]) {
+        var nodeId = fpNodeMap[childFp];
+        network.selectNodes([nodeId]);
+        network.focus(nodeId, { scale: 1.3, animation: true });
+        // 同时加载该子事件的右侧面板
+        selectNode(childFp, nodeId);
+        return;
+    }
+
+    // 子事件不在图中 → 先确保父节点已展开
+    if (parentFp && !expanded[parentFp]) {
+        var parentNodeId = fpNodeMap[parentFp];
+        if (parentNodeId) {
+            expandAndSelect(parentFp, parentNodeId, childFp);
+            return;
+        }
+    }
+
+    // 父节点已展开但子事件仍不在图中 → 直接尝试通过 API 添加到图
+    // 先展开父节点（强制重新加载）
+    if (parentFp && fpNodeMap[parentFp]) {
+        expandAndFocusChild(parentFp, childFp);
+    }
+}
+
+// ── 展开父节点，完成后聚焦子事件 ──
+function expandAndSelect(fp, nodeId, focusChildFp) {
+    expanded[fp] = true;
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/event-tree/children/' + fp, true);
+    xhr.onload = function() {
+        if (xhr.status !== 200) return;
+        var groups = JSON.parse(xhr.responseText);
+        if (!groups || groups.length === 0) return;
+        groups.forEach(function(group) {
+            group.events.forEach(function(evt) {
+                var edgeLabel = (evt.tool || evt.source || '?') + ' → ' + group.event_type;
+                addNode(evt, nodeId, edgeLabel);
+            });
+        });
+        network.fit({ animation: true });
+
+        // 如果需要聚焦特定子事件
+        if (focusChildFp) {
+            setTimeout(function() {
+                if (fpNodeMap[focusChildFp]) {
+                    var childId = fpNodeMap[focusChildFp];
+                    network.selectNodes([childId]);
+                    network.focus(childId, { scale: 1.3, animation: true });
+                    selectNode(focusChildFp, childId);
+                }
+            }, 400);
+        }
+    };
+    xhr.send();
+}
+
+// ── 父节点已展开，补充聚焦子事件 ──
+function expandAndFocusChild(parentFp, childFp) {
+    // 强制重新展开（重置 expanded 标记）
+    expanded[parentFp] = false;
+    var parentNodeId = fpNodeMap[parentFp];
+    if (parentNodeId) {
+        expandAndSelect(parentFp, parentNodeId, childFp);
+    }
+}
+
+// ── 搜索 ──
+function searchGraph() {
+    var q = document.getElementById('graph-search-input').value.trim();
+    if (!q) return;
+    var resultsDiv = document.getElementById('search-results');
+    resultsDiv.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;">搜索中...</div>';
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/event-tree/search?value=' + encodeURIComponent(q), true);
+    xhr.onload = function() {
+        if (xhr.status !== 200) {
+            resultsDiv.innerHTML = '<div style="color:var(--danger);font-size:0.8rem;">搜索失败</div>';
+            return;
+        }
+        var items = JSON.parse(xhr.responseText);
+        if (!items || items.length === 0) {
+            resultsDiv.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;">未找到</div>';
+            return;
+        }
+        var html = '<div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:4px;">' + items.length + ' 个结果</div>';
+        items.forEach(function(item) {
+            html += '<div style="padding:4px 6px;margin-bottom:4px;background:var(--bg);border-radius:4px;cursor:pointer;font-size:0.78rem;" onclick="showFullPath(\'' + item.fp + '\')">';
+            html += '<span class="badge badge-event" style="font-size:0.65rem;">' + item.event_type + '</span> ';
+            html += '<span style="font-family:monospace;">' + (item.value || '').slice(0, 30) + '</span>';
+            html += '</div>';
+        });
+        resultsDiv.innerHTML = html;
+    };
+    xhr.send();
+}
+
+function showFullPath(fp) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/event-tree/search?value=' + encodeURIComponent(document.getElementById('graph-search-input').value.trim()), true);
+    xhr.onload = function() {
+        if (xhr.status !== 200) return;
+        var items = JSON.parse(xhr.responseText);
+        var target = null;
+        for (var i = 0; i < items.length; i++) {
+            if (items[i].fp === fp) { target = items[i]; break; }
+        }
+        if (!target) return;
+        loadPathRecursive(target);
+    };
+    xhr.send();
+}
+
+function loadPathRecursive(target) {
+    if (!target || !target.fp) return;
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/path/' + target.fp, true);
+    xhr.onload = function() {
+        if (xhr.status !== 200) return;
+        var path = JSON.parse(xhr.responseText);
+        if (!path || path.length === 0) return;
+
+        var prevId = null;
+        path.forEach(function(step, idx) {
+            if (idx === 0) {
+                if (fpNodeMap[step.fingerprint]) {
+                    prevId = fpNodeMap[step.fingerprint];
+                    if (!expanded[step.fingerprint]) expandAndSelect(step.fingerprint, prevId);
+                }
+                return;
+            }
+            var parentMeta = path[idx - 1];
+            var parentId = fpNodeMap[parentMeta.fingerprint];
+            if (!parentId) return;
+
+            var nodeId = fpNodeMap[step.fingerprint];
+            if (!nodeId) {
+                var edgeLabel = (step.source_tool || step.tool_name || '?') + ' → ' + step.event_type;
+                nodeId = addNode(step, parentId, edgeLabel);
+            }
+            if (!expanded[step.fingerprint]) expandAndSelect(step.fingerprint, nodeId);
+            prevId = nodeId;
+        });
+        setTimeout(function() {
+            if (fpNodeMap[target.fp]) {
+                var targetId = fpNodeMap[target.fp];
+                network.selectNodes([targetId]);
+                network.focus(targetId, { scale: 1.5, animation: true });
+                selectNode(target.fp, targetId);
+            }
+        }, 500);
+    };
+    xhr.send();
+}
+
+// ── 工具函数 ──
+function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+}
+
+// ── 回车搜索 ──
+document.getElementById('graph-search-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') searchGraph();
+});
+
+// ── 键盘 ESC 取消选中 ──
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') network.unselectAll();
+});
+</script>
+{% endblock %}

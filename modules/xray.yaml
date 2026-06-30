@@ -1,27 +1,26 @@
 name: xray_passive_module
-description: 长亭科技 Xray 被动漏洞代理监听组件
+description: Xray 外部被动代理配置占位；FlowScan3 不拉起常驻 xray，只由 rad/其他工具转发到 config.http-proxy。
+enabled: false
 check:
-  command: 'cd ./bin/xray && ./xray version'
-  expect_keyword: 'Version: 1.9.11'
+  command: 'md5sum ./bin/xray/xray'
+  expect_keyword: '8225ad04650f2a04658a45797a6cf2a8'
   exclude_keyword: ''
 install:
+  install_timeout_seconds: 900
   steps:
-  - cd ./bin/xray && curl -fL https://github.com/chaitin/xray/releases/download/1.9.11/xray_linux_amd64.zip -o xray.zip && unzip -o xray.zip && mv xray_linux_amd64 xray && chmod +x xray && rm -f xray.zip
-execute:
-  inputs:
-  - START
-  outputs:
-  - VULNERABILITY
-  timeout: 99999999
-  max_parallel_num: 1
-  command: rm -f ./outputs/xray_out.json && cd ./bin/xray && ./xray webscan --listen 127.0.0.1:7777 --json-output ../../outputs/xray_out.json
-parser:
-  type: rules
-  rules:
-  - match:
-      type: prefix
-      value: '[VULN]'
-    extract:
-      VULNERABILITY: '{{rest}}'
-event_extractors:
-  VULNERABILITY: ''
+  - mkdir -p "./bin/xray/"
+  - cd "./bin/xray/" && curl -fL https://github.com/chaitin/xray/releases/download/1.9.11/xray_linux_amd64.zip
+    -o xray.zip && unzip -o xray.zip && mv xray_linux_amd64 xray && rm -f xray.zip
+runtime:
+  max_concurrency: 1
+  exec_timeout_seconds: 60
+allowed_output_events: []
+io_contract:
+  input_events:
+  - __DISABLED__
+  input_transform_code: |
+    return []
+execution:
+  command: echo "xray disabled; start xray externally at {{config.http-proxy}}"
+  output_parse_code: |
+    return []

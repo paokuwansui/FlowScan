@@ -1,0 +1,55 @@
+name: bypass403_module
+description: 403 绕过 — 对 URL 尝试多种绕过技术（路径遍历、Header 伪造、编码、方法切换等），输出成功绕过的 URL
+check:
+  command: $HOME/.local/bin/dontgo403 -h 2>&1 || true
+  expect_keyword: Usage
+  exclude_keyword: not found
+install:
+  steps:
+  - mkdir -p "$HOME/.local/bin" "$HOME/.cache/go-tmp"
+  - GOBIN="$HOME/.local/bin" GOCACHE="$HOME/.cache/go-tmp" go install -v github.com/devploit/dontgo403@latest
+  install_timeout_seconds: 1200
+runtime:
+  max_concurrency: 3
+  exec_timeout_seconds: 180
+allowed_output_events:
+- URL
+- LIVE_URL
+io_contract:
+  input_events:
+  - 403_URL
+  input_transform_code: |
+    import shlex
+    value = data["value"].strip()
+    if not value.startswith(("http://", "https://")):
+        value = "http://" + value
+    return [{"target": value, "target_q": shlex.quote(value)}]
+execution:
+  command: $HOME/.local/bin/dontgo403 -u {{target_q}} 2>/dev/null
+  output_parse_code: |
+    import re
+    results = []
+    seen = set()
+    def add(k, v):
+        v = str(v or "").strip().rstrip(")")
+        if not v or not v.startswith(("http://", "https://")):
+            return
+        key = (k, v)
+        if key not in seen:
+            seen.add(key)
+            results.append({k: v})
+    for line in data["stdout"].splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        # 跳过明确 403 的行（原始请求 / 绕过失败的尝试）
+        line_lower = line.lower()
+        if " 403 " in line or "[403]" in line or line.lstrip("[").startswith("403"):
+            continue
+        # 提取行中所有 URL，如果是成功绕过的结果则输出
+        urls = re.findall(r"https?://[^\s<>\"')\]]+", line)
+        for url in urls:
+            # 只保留非 403 的行中的 URL（绕过成功或信息行）
+            add("URL", url)
+            add("LIVE_URL", url)
+    return results

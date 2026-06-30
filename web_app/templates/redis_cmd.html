@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Redis 命令执行{% endblock %}
+{% block content %}
+<div class="section">
+    <h1>Redis 命令执行器</h1>
+    <p class="help-text">直接执行 Redis 命令，查看返回结果。<br>
+       危险命令（FLUSHALL、SHUTDOWN、DEL 等）会显示警告，请谨慎操作。</p>
+
+    <div class="card">
+        <form method="POST" action="{{ url_for('redis_cmd') }}" id="cmd-form">
+            <div class="form-group">
+                <label for="command">Redis 命令</label>
+                <input type="text" id="command" name="command"
+                       placeholder="例如: KEYS *    或 GET somekey"
+                       value="{{ last_cmd or '' }}" required
+                       style="font-family: monospace; font-size: 1rem;">
+            </div>
+            <button type="submit" class="btn btn-primary" id="exec-btn">执行</button>
+        </form>
+    </div>
+
+    {% if result is not none %}
+    <div class="card">
+        <h3>执行结果</h3>
+        <div class="result-box">
+            {% if result is string %}
+            <pre class="result-text">{{ result }}</pre>
+            {% elif result is iterable and result is not string %}
+            <table class="table">
+                <thead><tr><th>#</th><th>值</th></tr></thead>
+                <tbody>
+                {% for item in result %}
+                <tr><td>{{ loop.index0 }}</td><td class="value-cell">{{ item }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <pre class="result-text">{{ result }}</pre>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if error %}
+    <div class="card">
+        <h3>错误信息</h3>
+        <pre class="result-text error-text">{{ error }}</pre>
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <h3>常用命令示例</h3>
+        <table class="table">
+            <thead><tr><th>命令</th><th>说明</th></tr></thead>
+            <tbody>
+                <tr><td><code>KEYS *</code></td><td>列出所有 Key（谨慎使用，大数据量会阻塞）</td></tr>
+                <tr><td><code>SCAN 0</code></td><td>游标方式遍历 Key（推荐替代 KEYS）</td></tr>
+                <tr><td><code>DBSIZE</code></td><td>当前数据库 Key 数量</td></tr>
+                <tr><td><code>INFO server</code></td><td>Redis 服务器信息</td></tr>
+                <tr><td><code>GET key名</code></td><td>获取指定 Key 的值</td></tr>
+                <tr><td><code>TYPE key名</code></td><td>查看 Key 的类型</td></tr>
+                <tr><td><code>TTL key名</code></td><td>查看 Key 的剩余生存时间</td></tr>
+                <tr><td><code>LLEN queue:xxx</code></td><td>查看队列长度</td></tr>
+                <tr><td><code>LRANGE queue:xxx 0 10</code></td><td>查看队列前 10 条</td></tr>
+                <tr><td><code>HGETALL event:meta:{fp}</code></td><td>查看事件元数据</td></tr>
+                <tr><td><code>SMEMBERS event:set</code></td><td>事件去重集合元素数</td></tr>
+                <tr><td><code>FLUSHDB</code></td><td>清空当前数据库（仅 fs3:* 数据，危险）</td></tr>
+                <tr><td><code>FLUSHALL</code></td><td>清空所有数据库（极度危险）</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>Redis 持久化命令</h3>
+        <table class="table">
+            <thead><tr><th>命令</th><th>说明</th></tr></thead>
+            <tbody>
+                <tr><td><code>BGSAVE</code></td><td>后台异步保存 RDB 快照到磁盘（推荐）</td></tr>
+                <tr><td><code>SAVE</code></td><td>同步保存 RDB 快照（阻塞，不推荐）</td></tr>
+                <tr><td><code>LASTSAVE</code></td><td>查看最后一次成功保存的时间戳</td></tr>
+                <tr><td><code>INFO persistence</code></td><td>查看持久化状态（rdb_last_save_time 等）</td></tr>
+                <tr><td><code>CONFIG GET dir</code></td><td>查看 RDB 文件存储目录</td></tr>
+                <tr><td><code>CONFIG GET dbfilename</code></td><td>查看 RDB 文件名（默认 dump.rdb）</td></tr>
+                <tr><td><code>CONFIG SET save ""</code></td><td>禁用自动 RDB 快照（临时）</td></tr>
+                <tr><td><code>CONFIG SET save "900 1"</code></td><td>恢复自动快照策略</td></tr>
+            </tbody>
+        </table>
+        <p class="help-text">
+            <strong>恢复流程：</strong><br>
+            1. 确认 Redis 正在运行 → <code>PING</code><br>
+            2. 查看 RDB 目录和文件名 → <code>CONFIG GET dir</code> + <code>CONFIG GET dbfilename</code><br>
+            3. 停止所有 FlowScan 写入 → Worker 暂停<br>
+            4. 保存当前快照 → <code>BGSAVE</code><br>
+            5. 关闭 Redis → <code>SHUTDOWN NOSAVE</code><br>
+            6. 替换 RDB 文件 → <code>cp /path/to/backup/dump.rdb &lt;dir&gt;/&lt;dbfilename&gt;</code><br>
+            7. 重启 Redis → <code>redis-server</code> 或 <code>systemctl restart redis</code><br>
+            8. 验证 → <code>DBSIZE</code> 检查键数量<br>
+            <br>
+            <strong>清空后恢复流程：</strong><br>
+            1. <code>BGSAVE</code>（先备份当前状态）<br>
+            2. <code>FLUSHDB</code>（清空当前库）<br>
+            3. 如需恢复：替换 RDB 文件后重启 Redis<br>
+            <br>
+            <em>注意：RDB 恢复是全量替换，会覆盖当前所有数据。建议先 BGSAVE 备份。</em>
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 危险命令二次确认
+document.getElementById('cmd-form')?.addEventListener('submit', function(e) {
+    const cmd = document.getElementById('command').value.toUpperCase().trim();
+    const dangerous = ['FLUSHALL', 'FLUSHDB', 'SHUTDOWN', 'DEBUG', 'CONFIG RESET',
+                       'SLAVEOF', 'REPLICAOF', 'CLUSTER FAILOVER', 'MONITOR',
+                       'DEBUG SEGFAULT'];
+    for (const d of dangerous) {
+        if (cmd.startsWith(d)) {
+            if (!confirm('⚠️ 即将执行危险命令: ' + cmd + '\n\n确认执行？')) {
+                e.preventDefault();
+                return;
+            }
+            break;
+        }
+    }
+});
+</script>
+{% endblock %}

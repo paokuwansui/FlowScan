@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}事件查询{% endblock %}
+{% block content %}
+<div class="eq-layout">
+    {# ====== 左侧：事件类别 ====== #}
+    <div class="eq-sidebar">
+        <h3>事件类别</h3>
+        <ul class="eq-type-list">
+            {% for et in event_types %}
+            <li>
+                <a href="{{ url_for('event_query', type=et) }}"
+                   class="{% if et == selected_type and not search_term %}active{% endif %}">
+                    {{ et }}
+                </a>
+            </li>
+            {% else %}
+            <li class="empty">暂无事件</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    {# ====== 右侧主区域 ====== #}
+    <div class="eq-main">
+        {# ── 右上角搜索框 ── #}
+        <div class="eq-search-bar">
+            <form method="GET" action="{{ url_for('event_query') }}" id="search-form">
+                <input type="text" name="search" placeholder="搜索事件值..."
+                       value="{{ search_term }}" class="eq-search-input">
+                <button type="submit" class="btn btn-sm btn-primary">搜索</button>
+                {% if search_term %}
+                <a href="{{ url_for('event_query') }}" class="btn btn-sm btn-secondary">清除</a>
+                {% endif %}
+            </form>
+        </div>
+
+        {# ── 搜索结果显示 ── #}
+        {% if search_term %}
+        <div class="eq-section">
+            <h3>搜索: "{{ search_term }}" — 找到 {{ search_results|length }} 个结果</h3>
+            <div class="eq-value-grid">
+                {% for r in search_results %}
+                <div class="eq-value-item" data-fp="{{ r.fp }}"
+                     onclick="togglePath('{{ r.fp }}', this)">
+                    <span class="eq-value-type">{{ r.type }}</span>
+                    <span class="eq-value-text">{{ r.value[:80] }}</span>
+                    <span class="eq-value-source">{{ r.source or '?' }}</span>
+                </div>
+                <div class="eq-path-panel" id="path-{{ r.fp }}" style="display:none;"></div>
+                {% else %}
+                <div class="empty-state">未找到匹配的事件</div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {# ── 分类浏览结果 ── #}
+        {% if selected_type and not search_term %}
+        <div class="eq-section">
+            <h3>{{ selected_type }} — {{ type_values|length }} 个值</h3>
+            <div class="eq-value-grid">
+                {% for v in type_values %}
+                <div class="eq-value-item" data-fp="{{ v.fp }}"
+                     onclick="togglePath('{{ v.fp }}', this)">
+                    <span class="eq-value-text">{{ v.value[:80] }}</span>
+                    <span class="eq-value-source">{{ v.source or '?' }}</span>
+                </div>
+                <div class="eq-path-panel" id="path-{{ v.fp }}" style="display:none;"></div>
+                {% else %}
+                <div class="empty-state">该类型暂无事件值</div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {# ── 默认提示 ── #}
+        {% if not selected_type and not search_term %}
+        <div class="empty-state" style="margin-top:80px;">
+            <h2>事件查询</h2>
+            <p>从左侧选择一个事件类别，或在右上角搜索事件值</p>
+        </div>
+        {% endif %}
+
+        {# ── 路径弹出区域 ── #}
+        {% if path_data and path_fp %}
+        <div class="eq-path-detail" id="inline-path">
+            <h3>事件路径 <span class="fp-label">{{ path_fp[:20] }}...</span></h3>
+            <button class="btn btn-sm btn-secondary" onclick="closePath()">关闭</button>
+            <div class="path-timeline" style="margin-top:12px;">
+                {% for node in path_data %}
+                <div class="path-node">
+                    <div class="path-marker {% if loop.first %}root{% elif loop.last %}current{% else %}intermediate{% endif %}">
+                        {{ loop.index }}
+                    </div>
+                    <div class="path-content">
+                        <div class="path-event-type">
+                            <span class="badge badge-event">{{ node.event_type }}</span>
+                            {% if node.source_tool %}
+                            <span class="badge badge-tool">{{ node.source_tool }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="path-value">{{ node.value[:120] }}</div>
+                        <div class="path-meta">
+                            <span>指纹: {{ node.fingerprint[:20] }}...</span>
+                            <span>时间: {{ "%.2f"|format(node.timestamp|float) if node.timestamp else '-' }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 切换路径显示（AJAX 加载）
+function togglePath(fp, el) {
+    var panel = document.getElementById('path-' + fp);
+    if (panel.style.display === 'block') {
+        panel.style.display = 'none';
+        el.classList.remove('selected');
+        return;
+    }
+    // 隐藏其他已展开的面板
+    document.querySelectorAll('.eq-path-panel').forEach(function(p) {
+        p.style.display = 'none';
+    });
+    document.querySelectorAll('.eq-value-item').forEach(function(e) {
+        e.classList.remove('selected');
+    });
+    el.classList.add('selected');
+    // 如果已加载内容，直接显示
+    if (panel.innerHTML.trim()) {
+        panel.style.display = 'block';
+        return;
+    }
+    // AJAX 加载路径数据
+    panel.innerHTML = '<div class="loading">加载中...</div>';
+    panel.style.display = 'block';
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/path/' + fp, true);
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            var data = JSON.parse(xhr.responseText);
+            var html = '<div class="path-timeline" style="padding:8px 0 8px 24px;">';
+            data.forEach(function(node, i) {
+                var cls = i === 0 ? 'root' : (i === data.length-1 ? 'current' : 'intermediate');
+                html += '<div class="path-node" style="margin-bottom:8px;">';
+                html += '<div class="path-marker ' + cls + '" style="width:28px;height:28px;font-size:0.7rem;margin-left:-24px;">' + (i+1) + '</div>';
+                html += '<div class="path-content" style="padding:8px 12px;">';
+                html += '<div class="path-event-type"><span class="badge badge-event">' + (node.event_type||'') + '</span>';
+                if (node.source_tool) html += ' <span class="badge badge-tool">' + node.source_tool + '</span>';
+                html += '</div>';
+                html += '<div class="path-value" style="font-size:0.8rem;">' + (node.value||'').slice(0,100) + '</div>';
+                html += '</div></div>';
+            });
+            html += '</div>';
+            panel.innerHTML = html;
+        } else {
+            panel.innerHTML = '<div class="empty-state">加载失败</div>';
+        }
+    };
+    xhr.send();
+}
+function closePath() {
+    document.getElementById('inline-path')?.remove();
+}
+</script>
+{% endblock %}

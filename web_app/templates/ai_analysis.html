@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}AI 分析{% endblock %}
+{% block content %}
+<div class="section">
+    <h1>AI 分析</h1>
+
+    <div class="stats-grid" style="grid-template-columns:1fr 1fr 1fr;">
+        <div class="stat-card">
+            <div class="stat-value">{{ event_types|length }}</div>
+            <div class="stat-label">可选事件类型</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ result.event_count if result else context_events|length }}</div>
+            <div class="stat-label">本次上下文事件</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ ai_cfg.model or '-' }}</div>
+            <div class="stat-label">AI 模型</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>分析配置</h3>
+        <p class="help-text">AI 配置来自 config.yaml 的 ai_analysis，提示词默认从 prompts/ai_analysis.txt 读取。</p>
+        <form method="POST" action="{{ url_for('ai_analysis') }}">
+            <div class="form-group">
+                <label style="display:block;margin-bottom:8px;color:var(--text-muted);">选择事件类型</label>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;max-height:260px;overflow:auto;border:1px solid var(--border);border-radius:var(--radius);padding:10px;background:var(--bg);">
+                    {% for et in event_types %}
+                    <label style="display:flex;align-items:center;gap:7px;font-family:monospace;font-size:0.86rem;">
+                        <input type="checkbox" name="event_types" value="{{ et }}" {% if et in selected_types %}checked{% endif %}>
+                        {{ et }}
+                    </label>
+                    {% else %}
+                    <span class="empty">暂无事件类型</span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="form-row" style="align-items:center;gap:10px;margin:10px 0;">
+                <label>最多发送事件数
+                    <input type="number" name="max_events" value="{{ max_events }}" min="1" max="2000"
+                           style="width:110px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:monospace;">
+                </label>
+            </div>
+
+            {# ── 动作开关 ── #}
+            <div class="form-row" style="align-items:center;gap:16px;margin:10px 0;flex-wrap:wrap;">
+                <span style="color:var(--text-muted);font-size:0.82rem;">自动执行动作：</span>
+                <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:0.85rem;">
+                    <input type="checkbox" name="toggle_add" value="1" {% if toggles.add %}checked{% endif %}>
+                    <span class="badge" style="background:rgba(63,185,80,0.15);color:#3fb950;">添加事件</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:0.85rem;">
+                    <input type="checkbox" name="toggle_del" value="1" {% if toggles.del %}checked{% endif %}>
+                    <span class="badge" style="background:rgba(248,81,73,0.15);color:var(--danger);">删除事件</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:0.85rem;">
+                    <input type="checkbox" name="toggle_log" value="1" {% if toggles.log %}checked{% endif %}>
+                    <span class="badge" style="background:rgba(210,153,34,0.15);color:#d29922;">存储日志</span>
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label style="display:block;margin-bottom:8px;color:var(--text-muted);">用户问题</label>
+                <textarea name="question" rows="6" placeholder="例如：从这些扫描事件里找出最值得继续验证的资产和下一步扫描建议。"
+                          style="width:100%;font-family:monospace;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:10px;resize:vertical;">{{ question }}</textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">发送给 AI 分析</button>
+        </form>
+    </div>
+
+    {# ── 循环设置 ── #}
+    <div class="card">
+        <h3>循环自动分析</h3>
+        <p class="help-text">设置循环间隔后，系统每 N 分钟自动使用当前事件类型、问题和开关配置执行 AI 分析。设为 0 停止循环。</p>
+        <form method="POST" action="{{ url_for('ai_loop_save') }}">
+            <div class="form-row" style="align-items:center;gap:10px;flex-wrap:wrap;">
+                <label>循环间隔（分钟）
+                    <input type="number" name="loop_interval" value="{{ loop_config.interval_minutes }}" min="0" max="1440"
+                           style="width:100px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:monospace;">
+                </label>
+                <button type="submit" class="btn btn-primary">保存循环设置</button>
+                {% if loop_config.last_run > 0 %}
+                <span style="color:var(--text-muted);font-size:0.78rem;">
+                    上次执行: {{ loop_config.last_run | int | default(0) }}
+                </span>
+                {% endif %}
+            </div>
+            {# 保存当前表单状态到循环配置 #}
+            <input type="hidden" name="loop_question" value="{{ question }}">
+            <input type="hidden" name="loop_max_events" value="{{ max_events }}">
+            {% for et in selected_types %}
+            <input type="hidden" name="loop_event_types" value="{{ et }}">
+            {% endfor %}
+            <input type="hidden" name="loop_toggle_add" value="{% if toggles.add %}1{% else %}0{% endif %}">
+            <input type="hidden" name="loop_toggle_del" value="{% if toggles.del %}1{% else %}0{% endif %}">
+            <input type="hidden" name="loop_toggle_log" value="{% if toggles.log %}1{% else %}0{% endif %}">
+        </form>
+    </div>
+
+    {% if action_results %}
+    <div class="card">
+        <h3>自动执行结果</h3>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>类型</th>
+                    <th>详情</th>
+                    <th>状态</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ar in action_results %}
+                <tr>
+                    <td>
+                        {% if ar.type == 'add' %}
+                        <span class="badge" style="background:rgba(63,185,80,0.15);color:#3fb950;">添加</span>
+                        {% elif ar.type == 'del' %}
+                        <span class="badge" style="background:rgba(248,81,73,0.15);color:var(--danger);">删除</span>
+                        {% else %}
+                        <span class="badge" style="background:rgba(210,153,34,0.15);color:#d29922;">日志</span>
+                        {% endif %}
+                    </td>
+                    <td class="value-cell">
+                        {% if ar.type in ('add', 'del') %}
+                        <span class="badge badge-event">{{ ar.event_type }}</span> {{ ar.value[:80] }}
+                        {% else %}
+                        {{ ar.log_id }}
+                        {% endif %}
+                    </td>
+                    <td>{{ ar.note }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if result %}
+    <div class="card">
+        <h3>AI 回答</h3>
+        {% if result.ok %}
+        <pre style="white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px;color:var(--text);font-family:inherit;line-height:1.55;">{{ result.answer }}</pre>
+        {% else %}
+        <div class="flash error">{{ result.error }}</div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if context_events %}
+    <div class="card">
+        <h3>发送上下文预览</h3>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>类型</th>
+                    <th>值</th>
+                    <th>来源</th>
+                    <th>指纹</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for evt in context_events[:100] %}
+                <tr>
+                    <td><span class="badge badge-event">{{ evt.event_type }}</span></td>
+                    <td class="value-cell">{{ evt.value[:100] }}{% if evt.value|length > 100 %}...{% endif %}</td>
+                    <td>{{ evt.source_tool or '-' }}</td>
+                    <td class="fp-cell">{{ evt.fingerprint[:16] }}...</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if context_events|length > 100 %}
+        <p class="help-text">仅预览前 100 条，实际发送 {{ context_events|length }} 条。</p>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

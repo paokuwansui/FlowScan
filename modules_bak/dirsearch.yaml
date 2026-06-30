@@ -1,0 +1,72 @@
+name: dirsearch_module
+description: Dirsearch 目录扫描 — 对 Web 站点进行路径/文件发现，JSON 输出解析为 URL/URI
+check:
+  command: dirsearch --version
+  expect_keyword: dirsearch
+  exclude_keyword: not found
+install:
+  steps:
+  - sudo apt update
+  - sudo apt install dirsearch -y
+  install_timeout_seconds: 900
+runtime:
+  max_concurrency: 2
+  exec_timeout_seconds: 360
+allowed_output_events:
+- URI
+- URL
+io_contract:
+  input_events:
+  - LIVE_URL
+  input_transform_code: |
+    import shlex
+    value = data["value"].strip()
+    if not value.startswith(("http://", "https://")):
+        value = "http://" + value
+    return [{"target": value, "target_q": shlex.quote(value)}]
+execution:
+  command: dirsearch -u {{target_q}} --format json -o /dev/stdout --threads 20 --timeout 8 --max-rate 60 --include-status
+    200,204,301,302,307,308,401,403 --full-url --no-color 2>/dev/null
+  output_parse_code: |
+    import json
+    from urllib.parse import urlparse
+    results = []
+    seen = set()
+    def add(k, v):
+        v = str(v or "").strip()
+        if not v:
+            return
+        key = (k, v)
+        if key not in seen:
+            seen.add(key)
+            results.append({k: v})
+    text = data["stdout"].strip()
+    items = []
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict):
+            if isinstance(parsed.get("results"), list):
+                items = parsed["results"]
+            else:
+                for val in parsed.values():
+                    if isinstance(val, list):
+                        items.extend(val)
+        elif isinstance(parsed, list):
+            items = parsed
+    except:
+        for line in text.splitlines():
+            try:
+                items.append(json.loads(line))
+            except:
+                pass
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        url = item.get("url") or item.get("full_url") or item.get("redirect") or ""
+        path = item.get("path") or ""
+        add("URL", url)
+        if not path and url:
+            path = urlparse(url).path
+        if path and path.startswith("/"):
+            add("URI", path)
+    return results
