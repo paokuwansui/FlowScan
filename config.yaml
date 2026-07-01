@@ -1,6 +1,7 @@
 # FlowScan3 主配置
 redis:
-  host: 127.0.0.1
+  listen_host: 0.0.0.0
+  remote_host: 127.0.0.1
   port: 6379
   password: ""
   db: 0
@@ -8,14 +9,14 @@ redis:
 web_config:
   host: 0.0.0.0
   port: 8080
-  username: admin
-  password: admin
+  username: FlowScan
+  password: FlowScanPassWord123
   session_ttl: 3600
-  secret_key: flowscan3-session-secret-change-in-production
+  secret_key: 5329a77d233311276c3f0ac7951b165c0b43fdfe9b7e1226abaa603da135a22d
 
-# 外部 xray 被动代理监听地址；FlowScan3 不再拉起 xray 常驻进程。
-# rad 等模块可通过 {{config.http-proxy}} 读取该配置。
-http-proxy: http://127.0.0.1:7777
+
+xray_listen_http_proxy: http://0.0.0.0:7777
+xray_remote_http_proxy: http://127.0.0.1:7777
 
 worker:
   idle_sleep_seconds: 1.0
@@ -54,5 +55,5 @@ ai_analysis:
   # system_prompt 未设置时自动从 prompts/ai_analysis.txt 读取
   # system_prompt: |
   #   自定义提示词（覆盖 prompts/ai_analysis.txt）
-  log_api_key: flowscan3-agent-log-key-change-me
+  log_api_key: d6de3f6386d67953484daea7d560e8c97227bfac55f31ec628c837b2939d3fc0
   loop_interval_minutes: 0
