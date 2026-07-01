@@ -1,0 +1,78 @@
+name: bbot_subdomain_module
+description: BBOT 综合扫描 — 联动多源被动收集与字典爆破，自适应多级泛解析过滤
+check:
+  command: bbot --version
+  expect_keyword: BIGHUGE BLS OSINT TOOL
+  exclude_keyword: not found
+install:
+  steps:
+    - apt update
+    - apt install pipx -y
+    - pipx ensurepath
+    - pipx install bbot --pip-args="--upgrade --force-reinstall" --python python3.13
+    - bbot --install-all-deps
+  install_timeout_seconds: 3600
+runtime:
+  max_concurrency: 4
+  exec_timeout_seconds: 2400
+allowed_output_events:
+  - SUBDOMAIN
+  - IP
+
+
+io_contract:
+  input_events:
+    - DOMAIN
+  input_transform_code: |
+    import shlex
+    # 数据清洗：去空格、去末尾点、统一小写
+    domain = data["value"].strip().strip(".").lower()
+    # 基础合法性拦截
+    if not domain or "." not in domain:
+        return []
+    # 返回清洗后并经过 shell 安全转义的变量
+    return [{"domain": domain, "domain_q": shlex.quote(domain)}]
+
+execution:
+  # 可以通过-c modules.massdns.wordlist=./wordlists/subdomains.txt 设置大字典
+  command: bbot -t {{domain_q}} -p subdomain-enum -m subfinder massdns -c dns_wildcard_tests=15 --strict-scope -y 2>/dev/null
+  output_parse_code: |
+    import json
+    results = []
+    seen_domains = set()
+    seen_ips = set()
+
+    # 循环遍历 BBOT 输出的每一行 JSON 数据
+    for line in data["stdout"].splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+            # BBOT 的标准 JSON 输出格式中，数据类型存储在 "type" 字段中
+            event_type = event.get("type", "")
+            # 具体的资产内容存储在 "data" 字段中
+            event_data = event.get("data", "")
+            
+            if not event_data:
+                continue
+
+            # 1. 解析子域名事件
+            if event_type == "DNS_NAME":
+                host = event_data.strip().lower().strip(".")
+                # 排除根域名本身，只保留子域名，并进行去重
+                if host and "." in host and host != data["domain"] and host not in seen_domains:
+                    seen_domains.add(host)
+                    results.append({"SUBDOMAIN": host})
+
+            # 2. 解析 IP 事件（包含 IPv4 和 IPv6）
+            elif event_type in ["IP_ADDRESS", "IPV6_ADDRESS"]:
+                ip = event_data.strip()
+                if ip and ip not in seen_ips:
+                    seen_ips.add(ip)
+                    results.append({"IP": ip})
+        except:
+            # 忽略非标准 JSON 的杂乱日志输出
+            continue
+
+    return results

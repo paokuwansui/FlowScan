@@ -1,0 +1,44 @@
+
+name: filedownload_module
+description: Download common filetypes such as PDF, DOCX, PPTX, etc.
+check:
+  command: echo --true--
+  expect_keyword: --true--
+  exclude_keyword: --false--
+install:
+  steps:
+    - echo bbot not find
+  install_timeout_seconds: 3600
+runtime:
+  max_concurrency: 4
+  exec_timeout_seconds: 3600
+
+allowed_output_events:
+  - FILESYSTEM
+  - SCAN
+  - URL_UNVERIFIED
+  - DNS_NAME
+  - URL
+  - OPEN_TCP_PORT
+  - IP_ADDRESS
+  - IPV6_ADDRESS
+
+io_contract:
+  input_events:
+    - HTTP_RESPONSE
+    - URL_UNVERIFIED
+  input_transform_code: |
+    import shlex
+    return [{"value": shlex.quote(data["value"])}]
+
+execution:
+  command: bbot -t {{value}} -m filedownload --strict-scope --json --brief -y --fast-mode --allow-deadly  -em json csv txt
+  output_parse_code: |
+    import json
+    result = []
+    for line in data["stdout"].strip().split("\n"):
+        line = line.strip()
+        if line.startswith('{"type"'):
+            obj = json.loads(line)
+            result.append({obj["type"]: obj["data"]})
+    return result

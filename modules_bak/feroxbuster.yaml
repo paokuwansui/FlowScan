@@ -1,0 +1,99 @@
+name: feroxbuster_module
+description: Feroxbuster 目录扫描 — 快速路径发现，JS 文件/备份文件识别，URL_INFO 汇总
+check:
+  command: feroxbuster --version
+  expect_keyword: feroxbuster
+  exclude_keyword: not found
+install:
+  steps:
+  - sudo apt update
+  - sudo apt install feroxbuster -y
+  install_timeout_seconds: 900
+runtime:
+  max_concurrency: 2
+  exec_timeout_seconds: 360
+allowed_output_events:
+- URL
+- LIVE_URL
+- JS_URL
+- 403_URL
+- URL_INFO
+io_contract:
+  input_events:
+  - LIVE_URL
+  input_transform_code: |
+    import shlex
+    value = data["value"].strip()
+    if not value.startswith(("http://", "https://")):
+        value = "http://" + value
+    return [{"target": value, "target_q": shlex.quote(value)}]
+execution:
+  command: feroxbuster -u {{target_q}} --smart -n --depth 1 --json --silent --threads 40 --rate-limit 50 --status-codes 200,204,301,302,307,308,401,403,405,500 --timeout 8 --no-state --dont-extract-links 2>/dev/null
+  output_parse_code: |
+    import json, re
+    from urllib.parse import urlparse
+
+    results = []
+    seen = set()
+    seen_url_info = set()
+
+    def add(k, v):
+        v = str(v or "").strip()
+        if not v:
+            return
+        key = (k, v)
+        if key not in seen:
+            seen.add(key)
+            results.append({k: v})
+
+    for line in data["stdout"].splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            item = json.loads(line)
+        except:
+            continue
+
+        if item.get("type") and item.get("type") != "response":
+            continue
+
+        url = item.get("url") or item.get("target") or ""
+        if not url.startswith(("http://", "https://")):
+            continue
+
+        status = item.get("status")
+        ct = item.get("content_type") or ""
+        cl = item.get("content_length")
+        path = urlparse(url).path
+
+        # ── URL（所有发现）───
+        add("URL", url)
+
+        # ── LIVE_URL（非 4xx/5xx）───
+        if status and status < 400:
+            add("LIVE_URL", url)
+
+        # ── 403_URL（供 bypass403）───
+        if status == 403:
+            add("403_URL", url)
+
+        # ── JS_URL ──
+        if path.lower().split("?")[0].endswith(".js"):
+            add("JS_URL", url)
+
+        # ── URL_INFO 汇总 ──
+        if url not in seen_url_info:
+            seen_url_info.add(url)
+            parts = [url]
+            if status:
+                parts.append("status=%s" % status)
+            if ct:
+                parts.append("content_type=%s" % ct)
+            if cl is not None:
+                parts.append("length=%s" % cl)
+            if path and path != "/":
+                parts.append("path=%s" % path)
+            add("URL_INFO", " | ".join(parts))
+
+    return results

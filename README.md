@@ -19,9 +19,9 @@
 | `SUBDOMAIN` | subfinder, httpx, tlsx, nmap, dnsx_brute | dnsx_resolve, fofa, tlsx |
 | `IP` | dnsx_resolve, httpx, fofa | rustscan, fofa |
 | `PORT_OPEN` | rustscan | httpx, nmap, fscan |
-| `LIVE_URL` | httpx, feroxbuster, nmap, fscan | feroxbuster, katana, nuclei, observer_ward, wafw00f, arjun, tlsx, secretfinder |
-| `URL` | feroxbuster, katana, arjun, bypass403 | httpx, fofa, secretfinder |
-| `JS_URL` | feroxbuster, katana | secretfinder |
+| `LIVE_URL` | httpx, feroxbuster, nmap, fscan | feroxbuster, katana, nuclei, observer_ward, wafw00f, arjun, tlsx, secretfinder, jsfinder |
+| `URL` | feroxbuster, katana, arjun, bypass403, jsfinder | httpx, fofa, secretfinder |
+| `JS_URL` | feroxbuster, katana, jsfinder | secretfinder, jsfinder |
 | `403_URL` | httpx, feroxbuster | bypass403 |
 | `URL_INFO` | httpx, feroxbuster, katana, observer_ward, wafw00f, tlsx, arjun | (日志/Web UI 展示) |
 | `VULNERABILITY` | nuclei, fscan, nmap, secretfinder | (日志/Web UI 展示) |
@@ -44,7 +44,7 @@ IP → rustscan → PORT_OPEN (127.0.0.1:[22,80,443])
 PORT_OPEN → httpx → LIVE_URL + 403_URL + URL_INFO
 PORT_OPEN → nmap → SERVICE/OS/CERT/VULN/FINGERPRINT...
 PORT_OPEN → fscan → SERVICE/VULN/TECH
-LIVE_URL → feroxbuster/katana → URL/JS_URL/403_URL
+LIVE_URL → feroxbuster/katana/jsfinder → URL/JS_URL/403_URL
 LIVE_URL → nuclei/afrog → VULNERABILITY
 LIVE_URL → observer_ward → FINGERPRINT
 LIVE_URL → wafw00f → WAF

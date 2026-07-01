@@ -2,7 +2,7 @@
 redis:
   host: 127.0.0.1
   port: 6379
-  password: "fjasflksaglhglfuiaefnaksl47283198234"
+  password: ""
   db: 0
 
 web_config:

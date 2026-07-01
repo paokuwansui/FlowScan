@@ -115,6 +115,14 @@ class FlowScanRedis:
         data = self.conn.hgetall(f"fs3:event:{fp}")
         return data or None
 
+    def is_event_cancelled(self, fp: str) -> bool:
+        """Return True if an event was explicitly deleted/cancelled.
+
+        Deleted events are marked with fs3:cancelled:<fp> so workers that already
+        claimed the event can still notice the deletion before publishing output.
+        """
+        return bool(fp and self.conn.exists(f"fs3:cancelled:{fp}"))
+
     def consumers_for_event_type(self, event_type: str) -> Set[str]:
         consumers: Set[str] = set(self.conn.smembers(f"fs3:consumers:{event_type}") or [])
         for name, raw in (self.conn.hgetall("fs3:tools") or {}).items():
@@ -146,6 +154,9 @@ class FlowScanRedis:
         stale_fps: List[str] = []
         for fp in self.conn.zrange(queue_key, 0, max(limit * 5, limit) - 1):
             if self.conn.exists(f"fs3:done:{tool_name}:{fp}"):
+                stale_fps.append(fp)
+                continue
+            if self.is_event_cancelled(fp):
                 stale_fps.append(fp)
                 continue
             event = self.get_event(fp)

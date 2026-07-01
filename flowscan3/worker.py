@@ -112,6 +112,10 @@ class Worker:
         fp = event.get("fingerprint", "")
         status = "done"
         try:
+            if fp and self.redis.is_event_cancelled(fp):
+                status = "cancelled"
+                self.redis.log(f"[{self.node_id}] [{tool.name}] skip cancelled event fp={fp[:10]}")
+                return
             self.pipeline.process(event, tool, self.redis)
         except Exception as exc:
             status = f"error:{exc}"

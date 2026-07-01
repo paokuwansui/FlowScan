@@ -1,0 +1,55 @@
+name: afrog_module
+description: Afrog 漏洞扫描 — 仅对存活 URL 运行 high/critical PoC，输出高可信漏洞事件
+check:
+  command: cd ./bin/afrog/ && $HOME/.local/bin/afrog -v
+  expect_keyword: Afrog
+  exclude_keyword: not found
+install:
+  steps:
+  - mkdir -p "./bin/afrog/"
+  - mkdir -p "$HOME/.local/bin" "$HOME/.cache/go-tmp"
+  - GOBIN="$HOME/.local/bin" GOCACHE="$HOME/.cache/go-tmp" go install -v github.com/zan8in/afrog/v3/cmd/afrog@latest
+  install_timeout_seconds: 1200
+runtime:
+  max_concurrency: 2
+  exec_timeout_seconds: 900
+allowed_output_events:
+- VULNERABILITY
+io_contract:
+  input_events:
+  - LIVE_URL
+  input_transform_code: |
+    import shlex
+    value = data["value"].strip()
+    if not value.startswith(("http://", "https://")):
+        value = "http://" + value
+    return [{"target": value, "target_q": shlex.quote(value)}]
+execution:
+  command: $HOME/.local/bin/afrog -t {{target_q}} -S high,critical -c 15 -rl 60 -rlt 8 -timeout 15 -retries 1 -silent
+    -doh -json /dev/stdout 2>/dev/null
+  output_parse_code: |
+    import json
+    results = []
+    seen = set()
+    for line in data["stdout"].splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            item = json.loads(line)
+        except:
+            continue
+        info = item.get("info") if isinstance(item.get("info"), dict) else {}
+        severity = str(info.get("severity") or item.get("severity") or "").lower()
+        if severity not in ("high", "critical"):
+            continue
+        name = info.get("name") or item.get("name") or item.get("id") or "afrog finding"
+        target = item.get("target") or item.get("fulltarget") or item.get("url") or ""
+        poc = item.get("poc") or item.get("id") or ""
+        value = "[afrog][%s] %s @ %s" % (severity.upper(), name, target)
+        if poc:
+            value += " (%s)" % poc
+        if value not in seen:
+            seen.add(value)
+            results.append({"VULNERABILITY": value})
+    return results

@@ -42,7 +42,7 @@
                 <div class="eq-value-item" data-fp="{{ r.fp }}"
                      onclick="togglePath('{{ r.fp }}', this)">
                     <span class="eq-value-type">{{ r.type }}</span>
-                    <span class="eq-value-text">{{ r.value[:80] }}</span>
+                    <span class="eq-value-text">{{ r.value }}</span>
                     <span class="eq-value-source">{{ r.source or '?' }}</span>
                 </div>
                 <div class="eq-path-panel" id="path-{{ r.fp }}" style="display:none;"></div>
@@ -61,7 +61,7 @@
                 {% for v in type_values %}
                 <div class="eq-value-item" data-fp="{{ v.fp }}"
                      onclick="togglePath('{{ v.fp }}', this)">
-                    <span class="eq-value-text">{{ v.value[:80] }}</span>
+                    <span class="eq-value-text">{{ v.value }}</span>
                     <span class="eq-value-source">{{ v.source or '?' }}</span>
                 </div>
                 <div class="eq-path-panel" id="path-{{ v.fp }}" style="display:none;"></div>
@@ -98,7 +98,7 @@
                             <span class="badge badge-tool">{{ node.source_tool }}</span>
                             {% endif %}
                         </div>
-                        <div class="path-value">{{ node.value[:120] }}</div>
+                        <div class="path-value">{{ node.value }}</div>
                         <div class="path-meta">
                             <span>指纹: {{ node.fingerprint[:20] }}...</span>
                             <span>时间: {{ "%.2f"|format(node.timestamp|float) if node.timestamp else '-' }}</span>
@@ -153,7 +153,7 @@ function togglePath(fp, el) {
                 html += '<div class="path-event-type"><span class="badge badge-event">' + (node.event_type||'') + '</span>';
                 if (node.source_tool) html += ' <span class="badge badge-tool">' + node.source_tool + '</span>';
                 html += '</div>';
-                html += '<div class="path-value" style="font-size:0.8rem;">' + (node.value||'').slice(0,100) + '</div>';
+                html += '<div class="path-value" style="font-size:0.8rem;">' + escapeHtml(node.value||'') + '</div>';
                 html += '</div></div>';
             });
             html += '</div>';
@@ -166,6 +166,11 @@ function togglePath(fp, el) {
 }
 function closePath() {
     document.getElementById('inline-path')?.remove();
+}
+function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(String(str || '')));
+    return div.innerHTML;
 }
 </script>
 {% endblock %}

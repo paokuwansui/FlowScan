@@ -1,0 +1,113 @@
+name: fscan_module
+description: Fscan 服务探测/漏洞/弱口令 — 接 rustscan 的 PORT_OPEN 端口进行针对性 JSON 输出检测
+check:
+  command: $HOME/.local/bin/fscan -h 2>&1 || true
+  expect_keyword: Usage
+  exclude_keyword: not found
+install:
+  steps:
+  - mkdir -p "$HOME/.local/bin"
+  - 'python3 - <<''PY'' | xargs -I{} sh -c ''curl -fL
+    "{}" -o "$HOME/.local/bin/fscan" && chmod 0755 "$HOME/.local/bin/fscan"''
+
+    import json, urllib.request
+
+    req=urllib.request.Request("https://api.github.com/repos/shadow1ng/fscan/releases/latest",
+    headers={"User-Agent":"FlowScan-loader"})
+
+    data=json.load(urllib.request.urlopen(req, timeout=30))
+
+    assets=data.get("assets", [])
+
+    matches=[a["browser_download_url"] for a in assets if a.get("name", "").startswith("fscan_")
+    and "linux_x64" in a.get("name", "").lower()]
+
+    print(matches[0] if matches else "")
+
+    PY'
+  install_timeout_seconds: 900
+runtime:
+  max_concurrency: 2
+  exec_timeout_seconds: 600
+allowed_output_events:
+- FINGERPRINT
+- LIVE_URL
+- VULNERABILITY
+io_contract:
+  input_events:
+  - PORT_OPEN
+  input_transform_code: |
+    import re, shlex
+
+    value = data["value"].strip()
+    if not value:
+        return []
+
+    # 格式: "127.0.0.1:[22,80,443]"
+    m = re.match(r"(\d+\.\d+\.\d+\.\d+):\[([0-9,\s]+)\]", value)
+    if m:
+        host = m.group(1)
+        ports = [p.strip() for p in m.group(2).split(",") if p.strip()]
+        ports_str = ",".join(ports)
+        return [{"host": host, "ports": ports_str, "host_q": shlex.quote(host), "ports_q": shlex.quote(ports_str)}]
+
+    return []
+execution:
+  command: $HOME/.local/bin/fscan -h {{host_q}} -p {{ports_q}} -np -no -silent -t 3000 -num 100 -time 3 -f json -full 2>/dev/null
+  output_parse_code: |
+    import json
+
+    results = []
+    seen = set()
+
+    def add(k, v):
+        v = str(v or "").strip()
+        if not v:
+            return
+        key = (k, v)
+        if key not in seen:
+            seen.add(key)
+            results.append({k: v})
+
+    for line in data["stdout"].splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            item = json.loads(line)
+        except:
+            continue
+
+        ftype = str(item.get("type") or "").upper()
+        host = str(item.get("host") or "")
+        port = str(item.get("port") or "")
+        port_str = "%s:%s" % (host, port) if host and port else ""
+        target = str(item.get("target") or "")
+        svc_name = str(item.get("service") or "")
+        banner = str(item.get("banner") or "")
+        version = str(item.get("version") or "")
+        os_info = str(item.get("os") or "")
+
+        if ftype == "VULN":
+            add("VULNERABILITY", line)
+
+        elif ftype == "SERVICE":
+            # 服务信息 → FINGERPRINT
+            detail_parts = [svc_name, version, os_info]
+            detail = " ".join([x for x in detail_parts if x])
+            if detail:
+                add("FINGERPRINT", "tcp/%s => %s" % (port_str, detail))
+            # 技术栈 → FINGERPRINT
+            if version:
+                add("FINGERPRINT", "%s %s @ %s" % (svc_name, version, port_str))
+            if os_info:
+                add("FINGERPRINT", "%s @ %s" % (os_info, port_str))
+            if banner:
+                add("FINGERPRINT", "banner:%s @ %s" % (banner[:120], port_str))
+            # Web URL
+            if svc_name in ("http", "http-alt", "http-proxy"):
+                add("LIVE_URL", "http://%s:%s" % (host, port))
+            elif svc_name in ("https", "ssl/http", "ssl"):
+                add("LIVE_URL", "https://%s:%s" % (host, port))
+
+    return results

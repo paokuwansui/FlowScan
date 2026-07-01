@@ -21,8 +21,11 @@
 
     <div class="card">
         <h3>分析配置</h3>
-        <p class="help-text">AI 配置来自 config.yaml 的 ai_analysis，提示词默认从 prompts/ai_analysis.txt 读取。</p>
-        <form method="POST" action="{{ url_for('ai_analysis') }}">
+        <p class="help-text">
+            手动点击“发送给 AI 分析”时，会把系统提示词、所选事件结果和你的问题一起发送给 AI。
+            AI 回答末尾如果包含结构化 actions，系统会按下方勾选框自动添加事件、删除事件或存储重要日志；执行顺序固定为先删除、再添加、最后写日志。
+        </p>
+        <form id="ai-analysis-form" method="POST" action="{{ url_for('ai_analysis') }}">
             <div class="form-group">
                 <label style="display:block;margin-bottom:8px;color:var(--text-muted);">选择事件类型</label>
                 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;max-height:260px;overflow:auto;border:1px solid var(--border);border-radius:var(--radius);padding:10px;background:var(--bg);">
@@ -36,27 +39,36 @@
                     {% endfor %}
                 </div>
             </div>
-            <div class="form-row" style="align-items:center;gap:10px;margin:10px 0;">
+
+            <div class="form-row" style="align-items:center;gap:10px;margin:10px 0;flex-wrap:wrap;">
                 <label>最多发送事件数
                     <input type="number" name="max_events" value="{{ max_events }}" min="1" max="2000"
                            style="width:110px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:monospace;">
                 </label>
+                <label>定时分析间隔（分钟）
+                    <input type="number" name="loop_interval" value="0" min="0" max="1440"
+                           style="width:110px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:monospace;">
+                </label>
+                <span class="help-text">0 表示不新增定时任务；新增后不会被前端手动问询影响。</span>
             </div>
 
-            {# ── 动作开关 ── #}
             <div class="form-row" style="align-items:center;gap:16px;margin:10px 0;flex-wrap:wrap;">
                 <span style="color:var(--text-muted);font-size:0.82rem;">自动执行动作：</span>
                 <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:0.85rem;">
                     <input type="checkbox" name="toggle_add" value="1" {% if toggles.add %}checked{% endif %}>
-                    <span class="badge" style="background:rgba(63,185,80,0.15);color:#3fb950;">添加事件</span>
+                    <span class="badge" style="background:rgba(63,185,80,0.15);color:#3fb950;">自动增加事件</span>
                 </label>
                 <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:0.85rem;">
                     <input type="checkbox" name="toggle_del" value="1" {% if toggles.del %}checked{% endif %}>
-                    <span class="badge" style="background:rgba(248,81,73,0.15);color:var(--danger);">删除事件</span>
+                    <span class="badge" style="background:rgba(248,81,73,0.15);color:var(--danger);">自动删除事件</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:0.85rem;">
+                    <input type="checkbox" name="toggle_del_children" value="1" {% if toggles.del_children %}checked{% endif %}>
+                    <span class="badge" style="background:rgba(248,81,73,0.10);color:var(--danger);">删除时同时删除子事件</span>
                 </label>
                 <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:0.85rem;">
                     <input type="checkbox" name="toggle_log" value="1" {% if toggles.log %}checked{% endif %}>
-                    <span class="badge" style="background:rgba(210,153,34,0.15);color:#d29922;">存储日志</span>
+                    <span class="badge" style="background:rgba(210,153,34,0.15);color:#d29922;">自动存储重要日志</span>
                 </label>
             </div>
 
@@ -65,68 +77,79 @@
                 <textarea name="question" rows="6" placeholder="例如：从这些扫描事件里找出最值得继续验证的资产和下一步扫描建议。"
                           style="width:100%;font-family:monospace;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:10px;resize:vertical;">{{ question }}</textarea>
             </div>
-            <button type="submit" class="btn btn-primary">发送给 AI 分析</button>
+
+            <div class="form-row" style="gap:10px;flex-wrap:wrap;">
+                <button type="submit" class="btn btn-primary" formaction="{{ url_for('ai_analysis') }}">发送给 AI 分析</button>
+                <button type="submit" class="btn" formaction="{{ url_for('ai_schedule_create') }}">增加定时状态</button>
+            </div>
         </form>
     </div>
 
-    {# ── 循环设置 ── #}
     <div class="card">
-        <h3>循环自动分析</h3>
-        <p class="help-text">设置循环间隔后，系统每 N 分钟自动使用当前事件类型、问题和开关配置执行 AI 分析。设为 0 停止循环。</p>
-        <form method="POST" action="{{ url_for('ai_loop_save') }}">
-            <div class="form-row" style="align-items:center;gap:10px;flex-wrap:wrap;">
-                <label>循环间隔（分钟）
-                    <input type="number" name="loop_interval" value="{{ loop_config.interval_minutes }}" min="0" max="1440"
-                           style="width:100px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:monospace;">
-                </label>
-                <button type="submit" class="btn btn-primary">保存循环设置</button>
-                {% if loop_config.last_run > 0 %}
-                <span style="color:var(--text-muted);font-size:0.78rem;">
-                    上次执行: {{ loop_config.last_run | int | default(0) }}
-                </span>
-                {% endif %}
-            </div>
-            {# 保存当前表单状态到循环配置 #}
-            <input type="hidden" name="loop_question" value="{{ question }}">
-            <input type="hidden" name="loop_max_events" value="{{ max_events }}">
-            {% for et in selected_types %}
-            <input type="hidden" name="loop_event_types" value="{{ et }}">
-            {% endfor %}
-            <input type="hidden" name="loop_toggle_add" value="{% if toggles.add %}1{% else %}0{% endif %}">
-            <input type="hidden" name="loop_toggle_del" value="{% if toggles.del %}1{% else %}0{% endif %}">
-            <input type="hidden" name="loop_toggle_log" value="{% if toggles.log %}1{% else %}0{% endif %}">
-        </form>
+        <h3>定时分析事件</h3>
+        <p class="help-text">每个定时事件保存创建时的事件类型、自动开关、系统提示词和问题快照；后续你在本页手动问询不会改变已有定时事件。</p>
+        {% if schedules %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>间隔</th>
+                    <th>事件类型</th>
+                    <th>开关</th>
+                    <th>运行次数</th>
+                    <th>上次/下次</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in schedules %}
+                <tr>
+                    <td class="fp-cell">{{ item.schedule_id }}</td>
+                    <td>{{ item.interval_minutes }} 分钟</td>
+                    <td class="value-cell">{{ item.selected_types|join(', ') }}</td>
+                    <td>
+                        {% if item.toggles.add %}<span class="badge">增</span>{% endif %}
+                        {% if item.toggles.del %}<span class="badge">删</span>{% endif %}
+                        {% if item.toggles.del and item.toggles.del_children %}<span class="badge">删子</span>{% endif %}
+                        {% if item.toggles.log %}<span class="badge">记</span>{% endif %}
+                    </td>
+                    <td>{{ item.run_count }}</td>
+                    <td style="font-size:0.78rem;color:var(--text-muted);">
+                        上次: {{ item.last_run_iso or '-' }}<br>
+                        下次: {{ item.next_run_iso or '-' }}
+                    </td>
+                    <td>{{ item.last_status }}{% if item.last_error %}<br><span style="color:var(--danger);">{{ item.last_error[:120] }}</span>{% endif %}</td>
+                    <td style="white-space:nowrap;">
+                        <a class="btn" href="{{ url_for('ai_schedule_detail', schedule_id=item.schedule_id) }}">详情</a>
+                        <form method="POST" action="{{ url_for('ai_schedule_delete', schedule_id=item.schedule_id) }}" style="display:inline;" onsubmit="return confirm('确认删除这个定时 AI 分析任务？');">
+                            <button type="submit" class="btn btn-danger">删除</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">暂无定时分析事件。设置大于 0 的分钟数并点击“增加定时状态”。</div>
+        {% endif %}
     </div>
 
     {% if action_results %}
     <div class="card">
         <h3>自动执行结果</h3>
         <table class="table">
-            <thead>
-                <tr>
-                    <th>类型</th>
-                    <th>详情</th>
-                    <th>状态</th>
-                </tr>
-            </thead>
+            <thead><tr><th>类型</th><th>详情</th><th>状态</th></tr></thead>
             <tbody>
                 {% for ar in action_results %}
                 <tr>
-                    <td>
-                        {% if ar.type == 'add' %}
-                        <span class="badge" style="background:rgba(63,185,80,0.15);color:#3fb950;">添加</span>
-                        {% elif ar.type == 'del' %}
-                        <span class="badge" style="background:rgba(248,81,73,0.15);color:var(--danger);">删除</span>
-                        {% else %}
-                        <span class="badge" style="background:rgba(210,153,34,0.15);color:#d29922;">日志</span>
-                        {% endif %}
-                    </td>
+                    <td>{{ ar.type }}</td>
                     <td class="value-cell">
                         {% if ar.type in ('add', 'del') %}
-                        <span class="badge badge-event">{{ ar.event_type }}</span> {{ ar.value[:80] }}
-                        {% else %}
+                        <span class="badge badge-event">{{ ar.event_type }}</span> {{ ar.value }}
+                        {% elif ar.type == 'log' %}
                         {{ ar.log_id }}
-                        {% endif %}
+                        {% else %}-{% endif %}
                     </td>
                     <td>{{ ar.note }}</td>
                 </tr>
@@ -141,6 +164,7 @@
         <h3>AI 回答</h3>
         {% if result.ok %}
         <pre style="white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px;color:var(--text);font-family:inherit;line-height:1.55;">{{ result.answer }}</pre>
+        <p class="help-text">解析到 {{ result.parsed_action_count or 0 }} 个结构化动作，实际执行 {{ result.action_count or 0 }} 个动作。</p>
         {% else %}
         <div class="flash error">{{ result.error }}</div>
         {% endif %}
@@ -151,28 +175,19 @@
     <div class="card">
         <h3>发送上下文预览</h3>
         <table class="table">
-            <thead>
-                <tr>
-                    <th>类型</th>
-                    <th>值</th>
-                    <th>来源</th>
-                    <th>指纹</th>
-                </tr>
-            </thead>
+            <thead><tr><th>类型</th><th>值</th><th>来源</th><th>指纹</th></tr></thead>
             <tbody>
                 {% for evt in context_events[:100] %}
                 <tr>
                     <td><span class="badge badge-event">{{ evt.event_type }}</span></td>
-                    <td class="value-cell">{{ evt.value[:100] }}{% if evt.value|length > 100 %}...{% endif %}</td>
+                    <td class="value-cell">{{ evt.value }}</td>
                     <td>{{ evt.source_tool or '-' }}</td>
                     <td class="fp-cell">{{ evt.fingerprint[:16] }}...</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-        {% if context_events|length > 100 %}
-        <p class="help-text">仅预览前 100 条，实际发送 {{ context_events|length }} 条。</p>
-        {% endif %}
+        {% if context_events|length > 100 %}<p class="help-text">仅预览前 100 条，实际发送 {{ context_events|length }} 条。</p>{% endif %}
     </div>
     {% endif %}
 </div>

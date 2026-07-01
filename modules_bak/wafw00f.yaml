@@ -1,0 +1,70 @@
+name: wafw00f_module
+description: Wafw00f WAF 检测 — 识别目标网站的 WAF/CDN，URL_INFO 汇总
+check:
+  command: wafw00f --version
+  expect_keyword: WAFW00F
+  exclude_keyword: not found
+install:
+  steps:
+  - python3 -m pip install --user --break-system-packages wafw00f
+  install_timeout_seconds: 900
+runtime:
+  max_concurrency: 4
+  exec_timeout_seconds: 120
+allowed_output_events:
+- FINGERPRINT
+- URL_INFO
+io_contract:
+  input_events:
+  - LIVE_URL
+  input_transform_code: |
+    import shlex
+    value = data["value"].strip()
+    if not value.startswith(("http://", "https://")):
+        value = "http://" + value
+    return [{"target": value, "target_q": shlex.quote(value)}]
+execution:
+  command: wafw00f {{target_q}} -a -f json -o - --no-colors -T 10 2>/dev/null
+  output_parse_code: |
+    import json, re
+    results = []
+    seen = set()
+    seen_url_info = set()
+
+    def add(k, v):
+        v = str(v or "").strip()
+        if not v:
+            return
+        key = (k, v)
+        if key not in seen:
+            seen.add(key)
+            results.append({k: v})
+
+    def add_url_info(url, extra_parts):
+        if url and url not in seen_url_info:
+            seen_url_info.add(url)
+            parts = [url] + extra_parts
+            add("URL_INFO", " | ".join(parts))
+
+    out = data["stdout"].strip()
+    try:
+        parsed = json.loads(out)
+        items = parsed if isinstance(parsed, list) else [parsed]
+        for item in items:
+            target = item.get("url") or item.get("target") or ""
+            detected = item.get("detected")
+            firewall = item.get("firewall") or item.get("waf")
+            if detected and firewall:
+                add("FINGERPRINT", "WAF: %s @ %s" % (firewall, target))
+                add_url_info(target, ["waf=%s" % firewall])
+    except:
+        # JSON 解析失败时回退到文本行处理
+        for line in out.splitlines():
+            m = re.search(r"is behind (.+)$", line, re.I)
+            if m and "not behind" not in line.lower():
+                waf = m.group(1).strip()
+                url_part = line.split()[0] if line.split() else ""
+                add("FINGERPRINT", "WAF: %s @ %s" % (waf, url_part))
+                add_url_info(url_part, ["waf=%s" % waf])
+
+    return results

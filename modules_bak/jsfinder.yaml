@@ -1,0 +1,94 @@
+name: jsfinder_module
+description: JSFinder JS 链接/接口/子域名提取 — 从页面或 JS 文件中提取 URL、JS_URL、SUBDOMAIN 和 URL_INFO
+check:
+  command: python3 ./bin/JSFinder/JSFinder.py -h 2>&1 || true
+  expect_keyword: JSFinder.py
+  exclude_keyword: No such file
+install:
+  steps:
+  - git clone --depth 1 https://github.com/Threezh1/JSFinder ./bin/JSFinder 2>/dev/null || (cd ./bin/JSFinder && git pull --ff-only)
+  - python3 -m pip install --user --break-system-packages requests beautifulsoup4 lxml
+  install_timeout_seconds: 900
+runtime:
+  max_concurrency: 3
+  exec_timeout_seconds: 180
+allowed_output_events:
+- URL
+- JS_URL
+- SUBDOMAIN
+- URL_INFO
+io_contract:
+  input_events:
+  - LIVE_URL
+  - JS_URL
+  input_transform_code: |
+    import shlex
+    value = data["value"].strip()
+    if not value.startswith(("http://", "https://")):
+        return []
+    is_js = value.lower().split("?", 1)[0].endswith(".js") or data.get("event_type") == "JS_URL"
+    mode_arg = "-j" if is_js else ""
+    return [{"target": value, "target_q": shlex.quote(value), "mode_arg": mode_arg}]
+execution:
+  command: python3 ./bin/JSFinder/JSFinder.py -u {{target_q}} {{mode_arg}} 2>/dev/null
+  output_parse_code: |
+    import re
+    from urllib.parse import urljoin, urlparse
+
+    results = []
+    seen = set()
+
+    def add(k, v):
+        v = str(v or "").strip().strip('"\'')
+        if not v:
+            return
+        key = (k, v)
+        if key not in seen:
+            seen.add(key)
+            results.append({k: v})
+
+    current_section = ""
+    target = ""
+    for raw in data["stdout"].splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith("url:"):
+            target = line.split(":", 1)[1].strip()
+            add("URL_INFO", "%s | jsfinder=started" % target)
+            continue
+        m = re.match(r"Find\s+\d+\s+(URL|Subdomain):", line, re.I)
+        if m:
+            current_section = m.group(1).lower()
+            continue
+        if line.startswith("[") or line.lower().startswith(("error", "traceback")):
+            continue
+
+        if current_section == "subdomain":
+            host = line.strip().strip(".").lower()
+            if host and "." in host and "/" not in host:
+                add("SUBDOMAIN", host)
+            continue
+
+        if current_section == "url":
+            url = line
+            if not url.startswith(("http://", "https://")):
+                if target.startswith(("http://", "https://")):
+                    url = urljoin(target, url)
+                else:
+                    continue
+            add("URL", url)
+            path = urlparse(url).path.lower().split("?", 1)[0]
+            if path.endswith(".js"):
+                add("JS_URL", url)
+            continue
+
+        # 兼容非标准输出：直接扫描行内 URL/域名
+        for url in re.findall(r"https?://[^\s<>\"')]+", line):
+            add("URL", url)
+            if urlparse(url).path.lower().split("?", 1)[0].endswith(".js"):
+                add("JS_URL", url)
+        for host in re.findall(r"\b(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}\b", line):
+            add("SUBDOMAIN", host.lower().strip("."))
+
+    return results

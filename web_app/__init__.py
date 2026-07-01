@@ -239,16 +239,27 @@ def _register_routes(app: Flask) -> None:
     @login_required
     def logs():
         redis = app.config["get_redis"]()
-        limit = _to_int(request.args.get("limit"), 200)
-        logs_data = [{"ts": idx, "msg": line} for idx, line in enumerate(redis.conn.lrange("fs3:logs", 0, limit - 1))]
+        raw_limit = str(request.args.get("limit", "200")).strip().lower()
+        if raw_limit == "all":
+            limit: Any = "all"
+            raw_logs = redis.conn.lrange("fs3:logs", 0, -1)
+        else:
+            limit = _to_int(raw_limit, 200)
+            raw_logs = redis.conn.lrange("fs3:logs", 0, int(limit) - 1)
+        logs_data = [{"ts": idx, "msg": line} for idx, line in enumerate(raw_logs)]
         return render_template("logs.html", logs=logs_data, limit=limit)
 
     @app.route("/logs/download")
     @login_required
     def logs_download():
         redis = app.config["get_redis"]()
-        limit = _to_int(request.args.get("limit"), 10000)
-        text = "\n".join(redis.conn.lrange("fs3:logs", 0, limit - 1))
+        raw_limit = str(request.args.get("limit", "10000")).strip().lower()
+        if raw_limit == "all":
+            raw_logs = redis.conn.lrange("fs3:logs", 0, -1)
+        else:
+            limit = _to_int(raw_limit, 10000)
+            raw_logs = redis.conn.lrange("fs3:logs", 0, limit - 1)
+        text = "\n".join(raw_logs)
         filename = f"flowscan3_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
         return Response(text, mimetype="text/plain; charset=utf-8", headers={"Content-Disposition": f"attachment; filename={filename}"})
 
@@ -420,42 +431,37 @@ def _register_routes(app: Flask) -> None:
         config = load_yaml(app.config["CONFIG_PATH"])
         ai_cfg = _ai_config(config)
         event_types = _event_types(redis)
-        if request.method == "POST":
-            selected_types = request.form.getlist("event_types")
-            question = request.form.get("question", "").strip()
-            max_events = _to_int(request.form.get("max_events"), int(ai_cfg.get("max_events", 200)))
-            # 读取 toggle 状态
-            toggles = {
-                "add": request.form.get("toggle_add", "1") == "1",
-                "del": request.form.get("toggle_del", "1") == "1",
-                "log": request.form.get("toggle_log", "1") == "1",
-            }
-        else:
-            selected_types = []
-            question = ""
-            max_events = int(ai_cfg.get("max_events", 200))
-            toggles = {"add": True, "del": True, "log": True}
-
-        # 读取循环配置
-        loop_config = _load_loop_config(redis)
-
+        selected_types = []
+        question = ""
+        max_events = int(ai_cfg.get("max_events", 200))
+        toggles = _default_ai_toggles()
         result = None
         context_events = []
         action_results = []
+        parsed_actions = []
+
         if request.method == "POST":
+            selected_types, question, max_events, toggles = _analysis_request_from_form(request.form, ai_cfg)
             if not selected_types:
                 flash("至少选择一个事件类型", "error")
             elif not question:
                 flash("问题不能为空", "error")
             else:
-                context_events = _events_for_ai(redis, selected_types, max_events)
-                result = _call_ai_analysis(ai_cfg, selected_types, context_events, question)
-                if result and result.get("ok") and result.get("answer"):
-                    actions = _parse_ai_actions(result["answer"])
-                    if actions:
-                        action_results = _execute_ai_actions(actions, redis, toggles)
-                        result["action_results"] = action_results
-                        result["action_count"] = len(action_results)
+                run_data = _run_ai_analysis_once(
+                    redis=redis,
+                    ai_cfg=ai_cfg,
+                    selected_types=selected_types,
+                    question=question,
+                    max_events=max_events,
+                    toggles=toggles,
+                    run_source="manual",
+                )
+                result = run_data["result"]
+                context_events = run_data["context_events"]
+                parsed_actions = run_data["parsed_actions"]
+                action_results = run_data["action_results"]
+
+        schedules = _list_ai_schedules(redis)
         return render_template(
             "ai_analysis.html",
             event_types=event_types,
@@ -467,7 +473,8 @@ def _register_routes(app: Flask) -> None:
             context_events=context_events,
             toggles=toggles,
             action_results=action_results,
-            loop_config=loop_config,
+            parsed_actions=parsed_actions,
+            schedules=schedules,
         )
 
     @app.route("/ai-logs")
@@ -502,30 +509,56 @@ def _register_routes(app: Flask) -> None:
 
         return render_template("ai_logs.html", logs=entries, count=len(entries))
 
-    @app.route("/api/ai-loop/save", methods=["POST"])
+    @app.route("/api/ai-schedule/create", methods=["POST"])
     @login_required
-    def ai_loop_save():
-        """保存循环配置。"""
+    def ai_schedule_create():
+        """按当前页面表单快照新增一个独立的定时 AI 分析任务。"""
         redis = app.config["get_redis"]()
+        config = load_yaml(app.config["CONFIG_PATH"])
+        ai_cfg = _ai_config(config)
+        selected_types, question, max_events, toggles = _analysis_request_from_form(request.form, ai_cfg)
         interval = _to_int(request.form.get("loop_interval"), 0)
-        selected_types = request.form.getlist("loop_event_types")
-        question = request.form.get("loop_question", "").strip()
-        max_events = _to_int(request.form.get("loop_max_events"), 200)
-        toggles = {
-            "add": request.form.get("loop_toggle_add", "1") == "1",
-            "del": request.form.get("loop_toggle_del", "1") == "1",
-            "log": request.form.get("loop_toggle_log", "1") == "1",
-        }
-        _save_loop_config(redis, {
+        if interval <= 0:
+            flash("定时间隔为 0 表示不开启；请输入大于 0 的分钟数", "error")
+            return redirect(url_for("ai_analysis"))
+        if not selected_types:
+            flash("新增定时任务前至少选择一个事件类型", "error")
+            return redirect(url_for("ai_analysis"))
+        if not question:
+            flash("新增定时任务前问题不能为空", "error")
+            return redirect(url_for("ai_analysis"))
+        schedule = _create_ai_schedule(redis, {
             "interval_minutes": interval,
             "selected_types": selected_types,
             "question": question,
             "max_events": max_events,
             "toggles": toggles,
-            "last_run": 0,
+            "system_prompt": ai_cfg.get("system_prompt", ""),
+            "model": ai_cfg.get("model", ""),
         })
-        flash(f"循环配置已保存：间隔 {interval} 分钟" + (" (已停止)" if interval == 0 else ""), "success")
+        flash(f"已新增定时 AI 分析任务：{schedule['schedule_id']}，每 {interval} 分钟执行一次", "success")
         return redirect(url_for("ai_analysis"))
+
+    @app.route("/api/ai-schedule/<schedule_id>/delete", methods=["POST"])
+    @login_required
+    def ai_schedule_delete(schedule_id: str):
+        redis = app.config["get_redis"]()
+        if _delete_ai_schedule(redis, schedule_id):
+            flash(f"已删除定时任务 {schedule_id}", "success")
+        else:
+            flash(f"未找到定时任务 {schedule_id}", "warning")
+        return redirect(url_for("ai_analysis"))
+
+    @app.route("/ai-schedule/<schedule_id>")
+    @login_required
+    def ai_schedule_detail(schedule_id: str):
+        redis = app.config["get_redis"]()
+        schedule = _load_ai_schedule(redis, schedule_id)
+        if not schedule:
+            flash(f"未找到定时任务 {schedule_id}", "error")
+            return redirect(url_for("ai_analysis"))
+        runs = _list_ai_schedule_runs(redis, schedule_id, limit=50)
+        return render_template("ai_schedule_detail.html", schedule=schedule, runs=runs)
 
     @app.route("/flow")
     @login_required
@@ -600,6 +633,52 @@ def _ai_config(config: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _default_ai_toggles() -> Dict[str, bool]:
+    return {"add": True, "del": True, "del_children": True, "log": True}
+
+
+def _analysis_request_from_form(form: Any, ai_cfg: Dict[str, Any]) -> tuple[List[str], str, int, Dict[str, bool]]:
+    selected_types = [item.strip() for item in form.getlist("event_types") if item.strip()]
+    question = form.get("question", "").strip()
+    max_events = _to_int(form.get("max_events"), int(ai_cfg.get("max_events", 200)))
+    toggles = {
+        "add": form.get("toggle_add") == "1",
+        "del": form.get("toggle_del") == "1",
+        "del_children": form.get("toggle_del_children") == "1",
+        "log": form.get("toggle_log") == "1",
+    }
+    return selected_types, question, max_events, toggles
+
+
+def _run_ai_analysis_once(
+    redis: FlowScanRedis,
+    ai_cfg: Dict[str, Any],
+    selected_types: List[str],
+    question: str,
+    max_events: int,
+    toggles: Dict[str, bool],
+    run_source: str = "manual",
+    schedule_id: str = "",
+) -> Dict[str, Any]:
+    context_events = _events_for_ai(redis, selected_types, max_events)
+    result = _call_ai_analysis(ai_cfg, selected_types, context_events, question)
+    parsed_actions: List[Dict[str, Any]] = []
+    action_results: List[Dict[str, Any]] = []
+    if result and result.get("ok") and result.get("answer"):
+        parsed_actions = _parse_ai_actions(result["answer"])
+        if parsed_actions:
+            action_results = _execute_ai_actions(parsed_actions, redis, toggles, source=run_source, schedule_id=schedule_id)
+        result["action_results"] = action_results
+        result["action_count"] = len(action_results)
+        result["parsed_action_count"] = len(parsed_actions)
+    return {
+        "result": result,
+        "context_events": context_events,
+        "parsed_actions": parsed_actions,
+        "action_results": action_results,
+    }
+
+
 def _events_for_ai(redis: FlowScanRedis, event_types: List[str], max_events: int) -> List[Dict[str, Any]]:
     max_events = max(1, min(max_events, 2000))
     events = []
@@ -668,9 +747,12 @@ def _call_ai_analysis(ai_cfg: Dict[str, Any], selected_types: List[str], events:
 
 
 def _parse_ai_actions(text: str) -> List[Dict[str, Any]]:
-    """从 AI 回答文本中提取 ```json 代码块中的 actions 数组。"""
-    json_blocks = re.findall(r"```json\s*(.*?)\s*```", text, re.DOTALL)
-    for block in json_blocks:
+    """从 AI 回答文本中提取结构化动作。优先读取 ```json 代码块，也兼容纯 JSON。"""
+    candidates = re.findall(r"```json\s*(.*?)\s*```", text, re.DOTALL | re.IGNORECASE)
+    stripped = text.strip()
+    if stripped.startswith("{") and stripped.endswith("}"):
+        candidates.append(stripped)
+    for block in candidates:
         try:
             parsed = json.loads(block)
             if isinstance(parsed, dict) and isinstance(parsed.get("actions"), list):
@@ -680,30 +762,63 @@ def _parse_ai_actions(text: str) -> List[Dict[str, Any]]:
     return []
 
 
-def _execute_ai_actions(actions: List[Dict[str, Any]], redis: Any, toggles: Dict[str, bool]) -> List[Dict[str, Any]]:
-    """执行 AI 动作列表，返回执行结果。toggles 控制是否执行对应类型。"""
+def _execute_ai_actions(
+    actions: List[Dict[str, Any]],
+    redis: Any,
+    toggles: Dict[str, bool],
+    source: str = "manual",
+    schedule_id: str = "",
+) -> List[Dict[str, Any]]:
+    """执行 AI 动作列表，返回执行结果。
+
+    toggles 控制是否执行对应类型。动作固定按 del -> add -> log 三段执行，
+    避免 AI 同一轮同时删除和新增时，新事件被旧删除动作误伤；AI 新增事件不带
+    parent/root 参数，始终作为根事件入队运行。
+    """
     results = []
-    for action in actions:
+    ordered_actions = [
+        action
+        for action_type in ("del", "add", "log")
+        for action in actions
+        if action.get("type", "") == action_type
+    ]
+    remove_children = bool(toggles.get("del_children", True))
+    for action in ordered_actions:
         atype = action.get("type", "")
-        if atype == "add" and toggles.get("add", True):
+        if atype not in ("add", "del", "log"):
+            continue
+        if not toggles.get(atype, True):
+            results.append({"ok": True, "type": atype, "note": "开关未勾选，已跳过", "skipped": True})
+            continue
+        if atype == "add":
             event_type = str(action.get("event_type", "")).strip()
             value = str(action.get("value", "")).strip()
             if event_type and value:
+                existed = bool(redis.conn.sismember("fs3:event:set", FlowScanRedis.fingerprint(event_type, value)))
+                # AI 新增事件一律作为根事件运行，不继承任何父事件关系。
                 fp = redis.push_event(event_type, value, source_tool="ai_analysis")
-                results.append({"ok": True, "type": "add", "event_type": event_type, "value": value, "fp": (fp or "")[:16], "note": "已注入队列" if fp else "重复事件"})
-        elif atype == "del" and toggles.get("del", True):
+                results.append({"ok": True, "type": "add", "event_type": event_type, "value": value, "fp": (fp or "")[:16], "note": "已注入队列" if not existed else "重复事件"})
+            else:
+                results.append({"ok": False, "type": "add", "event_type": event_type, "value": value, "note": "缺少 event_type 或 value"})
+        elif atype == "del":
             event_type = str(action.get("event_type", "")).strip()
             value = str(action.get("value", "")).strip()
-            fp = FlowScanRedis.fingerprint(event_type, value)
-            removed = _remove_event(redis, fp, remove_children=False) if event_type and value else 0
-            results.append({"ok": True, "type": "del", "event_type": event_type, "value": value, "removed": removed, "note": "已移除" if removed else "未找到"})
-        elif atype == "log" and toggles.get("log", True):
-            entry = _ai_log_entry(redis, action)
+            fp = str(action.get("fingerprint", "") or "").strip()
+            if not fp and event_type and value:
+                fp = FlowScanRedis.fingerprint(event_type, value)
+            removed = _remove_event(redis, fp, remove_children=remove_children) if fp else 0
+            if removed:
+                note = f"已级联移除 {removed} 个事件" if remove_children else "已移除 1 个事件"
+            else:
+                note = "未找到"
+            results.append({"ok": True, "type": "del", "event_type": event_type, "value": value, "removed": removed, "remove_children": remove_children, "note": note})
+        elif atype == "log":
+            entry = _ai_log_entry(redis, action, source=source, schedule_id=schedule_id)
             results.append({"ok": True, "type": "log", "log_id": entry.get("log_id", ""), "note": "已存储"})
     return results
 
 
-def _ai_log_entry(redis: Any, action: Dict[str, Any]) -> Dict[str, Any]:
+def _ai_log_entry(redis: Any, action: Dict[str, Any], source: str = "manual", schedule_id: str = "") -> Dict[str, Any]:
     """存储一条 AI 日志到 Redis。"""
     log_id = uuid.uuid4().hex[:12]
     now = time.time()
@@ -713,6 +828,8 @@ def _ai_log_entry(redis: Any, action: Dict[str, Any]) -> Dict[str, Any]:
         "message": str(action.get("message", "")),
         "target": str(action.get("target", "")),
         "priority": str(action.get("priority", "medium")),
+        "source": source,
+        "schedule_id": schedule_id,
         "created_at": now,
         "created_at_iso": datetime.fromtimestamp(now).isoformat(),
     }
@@ -953,6 +1070,9 @@ def _remove_event(redis: FlowScanRedis, fp: str, remove_children: bool = True) -
     event = redis.get_event(fp)
     if not event:
         return 0
+    # 先标记取消，再递归删除子树。这样即使有运行中的 worker 正在基于该事件
+    # 产出结果，FlowScanRedis.push_event 也会立即丢弃这些新子事件。
+    redis.conn.setex(f"fs3:cancelled:{fp}", 86400, "1")
     removed = 0
     if remove_children:
         for child_fp in _children_fps(redis, fp):
@@ -964,7 +1084,7 @@ def _remove_event(redis: FlowScanRedis, fp: str, remove_children: bool = True) -
     pipe.srem("fs3:event:all", fp)
     pipe.srem(f"fs3:events:type:{event_type}", fp)
     pipe.lrem("fs3:event:new", 0, fp)
-    # 标记为已取消，阻止运行中的任务产生孤儿子事件（24h TTL）
+    # 保留取消标记，阻止运行中的任务产生孤儿子事件（24h TTL）
     pipe.setex(f"fs3:cancelled:{fp}", 86400, "1")
     for key in redis.conn.scan_iter("fs3:pending:*"):
         pipe.zrem(key, fp)
@@ -1323,74 +1443,212 @@ def _json_or_raw(value: str) -> Any:
         return value
 
 
-def _load_loop_config(redis: Any) -> Dict[str, Any]:
-    """从 Redis 读取 AI 循环配置."""
-    raw = redis.conn.hgetall("fs3:ai:loop") or {}
-    if not raw:
-        return {"interval_minutes": 0, "selected_types": [], "question": "", "max_events": 200, "toggles": {"add": True, "del": True, "log": True}, "last_run": 0}
-    toggles_raw = raw.get("toggles", "{}")
-    try:
-        toggles = json.loads(toggles_raw) if isinstance(toggles_raw, str) else toggles_raw
-    except Exception:
-        toggles = {"add": True, "del": True, "log": True}
+def _ai_schedule_defaults() -> Dict[str, Any]:
     return {
-        "interval_minutes": int(raw.get("interval_minutes", 0) or 0),
-        "selected_types": json.loads(raw.get("selected_types", "[]")) if isinstance(raw.get("selected_types"), str) else (raw.get("selected_types") or []),
-        "question": str(raw.get("question", "") or ""),
-        "max_events": int(raw.get("max_events", 200) or 200),
-        "toggles": toggles,
-        "last_run": float(raw.get("last_run", 0) or 0),
+        "schedule_id": "",
+        "interval_minutes": 0,
+        "selected_types": [],
+        "question": "",
+        "max_events": 200,
+        "toggles": _default_ai_toggles(),
+        "system_prompt": "",
+        "model": "",
+        "enabled": True,
+        "created_at": 0.0,
+        "created_at_iso": "",
+        "last_run": 0.0,
+        "last_run_iso": "",
+        "next_run": 0.0,
+        "next_run_iso": "",
+        "run_count": 0,
+        "last_status": "pending",
+        "last_error": "",
     }
 
 
-def _save_loop_config(redis: Any, cfg: Dict[str, Any]) -> None:
-    """保存 AI 循环配置到 Redis."""
-    redis.conn.hset("fs3:ai:loop", mapping={
-        "interval_minutes": str(cfg.get("interval_minutes", 0)),
-        "selected_types": json.dumps(cfg.get("selected_types", [])),
-        "question": str(cfg.get("question", "")),
-        "max_events": str(cfg.get("max_events", 200)),
-        "toggles": json.dumps(cfg.get("toggles", {})),
-        "last_run": str(cfg.get("last_run", 0)),
+def _normalize_ai_schedule(raw: Dict[str, Any]) -> Dict[str, Any]:
+    data = _ai_schedule_defaults()
+    data.update(raw or {})
+    data["interval_minutes"] = int(data.get("interval_minutes") or 0)
+    data["max_events"] = int(data.get("max_events") or 200)
+    data["run_count"] = int(data.get("run_count") or 0)
+    data["last_run"] = float(data.get("last_run") or 0)
+    data["next_run"] = float(data.get("next_run") or 0)
+    data["created_at"] = float(data.get("created_at") or 0)
+    data["enabled"] = bool(data.get("enabled", True))
+    raw_toggles = data.get("toggles")
+    toggles: Dict[str, bool] = raw_toggles if isinstance(raw_toggles, dict) else {}
+    normalized_toggles = _default_ai_toggles()
+    normalized_toggles.update(toggles)
+    data["toggles"] = normalized_toggles
+    if not isinstance(data.get("selected_types"), list):
+        data["selected_types"] = []
+    return data
+
+
+def _create_ai_schedule(redis: Any, cfg: Dict[str, Any]) -> Dict[str, Any]:
+    now = time.time()
+    schedule_id = uuid.uuid4().hex[:12]
+    schedule = _normalize_ai_schedule({
+        **cfg,
+        "schedule_id": schedule_id,
+        "enabled": True,
+        "created_at": now,
+        "created_at_iso": datetime.fromtimestamp(now).isoformat(),
+        "last_run": 0,
+        "last_run_iso": "",
+        "next_run": now + int(cfg.get("interval_minutes", 0)) * 60,
+        "next_run_iso": datetime.fromtimestamp(now + int(cfg.get("interval_minutes", 0)) * 60).isoformat(),
+        "run_count": 0,
+        "last_status": "pending",
+        "last_error": "",
     })
+    redis.conn.hset(f"fs3:ai:schedule:{schedule_id}", mapping={k: json.dumps(v, ensure_ascii=False) for k, v in schedule.items()})
+    redis.conn.zadd("fs3:ai:schedules", {schedule_id: schedule["created_at"]})
+    return schedule
+
+
+def _load_ai_schedule(redis: Any, schedule_id: str) -> Optional[Dict[str, Any]]:
+    raw = redis.conn.hgetall(f"fs3:ai:schedule:{schedule_id}")
+    if not raw:
+        return None
+    return _normalize_ai_schedule({k: _json_or_raw(v) for k, v in raw.items()})
+
+
+def _save_ai_schedule(redis: Any, schedule: Dict[str, Any]) -> None:
+    schedule = _normalize_ai_schedule(schedule)
+    redis.conn.hset(f"fs3:ai:schedule:{schedule['schedule_id']}", mapping={k: json.dumps(v, ensure_ascii=False) for k, v in schedule.items()})
+    redis.conn.zadd("fs3:ai:schedules", {schedule["schedule_id"]: schedule.get("created_at") or time.time()})
+
+
+def _list_ai_schedules(redis: Any) -> List[Dict[str, Any]]:
+    ids = redis.conn.zrevrange("fs3:ai:schedules", 0, 200)
+    schedules = []
+    for schedule_id in ids:
+        schedule = _load_ai_schedule(redis, schedule_id)
+        if schedule:
+            schedules.append(schedule)
+        else:
+            redis.conn.zrem("fs3:ai:schedules", schedule_id)
+    schedules.sort(key=lambda item: float(item.get("created_at") or 0), reverse=True)
+    return schedules
+
+
+def _delete_ai_schedule(redis: Any, schedule_id: str) -> bool:
+    key = f"fs3:ai:schedule:{schedule_id}"
+    existed = bool(redis.conn.exists(key))
+    pipe = redis.conn.pipeline()
+    pipe.delete(key)
+    pipe.zrem("fs3:ai:schedules", schedule_id)
+    for run_id in redis.conn.zrange(f"fs3:ai:schedule:{schedule_id}:runs", 0, -1):
+        pipe.delete(f"fs3:ai:schedule:{schedule_id}:run:{run_id}")
+    pipe.delete(f"fs3:ai:schedule:{schedule_id}:runs")
+    pipe.execute()
+    return existed
+
+
+def _save_ai_schedule_run(redis: Any, schedule_id: str, run: Dict[str, Any]) -> Dict[str, Any]:
+    run_id = uuid.uuid4().hex[:12]
+    now = time.time()
+    entry = {
+        "run_id": run_id,
+        "schedule_id": schedule_id,
+        "created_at": now,
+        "created_at_iso": datetime.fromtimestamp(now).isoformat(),
+        **run,
+    }
+    pipe = redis.conn.pipeline()
+    pipe.hset(f"fs3:ai:schedule:{schedule_id}:run:{run_id}", mapping={k: json.dumps(v, ensure_ascii=False) for k, v in entry.items()})
+    pipe.zadd(f"fs3:ai:schedule:{schedule_id}:runs", {run_id: now})
+    pipe.zremrangebyrank(f"fs3:ai:schedule:{schedule_id}:runs", 0, -101)
+    pipe.execute()
+    return entry
+
+
+def _list_ai_schedule_runs(redis: Any, schedule_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+    run_ids = redis.conn.zrevrange(f"fs3:ai:schedule:{schedule_id}:runs", 0, max(0, limit - 1))
+    runs = []
+    for run_id in run_ids:
+        raw = redis.conn.hgetall(f"fs3:ai:schedule:{schedule_id}:run:{run_id}")
+        if raw:
+            runs.append({k: _json_or_raw(v) for k, v in raw.items()})
+    return runs
 
 
 def _start_loop_thread(app: Flask) -> None:
-    """启动后台循环线程，按配置间隔自动执行 AI 分析。"""
+    """启动后台定时线程，按每个定时任务的配置自动执行 AI 分析。"""
+    if app.config.get("AI_SCHEDULE_THREAD_STARTED"):
+        return
+    app.config["AI_SCHEDULE_THREAD_STARTED"] = True
+
     def loop_worker():
         while True:
-            time.sleep(60)  # 每分钟检查一次
+            time.sleep(15)
             try:
                 redis = app.config["get_redis"]()
-                loop_cfg = _load_loop_config(redis)
-                interval = loop_cfg.get("interval_minutes", 0)
-                if interval <= 0:
-                    continue
                 now = time.time()
-                last = loop_cfg.get("last_run", 0)
-                if now - last < interval * 60:
-                    continue
-                # 执行分析
-                config = load_yaml(app.config["CONFIG_PATH"])
-                ai_cfg = _ai_config(config)
-                selected_types = loop_cfg.get("selected_types", [])
-                question = loop_cfg.get("question", "")
-                max_events = loop_cfg.get("max_events", 200)
-                toggles = loop_cfg.get("toggles", {"add": True, "del": True, "log": True})
-                if not selected_types or not question:
-                    continue
-                events = _events_for_ai(redis, selected_types, max_events)
-                result = _call_ai_analysis(ai_cfg, selected_types, events, question)
-                if result and result.get("ok") and result.get("answer"):
-                    actions = _parse_ai_actions(result["answer"])
-                    if actions:
-                        _execute_ai_actions(actions, redis, toggles)
-                # 更新最后执行时间
-                loop_cfg["last_run"] = now
-                _save_loop_config(redis, loop_cfg)
-                redis.log(f"[AI-LOOP] executed, actions={len(actions) if result and result.get('ok') else 0}")
-            except Exception:
-                pass
+                for schedule in _list_ai_schedules(redis):
+                    schedule_id = schedule.get("schedule_id", "")
+                    interval = int(schedule.get("interval_minutes") or 0)
+                    if not schedule_id or not schedule.get("enabled", True) or interval <= 0:
+                        continue
+                    next_run = float(schedule.get("next_run") or 0)
+                    if next_run > now:
+                        continue
+                    lock_key = f"fs3:ai:schedule:{schedule_id}:lock"
+                    if not redis.conn.set(lock_key, str(now), nx=True, ex=max(60, interval * 60)):
+                        continue
+                    try:
+                        config = load_yaml(app.config["CONFIG_PATH"])
+                        ai_cfg = _ai_config(config)
+                        ai_cfg["system_prompt"] = schedule.get("system_prompt") or ai_cfg.get("system_prompt", "")
+                        if schedule.get("model"):
+                            ai_cfg["model"] = schedule.get("model")
+                        selected_types = list(schedule.get("selected_types") or [])
+                        question = str(schedule.get("question", "") or "")
+                        if not selected_types or not question:
+                            schedule["last_status"] = "skipped"
+                            schedule["last_error"] = "事件类型或问题为空"
+                        else:
+                            run_data = _run_ai_analysis_once(
+                                redis=redis,
+                                ai_cfg=ai_cfg,
+                                selected_types=selected_types,
+                                question=question,
+                                max_events=int(schedule.get("max_events") or 200),
+                                toggles=schedule.get("toggles") or _default_ai_toggles(),
+                                run_source="schedule",
+                                schedule_id=schedule_id,
+                            )
+                            result = run_data["result"] or {}
+                            ok = bool(result.get("ok"))
+                            action_results = run_data["action_results"]
+                            _save_ai_schedule_run(redis, schedule_id, {
+                                "ok": ok,
+                                "error": result.get("error", ""),
+                                "answer": result.get("answer", ""),
+                                "event_count": result.get("event_count", len(run_data["context_events"])),
+                                "parsed_actions": run_data["parsed_actions"],
+                                "action_results": action_results,
+                            })
+                            schedule["last_status"] = "ok" if ok else "error"
+                            schedule["last_error"] = "" if ok else str(result.get("error", ""))[:500]
+                        finished = time.time()
+                        schedule["last_run"] = finished
+                        schedule["last_run_iso"] = datetime.fromtimestamp(finished).isoformat()
+                        schedule["next_run"] = finished + interval * 60
+                        schedule["next_run_iso"] = datetime.fromtimestamp(schedule["next_run"]).isoformat()
+                        schedule["run_count"] = int(schedule.get("run_count") or 0) + 1
+                        _save_ai_schedule(redis, schedule)
+                        redis.log(f"[AI-SCHEDULE] {schedule_id} status={schedule['last_status']} next={schedule['next_run_iso']}")
+                    finally:
+                        redis.conn.delete(lock_key)
+            except Exception as exc:
+                try:
+                    app.logger.exception("AI schedule loop failed: %s", exc)
+                except Exception:
+                    pass
+
     t = threading.Thread(target=loop_worker, daemon=True)
     t.start()
 

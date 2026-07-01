@@ -1,0 +1,64 @@
+name: subfinder_module
+description: Subfinder 子域名枚举 — 从根域名被动发现子域名
+check:
+  command: subfinder -version
+  expect_keyword: Current Version
+  exclude_keyword: not found
+install:
+  steps:
+    - apt update
+    - apt install subfinder -y
+  install_timeout_seconds: 1200
+runtime:
+  max_concurrency: 3
+  exec_timeout_seconds: 1200
+allowed_output_events:
+  - SUBDOMAIN
+
+
+io_contract:
+  input_events:
+    - DOMAIN
+  input_transform_code: |
+    import shlex  # 导入 shell 参数转义模块，用于防止命令行注入攻击（如域名中包含恶意分号或空格）
+
+    # 1. data["value"] 获取输入的原始域名
+    # 2. .strip() 去除域名两端的空格
+    # 3. .strip(".") 去除域名末尾的点号（例如将 "example.com." 转换为 "example.com"）
+    # 4. .lower() 将所有字母转为小写，确保域名格式统一
+    domain = data["value"].strip().strip(".").lower()
+
+    # 判断域名是否合法：domain 不能为空，且必须包含点号 "."（确保是个有效的域名格式）
+    # 如果合法：返回一个列表，包含清洗后的域名 "domain"，以及经过 shlex 安全转义后的安全命令行变量 "domain_q"
+    # 如果不合法：返回一个空列表 []，表示放弃该输入，不执行后续扫描
+    return (
+        [{"domain": domain, "domain_q": shlex.quote(domain)}]
+        if domain and "." in domain
+        else []
+    )
+
+
+execution:
+  command: subfinder -d {{domain_q}} -silent -all -recursive -timeout 25 -rl 20 2>/dev/null
+  output_parse_code: |
+    results = []  # 初始化一个空列表，用于存储最终解析出来的结构化结果
+    seen = set()  # 初始化一个空集合，利用集合（Set）不重复的特性来进行数据去重
+
+    # 将 Subfinder 命令的标准输出（data["stdout"]）按行切分，并开始逐行循环遍历
+    for line in data["stdout"].splitlines():
+        # 1. line.strip() 去除当前行前后的空格或换行符
+        # 2. .lower() 将字母统一转换为小写，防止因大小写不同导致重复或格式不一致
+        # 3. .strip(".") 去除域名末尾可能存在的点号
+        host = line.strip().lower().strip(".")
+
+        # 实施数据清洗与去重过滤：
+        # 1. host：确保清洗后的域名不为空
+        # 2. "." in host：确保字符串中包含点号，过滤掉非域名的杂乱文本
+        # 3. host not in seen：确保这个子域名之前没有被处理过（核心去重逻辑）
+        if host and "." in host and host not in seen:
+            seen.add(host)  # 将这个新发现的子域名记录到去重集合中，防止后续重复添加
+
+            # 将子域名包装成系统要求的特定事件格式（键名为 "SUBDOMAIN"），并追加到结果列表中
+            results.append({"SUBDOMAIN": host})
+
+    return results  # 循环结束后，返回包含所有合法且唯一的子域名的结果列表
