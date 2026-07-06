@@ -1,0 +1,50 @@
+name: fofa_module
+description: FoFaX 搜索引擎查询
+check:
+  command: grep -E "YOUR_FOFA_API_KEY" config.yaml && exit 1 || fofax --version
+  expect_keyword: fofaX
+  exclude_keyword: not found
+install:
+  steps:
+    - mkdir -p "$HOME/.local/bin" && tmpdir=$(mktemp -d) && cd "$tmpdir" && curl -fsSL https://api.github.com/repos/xiecat/fofax/releases/latest
+      | python3 -c "import json,sys; data=json.load(sys.stdin); assets=data.get('assets',[]); matches=[a['browser_download_url']
+      for a in assets if 'linux' in a['name'].lower() and ('amd64' in a['name'].lower() or 'x86_64' in a['name'].lower())];
+      print(matches[0] if matches else assets[0]['browser_download_url'])" | xargs -I{} sh -c 'curl -fL "{}" -o fofax_pkg &&
+      (tar -xzf fofax_pkg || unzip -o fofax_pkg || mv fofax_pkg fofax) && find . -type f \( -name "fofax" -o -name "fofax_linux*"
+      \) -perm /111 -print -quit | xargs -I%% install -m 0755 %% "$HOME/.local/bin/fofax"'
+  install_timeout_seconds: 1200
+runtime:
+  max_concurrency: 8
+  exec_timeout_seconds: 120
+allowed_output_events:
+  - DNS_NAME
+  - IP_ADDRESS
+  - URL
+
+io_contract:
+  input_events:
+    - DNS_NAME
+    - URL
+    - URL_UNVERIFIED
+    - IP_RANGE
+    - ICON_PATH
+    - IP_ADDRESS
+  input_transform_code: |
+    import shlex
+    return [{"value": shlex.quote(data["value"])}]
+execution:
+  command: python ./bin/fofa.py {{value}} -k {{config.fofa.api_key}}
+  output_parse_code: |
+    import json
+    temp_list = []
+    for line in data["stdout"].strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            # 解析单行 JSON 并添加到列表
+            ip_obj = json.loads(line)
+            temp_list.append(ip_obj)
+        except:
+          continue
+    return temp_list

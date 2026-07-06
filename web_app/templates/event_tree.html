@@ -101,6 +101,25 @@ var options = {
 };
 var network = new vis.Network(container, { nodes: nodes, edges: edges }, options);
 
+// 初始布局完成后关闭物理引擎，避免节点聚拢
+network.once('stabilizationIterationsDone', function() {
+    network.setOptions({ physics: false });
+});
+// 兜底：1.5 秒后强制关闭
+setTimeout(function() {
+    network.setOptions({ physics: false });
+}, 1500);
+
+// 拖拽结束后固定节点位置，防止被物理引擎拉回
+network.on('dragEnd', function(params) {
+    if (!params.nodes || params.nodes.length === 0) return;
+    var positions = network.getPositions(params.nodes);
+    params.nodes.forEach(function(nodeId) {
+        if (!positions[nodeId]) return;
+        nodes.update({ id: nodeId, x: positions[nodeId].x, y: positions[nodeId].y, fixed: { x: true, y: true } });
+    });
+});
+
 renderRootList();
 
 network.on('click', function(params) {
@@ -272,6 +291,13 @@ function renderImmediateChildren(parentFp, done) {
                     renderEdge(parentFp, evt);
                 });
             });
+            // 为新加入的节点做一次局部布局后关闭物理引擎
+            network.setOptions({ physics: true });
+            network.stabilize(120);
+            setTimeout(function() {
+                network.setOptions({ physics: false });
+                network.fit({ animation: true });
+            }, 400);
             if (done) done();
         })
         .catch(function() { if (done) done(); });
@@ -375,7 +401,13 @@ function renderPath(fp) {
             });
             var targetFp = path[path.length - 1].fingerprint;
             selectEvent(targetFp, { render: false, focus: true });
-            setTimeout(function() { network.fit({ animation: true }); }, 200);
+            // 为新加入的节点做一次局部布局后关闭物理引擎
+            network.setOptions({ physics: true });
+            network.stabilize(120);
+            setTimeout(function() {
+                network.setOptions({ physics: false });
+                network.fit({ animation: true });
+            }, 400);
         });
 }
 

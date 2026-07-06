@@ -26,25 +26,6 @@ worker:
 fofa:
   api_key: YOUR_FOFA_API_KEY
   base_url: https://fofa.info
-  query_policies:
-    DOMAIN:
-      limit: 1000
-      mode: truncate
-    SUBDOMAIN:
-      limit: 1000
-      mode: truncate
-    CERT:
-      limit: 1000
-      mode: truncate
-    URL:
-      limit: 1000
-      mode: truncate
-    IP:
-      limit: 300
-      mode: drop_all
-    ICON:
-      limit: 300
-      mode: drop_all
 
 ai_analysis:
   base_url: https://api.openai.com/v1

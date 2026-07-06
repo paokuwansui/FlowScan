@@ -1,0 +1,34 @@
+name: dns_name_resolve_module
+description: 子域名DNS解析模块。整合dnsx与cdncheck，将子域名转化为IP/CNAME并识别CDN，为资产探测流水线提供基础数据
+check:
+  command: 'dnsx -version && cdncheck --version'
+  expect_keyword: Current version
+  exclude_keyword: not found
+install:
+  steps:
+  - mkdir -p "$HOME/.local/bin" "$HOME/.cache/go-tmp"
+  - GOBIN="$HOME/.local/bin" GOCACHE="$HOME/.cache/go-tmp" go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest
+  - GOBIN="$HOME/.local/bin" GOCACHE="$HOME/.cache/go-tmp" go install -v github.com/projectdiscovery/cdncheck/cmd/cdncheck@latest
+  install_timeout_seconds: 1200
+runtime:
+  max_concurrency: 8
+  exec_timeout_seconds: 120
+allowed_output_events:
+- IP_ADDRESS
+
+io_contract:
+  input_events:
+  - DNS_NAME
+  
+  input_transform_code: |
+    import shlex
+    host = data["value"].strip().strip(".").lower()
+    return [{"subdomain": host, "subdomain_q": shlex.quote(host)}] if host and "." in host else []
+execution:
+  command: echo "{{subdomain_q}}" | dnsx -a -silent -ro | cdncheck -e -silent
+  output_parse_code: |
+    lines = [line.strip() for line in data["stdout"].splitlines() if line.strip()]
+    if len(lines) == 1:
+        return [{"IP_ADDRESS": lines[0]}]
+    else:
+        return []

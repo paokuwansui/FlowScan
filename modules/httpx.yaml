@@ -1,0 +1,46 @@
+name: httpx_module
+description: httpx HTTP 探活 — 探测 URL/端口存活，提取标题/技术栈/状态码/图标/证书等汇总为 URL_INFO，403 单独输出
+check:
+  command: $HOME/.local/bin/httpx -version
+  expect_keyword: Current Version
+  exclude_keyword: not found
+install:
+  steps:
+  - mkdir -p "$HOME/.local/bin" "$HOME/.cache/go-tmp"
+  - GOBIN="$HOME/.local/bin" GOCACHE="$HOME/.cache/go-tmp" go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
+  install_timeout_seconds: 1200
+runtime:
+  max_concurrency: 8
+  exec_timeout_seconds: 180
+allowed_output_events:
+  - INPUT
+io_contract:
+  input_events:
+  - URL
+  - URL_UNVERIFIED
+  - OPEN_TCP_PORT
+  input_transform_code: |
+    import shlex, re
+    value = data["value"].strip()
+    return [{"target": value, "target_q": shlex.quote(value)}]
+execution:
+  command: httpx -title -favicon -tls-probe -status-code -json -silent -u {{target_q}} -threads 50
+  output_parse_code: |
+    import json
+    def clean_httpx_record(data: str) -> dict:
+        try:
+            data = json.loads(data.replace('\\',''))
+            data["tls"] = data["tls"]["subject_an"]
+            data.pop("timestamp", None)
+            data.pop("a", None)
+            data.pop("cname", None)
+            data.pop("tech", None)
+            data.pop("resolvers", None)
+            data = json.dumps(data, ensure_ascii=False)
+        except:
+            pass
+        return data
+    output = []
+    for line in data["stdout"].splitlines():
+        output.append({"INPUT":clean_httpx_record(line)})
+    return output

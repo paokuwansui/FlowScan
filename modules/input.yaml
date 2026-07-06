@@ -1,0 +1,42 @@
+name: input_module
+description: 自动将输入转换成程序内部需要的类型
+check:
+  command: 'echo --True--'
+  expect_keyword: --True--
+  exclude_keyword: not found
+install:
+  steps:
+  - echo --True--
+  install_timeout_seconds: 1200
+runtime:
+  max_concurrency: 8
+  exec_timeout_seconds: 120
+allowed_output_events:
+  - DNS_NAME
+  - URL
+  - ICON_PATH
+  - IP_ADDRESS
+  - IP_RANGE
+
+io_contract:
+  input_events:
+    - INPUT
+  input_transform_code: |
+    import shlex
+    return [{"value": shlex.quote(data["value"])}]
+execution:
+  command: python ./bin/input.py {{value}}
+  output_parse_code: |
+    import json
+    temp_list = []
+    for line in data["stdout"].strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            # 解析单行 JSON 并添加到列表
+            ip_obj = json.loads(line)
+            temp_list.append(ip_obj)
+        except:
+          continue
+    return temp_list

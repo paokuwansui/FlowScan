@@ -626,7 +626,7 @@ def _ai_config(config: Dict[str, Any]) -> Dict[str, Any]:
         "api_key": str(cfg.get("api_key", "")),
         "model": str(cfg.get("model", "gpt-4o-mini")),
         "timeout_seconds": int(cfg.get("timeout_seconds", 120) or 120),
-        "max_events": int(cfg.get("max_events", 200) or 200),
+        "max_events": int(cfg.get("max_events", 2000) or 2000),
         "system_prompt": system_prompt,
         "log_api_key": str(cfg.get("log_api_key", "")),
         "loop_interval_minutes": int(cfg.get("loop_interval_minutes", 0) or 0),
@@ -640,7 +640,7 @@ def _default_ai_toggles() -> Dict[str, bool]:
 def _analysis_request_from_form(form: Any, ai_cfg: Dict[str, Any]) -> tuple[List[str], str, int, Dict[str, bool]]:
     selected_types = [item.strip() for item in form.getlist("event_types") if item.strip()]
     question = form.get("question", "").strip()
-    max_events = _to_int(form.get("max_events"), int(ai_cfg.get("max_events", 200)))
+    max_events = _to_int(form.get("max_events"), int(ai_cfg.get("max_events", 2000)))
     toggles = {
         "add": form.get("toggle_add") == "1",
         "del": form.get("toggle_del") == "1",

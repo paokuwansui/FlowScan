@@ -1,0 +1,71 @@
+name: bbot_kitchen_sink_module
+description: everything everywhere all at once
+check:
+  command: echo --true--
+  expect_keyword: --true--
+  exclude_keyword: --false--
+install:
+  steps:
+    - echo bbot not find
+  install_timeout_seconds: 3600
+runtime:
+  max_concurrency: 2
+  exec_timeout_seconds: 3600
+
+allowed_output_events:
+  - ASN
+  - AZURE_TENANT
+  - CODE_REPOSITORY
+  - DNS_NAME
+  - DNS_NAME_UNRESOLVED
+  - EMAIL_ADDRESS
+  - FILESYSTEM
+  - FINDING
+  - GEOLOCATION
+  - HASHED_PASSWORD
+  - HTTP_RESPONSE
+  - IP_ADDRESS
+  - IP_RANGE
+  - MOBILE_APP
+  - OPEN_TCP_PORT
+  - OPEN_UDP_PORT
+  - ORG_STUB
+  - PASSWORD
+  - PROTOCOL
+  - RAW_DNS_RECORD
+  - RAW_TEXT
+  - SOCIAL
+  - STORAGE_BUCKET
+  - TECHNOLOGY
+  - URL
+  - URL_HINT
+  - URL_UNVERIFIED
+  - USERNAME
+  - VHOST
+  - VULNERABILITY
+  - WAF
+  - WEBSCREENSHOT
+  - WEB_PARAMETER
+
+io_contract:
+  input_events:
+    - DNS_NAME
+  input_transform_code: |
+    import shlex
+    return [{"value": shlex.quote(data["value"])}]
+
+execution:
+  command: bbot -t {{value}} -p kitchen-sink --allow-deadly --json --brief -y -em json csv txt
+  output_parse_code: |
+    import json
+    result = []
+    for line in data["stdout"].strip().split("\n"):
+        line = line.strip()
+        if line.startswith('{"type"'):
+            try:
+                obj = json.loads(line)
+                if isinstance(obj, dict) and "type" in obj and "data" in obj:
+                    result.append({obj["type"]: obj["data"]})
+            except Exception:
+                continue
+    return result

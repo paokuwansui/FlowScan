@@ -11,7 +11,7 @@ from flowscan3.worker import Worker, run_forever
 
 def connect_redis(config: dict, args) -> FlowScanRedis:
     redis_cfg = config.get("redis", {}) or {}
-    host = args.redis_host or redis_cfg.get("host", "127.0.0.1")
+    host = args.redis_host or redis_cfg.get("remote_host", "127.0.0.1")
     port = args.redis_port or int(redis_cfg.get("port", 6379))
     password = args.redis_password if args.redis_password is not None else redis_cfg.get("password", "")
     db = int(redis_cfg.get("db", 0))

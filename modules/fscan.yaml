@@ -1,0 +1,115 @@
+name: fscan_module
+description: Fscan 服务探测/漏洞/弱口令 — 接 rustscan 的 PORT_OPEN 端口进行针对性 JSON 输出检测
+check:
+  command: fscan -h 2>&1 || true
+  expect_keyword: Usage
+  exclude_keyword: not found
+install:
+  steps:
+  - mkdir -p "$HOME/.local/bin"
+  - 'python3 - <<''PY'' | xargs -I{} sh -c ''curl -fL "{}" -o "$HOME/.local/bin/fscan" && chmod 0755 "$HOME/.local/bin/fscan"''
+    import json, urllib.request
+    req=urllib.request.Request("https://api.github.com/repos/shadow1ng/fscan/releases/latest", headers={"User-Agent":"FlowScan-loader"})
+    data=json.load(urllib.request.urlopen(req, timeout=30))
+    assets=data.get("assets", [])
+    matches=[a["browser_download_url"] for a in assets if a.get("name", "").startswith("fscan_") and "linux_x64" in a.get("name", "").lower()]
+    print(matches[0] if matches else "")
+    PY'
+  install_timeout_seconds: 900
+runtime:
+  max_concurrency: 2
+  exec_timeout_seconds: 600
+allowed_output_events:
+- URL
+- VULNERABILITY
+- TECHNOLOGY
+- OPEN_TCP_PORT
+
+io_contract:
+  input_events:
+  - HOST_TCP_PORT_OPEN
+  input_transform_code: |
+    import shlex
+
+    value = data["value"].strip()
+    if not value or " -> " not in value:
+        return []
+
+    # 严格按照 " -> " 切割
+    host, ports_part = value.split(" -> ", 1)
+    
+    # 剥离两边的中括号 并提取端口
+    ports_raw = ports_part.strip("[]")
+    ports = [p.strip() for p in ports_raw.split(",") if p.strip()]
+    ports_str = ",".join(ports)
+    
+    return [{"host": host, "ports": ports_str, "host_q": shlex.quote(host), "ports_q": shlex.quote(ports_str)}]
+
+execution:
+  command: fscan -h {{host_q}} -p {{ports_q}} -np -no -silent -num 100 -time 3 -f json -full 2>/dev/null
+  output_parse_code: |
+    import json
+    result = []
+    stdout_content = data.get("stdout", "").strip()
+    if not stdout_content:
+        return []
+
+    for line in stdout_content.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            item = json.loads(line)
+            data_type = item.get("type")
+            host = item.get("host", "").strip()
+            port = str(item.get("port", "")).strip()
+            
+            # 兼容处理 VULN 类型或特殊行没有直接 host/port 的情况
+            if not host or not port:
+                target = item.get("target", "")
+                if target and ":" in target:
+                    host, port = target.split(":", 1)
+
+            # 1. 提取 TCP_PORT_OPEN（带上目标资产）
+            if data_type == "PORT" and item.get("status") == "open":
+                if host and port:
+                    result.append({"OPEN_TCP_PORT": f"{host}:{port}"})
+
+            # 2. 提取 VULNERABILITY（保持原样）
+            elif data_type == "VULN":
+                result.append({"VULNERABILITY": line})
+
+            # 3. 动态提取 SERVICE 相关的指纹与 URL
+            elif data_type == "SERVICE":
+                service_name = item.get("service", "")
+                service_lower = service_name.lower()
+                
+                # --- 动态计算协议与生成 URL ---
+                is_http = "http" in service_lower
+                is_ssl = "ssl" in service_lower or "https" in service_lower
+                
+                if is_http or is_ssl:
+                    schema = "https" if is_ssl else "http"
+                    url = f"{schema}://{host}:{port}" if port else f"{schema}://{host}"
+                    result.append({"URL": url})
+
+                # --- 不再写死组件名：全动态组装技术指纹 ---
+                # 优先从 banner 里拿特征，如果没有就拿 service，再拼上版本号
+                banner = item.get("banner", "").strip()
+                version = item.get("version", "").strip()
+                
+                # 智能拼接指纹名称
+                tech_name = banner if banner else service_name
+                if version and version not in tech_name:
+                    tech_name = f"{tech_name}/{version}"
+                    
+                if tech_name and host and port:
+                    # 核心改变：不仅带上目标和动态指纹，还直接把当前行的原始 JSON 塞进去，确保不丢失任何字段
+                    result.append({
+                        "TECHNOLOGY": f"{host}:{port}|{tech_name}|{line}"
+                    })
+
+        except json.JSONDecodeError:
+            continue 
+
+    return result
