@@ -56,5 +56,5 @@ export GOTMPDIR="$HOME/go/tmp"
 # Pre-install bbot system dependencies from venv (massdns, subfinder, etc.)
 echo "[WORKER_SETUP] Installing bbot dependencies..."
 "$PROJECT_DIR/flowscan_venv/bin/bbot" --install-all-deps 2>&1 || echo "[WORKER_SETUP] [WARN] bbot --install-all-deps had issues; continuing"
-
+GOBIN="$HOME/.local/bin" GOCACHE="$HOME/.cache/go-tmp" go install -v github.com/projectdiscovery/cdncheck/cmd/cdncheck@latest
 python3 main.py init

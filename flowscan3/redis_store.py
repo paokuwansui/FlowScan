@@ -5,6 +5,8 @@ from typing import Any, Dict, Iterable, List, Optional, Set
 
 import redis as redis_py
 
+from .filter import check_file_rules, check_redis_rules
+
 
 CLAIM_TASK_LUA = """
 local done_key = KEYS[1]
@@ -79,6 +81,14 @@ class FlowScanRedis:
         event_type = str(event_type).strip()
         value = str(value).strip()
         if not event_type or not value:
+            return None
+        # 1. 文件黑名单检查
+        if check_file_rules(event_type, value):
+            self.log(f"[BLACKLIST-FILE] {event_type}={value[:120]} discarded")
+            return None
+        # 2. Redis 动态黑名单检查
+        if check_redis_rules(self, event_type, value):
+            self.log(f"[BLACKLIST-REDIS] {event_type}={value[:120]} discarded")
             return None
         # 检查父事件是否已被取消（删除）——阻止孤儿事件入队
         if parent_fp and self.conn.exists(f"fs3:cancelled:{parent_fp}"):

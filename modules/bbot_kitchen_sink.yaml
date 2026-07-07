@@ -55,7 +55,7 @@ io_contract:
     return [{"value": shlex.quote(data["value"])}]
 
 execution:
-  command: bbot -t {{value}} -p kitchen-sink --allow-deadly --json --brief -y -em json csv txt
+  command: 'python ./flowscan3/filter.py {{value}} && bbot -t {{value}} -p kitchen-sink --allow-deadly -c modules.securitytrails.api_key={{config.bbot.securitytrails_api_key}} -c modules.virustotal.api_key={{config.bbot.virustotal_api_key}} -c modules.github_workflows.api_key={{config.bbot.github_workflows_api_key}} --json --brief -y -em json csv txt --exclude-cdn'
   output_parse_code: |
     import json
     result = []

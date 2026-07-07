@@ -15,7 +15,7 @@ web_config:
   secret_key: 5329a77d233311276c3f0ac7951b165c0b43fdfe9b7e1226abaa603da135a22d
 
 
-xray_listen_http_proxy: http://0.0.0.0:7777
+xray_listen_http_proxy: 0.0.0.0:7777
 xray_remote_http_proxy: http://127.0.0.1:7777
 
 worker:
@@ -26,6 +26,11 @@ worker:
 fofa:
   api_key: YOUR_FOFA_API_KEY
   base_url: https://fofa.info
+
+bbot:
+  securitytrails_api_key: 
+  virustotal_api_key: 
+  github_workflows_api_key: 
 
 ai_analysis:
   base_url: https://api.openai.com/v1

@@ -110,6 +110,14 @@ setTimeout(function() {
     network.setOptions({ physics: false });
 }, 1500);
 
+// 开始拖拽时临时解锁节点，允许任意多次拖动
+network.on('dragStart', function(params) {
+    if (!params.nodes || params.nodes.length === 0) return;
+    params.nodes.forEach(function(nodeId) {
+        nodes.update({ id: nodeId, fixed: { x: false, y: false } });
+    });
+});
+
 // 拖拽结束后固定节点位置，防止被物理引擎拉回
 network.on('dragEnd', function(params) {
     if (!params.nodes || params.nodes.length === 0) return;

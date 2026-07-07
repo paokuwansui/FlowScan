@@ -13,7 +13,7 @@ runtime:
   exec_timeout_seconds: 120
 allowed_output_events:
   - DNS_NAME
-  - URL
+  - URL_UNVERIFIED
   - ICON_PATH
   - IP_ADDRESS
   - IP_RANGE

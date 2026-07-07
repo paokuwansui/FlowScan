@@ -14,12 +14,12 @@ install:
       \) -perm /111 -print -quit | xargs -I%% install -m 0755 %% "$HOME/.local/bin/fofax"'
   install_timeout_seconds: 1200
 runtime:
-  max_concurrency: 8
-  exec_timeout_seconds: 120
+  max_concurrency: 1
+  exec_timeout_seconds: 1200
 allowed_output_events:
   - DNS_NAME
   - IP_ADDRESS
-  - URL
+  - URL_UNVERIFIED
 
 io_contract:
   input_events:
@@ -33,7 +33,7 @@ io_contract:
     import shlex
     return [{"value": shlex.quote(data["value"])}]
 execution:
-  command: python ./bin/fofa.py {{value}} -k {{config.fofa.api_key}}
+  command: 'python ./flowscan3/filter.py {{value}} && python ./bin/fofa.py {{value}} -k {{config.fofa.api_key}}'
   output_parse_code: |
     import json
     temp_list = []

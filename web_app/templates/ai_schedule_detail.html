@@ -17,10 +17,12 @@
                 <tr>
                     <th>自动动作</th>
                     <td>
-                        自动增加={{ '开' if schedule.toggles.add else '关' }}；
-                        自动删除={{ '开' if schedule.toggles.del else '关' }}；
+                        增加事件={{ '开' if schedule.toggles.add else '关' }}；
+                        删除事件={{ '开' if schedule.toggles.del else '关' }}；
                         删除子事件={{ '开' if schedule.toggles.del_children else '关' }}；
-                        自动存储日志={{ '开' if schedule.toggles.log else '关' }}
+                        增加黑名单={{ '开' if schedule.toggles.blacklist_add else '关' }}；
+                        删除黑名单={{ '开' if schedule.toggles.blacklist_del else '关' }}；
+                        存储日志={{ '开' if schedule.toggles.log else '关' }}
                     </td>
                 </tr>
                 <tr><th>上次执行</th><td>{{ schedule.last_run_iso or '-' }}</td></tr>

@@ -16,7 +16,7 @@ import uuid
 from datetime import datetime
 from functools import wraps
 from typing import Any, Dict, Iterable, List, Optional
-
+from flowscan3.filter import _fingerprint
 import yaml
 
 from flask import (
@@ -33,6 +33,15 @@ from flask import (
 
 from flowscan3.code_runner import CodeExecutionError, run_input_transform, run_output_parse
 from flowscan3.config import load_yaml, render_template as render_command_template
+from flowscan3.filter import (
+    add_redis_rule,
+    delete_redis_rule,
+    get_file_rules,
+    get_redis_rules,
+    reload_file_rules,
+    test_file_rules,
+    test_redis_rules,
+)
 from flowscan3.redis_store import FlowScanRedis
 from flowscan3.tool_module import ToolModule, load_tools
 from flowscan3.utils import run_cmd
@@ -61,7 +70,7 @@ def create_app(config_path: str = "config.yaml", modules_dir: str = "modules") -
     app.config["WEB_PASSWORD"] = web_cfg["password"]
     app.config["SESSION_TTL"] = web_cfg["session_ttl"]
     app.config["REDIS"] = {
-        "host": redis_cfg.get("host", "127.0.0.1"),
+        "host": redis_cfg.get("remote_host", "127.0.0.1"),
         "port": int(redis_cfg.get("port", 6379)),
         "password": redis_cfg.get("password", ""),
         "db": int(redis_cfg.get("db", 0)),
@@ -134,6 +143,7 @@ def _register_routes(app: Flask) -> None:
         search_val = request.args.get("search_val", "").strip()
         limit = _to_int(request.args.get("limit"), 100)
         offset = _to_int(request.args.get("offset"), 0)
+        tab = request.args.get("tab", "events")
         event_types = _event_types(redis)
         if search_val:
             term = search_val.lower()
@@ -151,6 +161,7 @@ def _register_routes(app: Flask) -> None:
             search_val=search_val,
             limit=limit,
             offset=offset,
+            tab=tab,
         )
 
     @app.route("/events/inject", methods=["POST"])
@@ -234,6 +245,77 @@ def _register_routes(app: Flask) -> None:
         key_count = _full_import(redis, json_data)
         flash(f"状态恢复完成: 清空旧数据后恢复了 {key_count} 个 Redis 键", "success")
         return redirect(url_for("events"))
+
+    # ================================================================
+    # 黑名单管理 API
+    # ================================================================
+
+    @app.route("/api/blacklist/redis-rules")
+    @login_required
+    def blacklist_redis_rules():
+        redis = app.config["get_redis"]()
+        return jsonify(get_redis_rules(redis))
+
+    @app.route("/api/blacklist/file-rules")
+    @login_required
+    def blacklist_file_rules():
+        rules = get_file_rules()
+        return jsonify({"rules": rules, "count": len(rules)})
+
+    @app.route("/api/blacklist/add", methods=["POST"])
+    @login_required
+    def blacklist_add():
+        redis = app.config["get_redis"]()
+        data = request.get_json(silent=True) or {}
+        event_type = str(data.get("event_type", "")).strip()
+        match_mode = str(data.get("match_mode", "")).strip()
+        value = str(data.get("value", "")).strip()
+        comment = str(data.get("comment", "")).strip()
+        if not event_type or not value:
+            return jsonify({"ok": False, "error": "event_type 和 value 不能为空"})
+        if match_mode not in ("contains", "suffix", "prefix", "ip_range"):
+            return jsonify({"ok": False, "error": "match_mode 必须是 contains/suffix/prefix/ip_range"})
+        fp = add_redis_rule(redis, event_type, match_mode, value, comment)
+        if fp:
+            return jsonify({"ok": True, "fp": fp})
+        return jsonify({"ok": False, "error": "规则已存在或添加失败"})
+
+    @app.route("/api/blacklist/delete", methods=["POST"])
+    @login_required
+    def blacklist_delete():
+        redis = app.config["get_redis"]()
+        data = request.get_json(silent=True) or {}
+        fp = str(data.get("fp", "")).strip()
+        if not fp:
+            return jsonify({"ok": False, "error": "fp 不能为空"})
+        ok = delete_redis_rule(redis, fp)
+        return jsonify({"ok": ok, "deleted": ok})
+
+    @app.route("/api/blacklist/reload-file", methods=["POST"])
+    @login_required
+    def blacklist_reload_file():
+        count = reload_file_rules()
+        return jsonify({"ok": True, "count": count})
+
+    @app.route("/api/blacklist/test", methods=["POST"])
+    @login_required
+    def blacklist_test():
+        redis = app.config["get_redis"]()
+        data = request.get_json(silent=True) or {}
+        event_type = str(data.get("event_type", "DNS_NAME")).strip()
+        value = str(data.get("value", "")).strip()
+        if not value:
+            return jsonify({"ok": False, "error": "value 不能为空"})
+        file_matches = test_file_rules(event_type, value)
+        redis_matches = test_redis_rules(redis, event_type, value)
+        total = len(file_matches) + len(redis_matches)
+        return jsonify({
+            "ok": True,
+            "total": total,
+            "blocked": total > 0,
+            "file_matches": file_matches,
+            "redis_matches": redis_matches,
+        })
 
     @app.route("/logs")
     @login_required
@@ -626,7 +708,7 @@ def _ai_config(config: Dict[str, Any]) -> Dict[str, Any]:
         "api_key": str(cfg.get("api_key", "")),
         "model": str(cfg.get("model", "gpt-4o-mini")),
         "timeout_seconds": int(cfg.get("timeout_seconds", 120) or 120),
-        "max_events": int(cfg.get("max_events", 2000) or 2000),
+        "max_events": int(cfg.get("max_events", 5000) or 5000),
         "system_prompt": system_prompt,
         "log_api_key": str(cfg.get("log_api_key", "")),
         "loop_interval_minutes": int(cfg.get("loop_interval_minutes", 0) or 0),
@@ -634,17 +716,19 @@ def _ai_config(config: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _default_ai_toggles() -> Dict[str, bool]:
-    return {"add": True, "del": True, "del_children": True, "log": True}
+    return {"add": True, "del": True, "del_children": True, "blacklist_add": True, "blacklist_del": True, "log": True}
 
 
 def _analysis_request_from_form(form: Any, ai_cfg: Dict[str, Any]) -> tuple[List[str], str, int, Dict[str, bool]]:
     selected_types = [item.strip() for item in form.getlist("event_types") if item.strip()]
     question = form.get("question", "").strip()
-    max_events = _to_int(form.get("max_events"), int(ai_cfg.get("max_events", 2000)))
+    max_events = _to_int(form.get("max_events"), int(ai_cfg.get("max_events", 5000)))
     toggles = {
         "add": form.get("toggle_add") == "1",
         "del": form.get("toggle_del") == "1",
         "del_children": form.get("toggle_del_children") == "1",
+        "blacklist_add": form.get("toggle_blacklist_add") == "1",
+        "blacklist_del": form.get("toggle_blacklist_del") == "1",
         "log": form.get("toggle_log") == "1",
     }
     return selected_types, question, max_events, toggles
@@ -661,7 +745,7 @@ def _run_ai_analysis_once(
     schedule_id: str = "",
 ) -> Dict[str, Any]:
     context_events = _events_for_ai(redis, selected_types, max_events)
-    result = _call_ai_analysis(ai_cfg, selected_types, context_events, question)
+    result = _call_ai_analysis(ai_cfg, selected_types, context_events, question, redis)
     parsed_actions: List[Dict[str, Any]] = []
     action_results: List[Dict[str, Any]] = []
     if result and result.get("ok") and result.get("answer"):
@@ -680,7 +764,7 @@ def _run_ai_analysis_once(
 
 
 def _events_for_ai(redis: FlowScanRedis, event_types: List[str], max_events: int) -> List[Dict[str, Any]]:
-    max_events = max(1, min(max_events, 2000))
+    max_events = max(1, min(max_events, 5000))
     events = []
     for event_type in event_types:
         events.extend(_list_events(redis, event_type=event_type, limit=max_events))
@@ -688,7 +772,7 @@ def _events_for_ai(redis: FlowScanRedis, event_types: List[str], max_events: int
     return events[:max_events]
 
 
-def _format_events_for_ai(events: List[Dict[str, Any]]) -> str:
+def _format_context_for_ai(events: List[Dict[str, Any]], redis: Any) -> str:
     lines = []
     for index, event in enumerate(events, 1):
         created = event.get("created_at") or event.get("timestamp") or ""
@@ -697,10 +781,28 @@ def _format_events_for_ai(events: List[Dict[str, Any]]) -> str:
             f"source={event.get('source_tool', '')} parent={event.get('parent_fp', '')[:12]} "
             f"root={event.get('root_fp', '')[:12]} fp={event.get('fingerprint', '')[:12]} created_at={created}"
         )
+    # 追加最近 AI 日志摘要（供 AI 参考，避免重复）
+    lines.append("")
+    lines.append("最近 AI 分析日志（供参考，相同事件/结论无需重复记录）：")
+    recent_ids = redis.conn.zrevrange("fs3:ai:logs", 0, 49) if redis else []
+    appended = 0
+    for lid in recent_ids:
+        raw = redis.conn.hgetall(f"fs3:ai:log:{lid}")
+        if not raw:
+            continue
+        p = str(raw.get("priority", "medium"))
+        msg = _json_or_raw(raw.get("message", ""))
+        target = _json_or_raw(raw.get("target", ""))
+        msg_str = str(msg)[:120] if msg else "-"
+        tgt_str = str(target)[:80] if target else "-"
+        lines.append(f"- [{p}] {msg_str} | target={tgt_str}")
+        appended += 1
+    if not appended:
+        lines.append("  （暂无历史日志）")
     return "\n".join(lines) if lines else "未找到所选事件类型的事件。"
 
 
-def _call_ai_analysis(ai_cfg: Dict[str, Any], selected_types: List[str], events: List[Dict[str, Any]], question: str) -> Dict[str, Any]:
+def _call_ai_analysis(ai_cfg: Dict[str, Any], selected_types: List[str], events: List[Dict[str, Any]], question: str, redis: Any = None) -> Dict[str, Any]:
     base_url = ai_cfg.get("base_url", "")
     api_key = ai_cfg.get("api_key", "")
     model = ai_cfg.get("model", "")
@@ -713,7 +815,7 @@ def _call_ai_analysis(ai_cfg: Dict[str, Any], selected_types: List[str], events:
         "已选择事件类型：\n"
         f"{', '.join(selected_types)}\n\n"
         "事件日志上下文：\n"
-        f"{_format_events_for_ai(events)}"
+        f"{_format_context_for_ai(events, redis)}"
     )
     body = {
         "model": model,
@@ -756,7 +858,7 @@ def _parse_ai_actions(text: str) -> List[Dict[str, Any]]:
         try:
             parsed = json.loads(block)
             if isinstance(parsed, dict) and isinstance(parsed.get("actions"), list):
-                return [action for action in parsed["actions"] if isinstance(action, dict) and action.get("type") in ("add", "del", "log")]
+                return [action for action in parsed["actions"] if isinstance(action, dict) and action.get("type") in ("add", "del", "blacklist_add", "blacklist_del", "log")]
         except (json.JSONDecodeError, ValueError):
             continue
     return []
@@ -771,21 +873,21 @@ def _execute_ai_actions(
 ) -> List[Dict[str, Any]]:
     """执行 AI 动作列表，返回执行结果。
 
-    toggles 控制是否执行对应类型。动作固定按 del -> add -> log 三段执行，
+    toggles 控制是否执行对应类型。动作固定按 del -> blacklist_del -> blacklist_add -> add -> log 五段执行，
     避免 AI 同一轮同时删除和新增时，新事件被旧删除动作误伤；AI 新增事件不带
     parent/root 参数，始终作为根事件入队运行。
     """
     results = []
     ordered_actions = [
         action
-        for action_type in ("del", "add", "log")
+        for action_type in ("del", "blacklist_del", "blacklist_add", "add", "log")
         for action in actions
         if action.get("type", "") == action_type
     ]
     remove_children = bool(toggles.get("del_children", True))
     for action in ordered_actions:
         atype = action.get("type", "")
-        if atype not in ("add", "del", "log"):
+        if atype not in ("add", "del", "blacklist_add", "blacklist_del", "log"):
             continue
         if not toggles.get(atype, True):
             results.append({"ok": True, "type": atype, "note": "开关未勾选，已跳过", "skipped": True})
@@ -812,6 +914,29 @@ def _execute_ai_actions(
             else:
                 note = "未找到"
             results.append({"ok": True, "type": "del", "event_type": event_type, "value": value, "removed": removed, "remove_children": remove_children, "note": note})
+        elif atype == "blacklist_add":
+            bl_et = str(action.get("event_type", "")).strip()
+            bl_mm = str(action.get("match_mode", "")).strip()
+            bl_val = str(action.get("value", "")).strip()
+            bl_comment = str(action.get("comment", "")).strip()
+            if not bl_et or not bl_val or bl_mm not in ("contains", "suffix", "prefix", "ip_range"):
+                results.append({"ok": False, "type": "blacklist_add", "note": "event_type/value 为空或 match_mode 无效"})
+            else:
+                fp = add_redis_rule(redis, bl_et, bl_mm, bl_val, bl_comment)
+                if fp:
+                    results.append({"ok": True, "type": "blacklist_add", "event_type": bl_et, "match_mode": bl_mm, "value": bl_val, "fp": fp[:16], "note": "已添加"})
+                else:
+                    results.append({"ok": False, "type": "blacklist_add", "event_type": bl_et, "match_mode": bl_mm, "value": bl_val, "note": "规则已存在"})
+        elif atype == "blacklist_del":
+            bl_et = str(action.get("event_type", "")).strip()
+            bl_mm = str(action.get("match_mode", "")).strip()
+            bl_val = str(action.get("value", "")).strip()
+            if not bl_et or not bl_val:
+                results.append({"ok": False, "type": "blacklist_del", "note": "event_type 或 value 为空"})
+            else:
+                bl_fp = _fingerprint(bl_et, bl_mm, bl_val)
+                ok = delete_redis_rule(redis, bl_fp)
+                results.append({"ok": ok, "type": "blacklist_del", "event_type": bl_et, "match_mode": bl_mm, "value": bl_val, "deleted": ok, "note": "已删除" if ok else "未找到"})
         elif atype == "log":
             entry = _ai_log_entry(redis, action, source=source, schedule_id=schedule_id)
             results.append({"ok": True, "type": "log", "log_id": entry.get("log_id", ""), "note": "已存储"})
@@ -1008,7 +1133,7 @@ def _parse_event_line(line: str) -> Optional[tuple[str, str]]:
         if len(parts) == 2 and parts[0] == parts[0].upper() and len(parts[0]) <= 30:
             event_type, value = parts[0].strip(), parts[1].strip()
         elif parts:
-            event_type, value = "DOMAIN", parts[0].strip()
+            event_type, value = "INPUT", parts[0].strip()
         else:
             return None
     if not event_type or not value:

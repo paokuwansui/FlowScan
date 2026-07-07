@@ -6,14 +6,22 @@ check:
   exclude_keyword: not found
 install:
   steps:
-  - mkdir -p "$HOME/.local/bin"
-  - 'python3 - <<''PY'' | xargs -I{} sh -c ''curl -fL "{}" -o "$HOME/.local/bin/fscan" && chmod 0755 "$HOME/.local/bin/fscan"''
+  - 'mkdir -p "$HOME/.local/bin" && python3 - <<''PY'' | xargs -I{} sh -c ''curl -fL
+    "{}" -o "$HOME/.local/bin/fscan" && chmod 0755 "$HOME/.local/bin/fscan"''
+
     import json, urllib.request
-    req=urllib.request.Request("https://api.github.com/repos/shadow1ng/fscan/releases/latest", headers={"User-Agent":"FlowScan-loader"})
+
+    req=urllib.request.Request("https://api.github.com/repos/shadow1ng/fscan/releases/latest",
+    headers={"User-Agent":"FlowScan-loader"})
+
     data=json.load(urllib.request.urlopen(req, timeout=30))
+
     assets=data.get("assets", [])
+
     matches=[a["browser_download_url"] for a in assets if a.get("name", "").startswith("fscan_") and "linux_x64" in a.get("name", "").lower()]
+
     print(matches[0] if matches else "")
+
     PY'
   install_timeout_seconds: 900
 runtime:

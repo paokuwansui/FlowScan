@@ -8,10 +8,11 @@ install:
   steps:
   - mkdir -p "$HOME/.local/bin" "$HOME/.cache/go-tmp"
   - GOBIN="$HOME/.local/bin" GOCACHE="$HOME/.cache/go-tmp" go install -v github.com/projectdiscovery/katana/cmd/katana@latest
+  - katana -u https://example.com -hl
   install_timeout_seconds: 1200
 runtime:
   max_concurrency: 3
-  exec_timeout_seconds: 300
+  exec_timeout_seconds: 1800
 allowed_output_events:
   - URL
 io_contract:

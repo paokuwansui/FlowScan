@@ -1,65 +1,133 @@
 # FlowScan3
 
-基于 Redis 的事件驱动安全扫描编排框架。将 18 种安全工具抽象为事件消费者/生产者，自动形成从子域名枚举到漏洞利用的完整扫描链路。
+基于 Redis 的事件驱动安全扫描编排框架。以 BBOT 为统一扫描引擎，通过 YAML 模块化配置串联多个安全工具，自动形成从资产发现到漏洞利用的完整扫描链路。
 
 ## 核心功能
 
-- **事件驱动架构**：所有工具通过 Redis 交换事件（DOMAIN → SUBDOMAIN → IP → PORT_OPEN → LIVE_URL → VULNERABILITY），自动串联
-- **18 个扫描模块**：子域名枚举、端口扫描、服务识别、HTTP 探活、目录爆破、爬虫、WAF 检测、指纹识别、漏洞扫描、403 绕过、参数发现、密钥提取、TLS 证书扫描、弱口令/未授权检测、OS 识别、FOFA 资产查询
-- **多节点并行**：多个 Worker 节点可同时运行，通过 Redis Lua 原子锁协调任务分配，互不冲突
-- **Web 控制面板**：事件查看/注入/删除、状态快照导出/恢复、工具流程可视化、Redis 命令执行器、AI 分析、模板测试沙箱
-- **AI 分析**：对接 OpenAI 兼容 API，对扫描结果进行智能分析和下一步建议
-- **Debug 模式**：`--debug` 标志记录所有工具命令和完整输出到 Redis 日志
+- **事件驱动架构**：所有工具通过 Redis 交换事件，自动串联扫描链
+- **10 个扫描模块**：资产输入解析、FOFA 搜索引擎、DNS 解析、RustScan 全端口扫描、Fscan 服务/漏洞探测、httpx HTTP 探活、Katana 爬虫、BBOT kitchen-sink 全量扫描、BBOT nuclear-meltdown 深度 Web 漏洞利用、Xray 被动代理
+- **黑名单过滤**：文件默认规则（`black_list.cfg`）+ Redis 动态规则双重体系。支持 4 种匹配模式：后缀(suffix)、前缀(prefix)、正则包含(contains)、IP 范围(ip_range)。匹配忽略大小写，任一命中即在入队阶段拦截
+- **多节点并行**：多个 Worker 节点通过 Redis Lua 原子锁协调任务分配
+- **Web 控制面板**：事件查看/注入/删除/清空、事件图谱、执行流图可视化、黑名单管理、AI 分析（含黑名单自动化 + 定时调度）、YAML 模板实验室、Redis 命令执行器
+- **状态快照**：全量 Redis 状态导出/恢复 JSON
 
-## 事件类型（23 种）
+## 事件类型
 
-| 事件 | 生产者 | 消费者 |
-|------|--------|--------|
-| `DOMAIN` | manual, fofa | subfinder, dnsx_brute, fofa |
-| `SUBDOMAIN` | subfinder, httpx, tlsx, nmap, dnsx_brute | dnsx_resolve, fofa, tlsx |
-| `IP` | dnsx_resolve, httpx, fofa | rustscan, fofa |
-| `PORT_OPEN` | rustscan | httpx, nmap, fscan |
-| `LIVE_URL` | httpx, feroxbuster, nmap, fscan | feroxbuster, katana, nuclei, observer_ward, wafw00f, arjun, tlsx, secretfinder, jsfinder |
-| `URL` | feroxbuster, katana, arjun, bypass403, jsfinder | httpx, fofa, secretfinder |
-| `JS_URL` | feroxbuster, katana, jsfinder | secretfinder, jsfinder |
-| `403_URL` | httpx, feroxbuster | bypass403 |
-| `URL_INFO` | httpx, feroxbuster, katana, observer_ward, wafw00f, tlsx, arjun | (日志/Web UI 展示) |
-| `VULNERABILITY` | nuclei, fscan, nmap, secretfinder | (日志/Web UI 展示) |
-| `SERVICE` | nmap, fscan | (日志/Web UI 展示) |
-| `TECH` | nmap, fscan | (日志/Web UI 展示) |
-| `TITLE` | nmap | (日志/Web UI 展示) |
-| `OS` | nmap | (日志/Web UI 展示) |
-| `HOSTNAME` | nmap | (日志/Web UI 展示) |
-| `FINGERPRINT` | nmap, observer_ward, tlsx | (日志/Web UI 展示) |
-| `CERT_INFO` | nmap, tlsx | (日志/Web UI 展示) |
-| `WAF` | wafw00f | (日志/Web UI 展示) |
-| `DOMAIN` | httpx, nmap, fofa | subfinder, dnsx_brute, fofa |
-| `CNAME` | dnsx_resolve | (日志/Web UI 展示) |
+### 资产发现
+
+| 事件类型 | 格式 | 示例 |
+|---------|------|------|
+| `INPUT` | 任意文本（JSON/URL/域名混合） | `{"url":"https://..."}` |
+| `DNS_NAME` | 域名（含子域名） | `api.example.com` |
+| `DNS_NAME_UNRESOLVED` | 无法解析的域名 | `nx.example.com` |
+| `IP_ADDRESS` | IPv4 地址 | `104.20.23.154` |
+| `IP_RANGE` | CIDR 网段 | `10.0.0.0/24` |
+| `URL` | 完整 URL | `https://example.com/admin` |
+| `URL_UNVERIFIED` | 未验证存活的 URL | `https://example.com` |
+| `ICON_PATH` | favicon 图标 URL | `https://example.com/favicon.ico` |
+
+### 端口与服务
+
+| 事件类型 | 格式 | 示例 |
+|---------|------|------|
+| `OPEN_TCP_PORT` | `ip:port` | `1.2.3.4:443` |
+| `OPEN_UDP_PORT` | `ip:port` | `1.2.3.4:53` |
+| `HOST_TCP_PORT_OPEN` | `ip -> [port1,...]` | `1.2.3.4 -> [22,80,443]` |
+
+### 指纹与技术
+
+| 事件类型 | 格式 |
+|---------|------|
+| `TECHNOLOGY` | `host:port\|名称/版本\|原始JSON` |
+| `ICON_PATH` | favicon 图标 URL |
+| `WAF` | WAF 名称 @ URL |
+| `HTTP_RESPONSE` | HTTP 响应数据 |
+| `WEBSCREENSHOT` | 网页截图 |
+
+### 漏洞与风险
+
+| 事件类型 | 格式 |
+|---------|------|
+| `VULNERABILITY` | 原始 JSON（nuclei/fscan/xray/BBOT 格式各异） |
+| `FINDING` | BBOT 综合分析发现 |
+| `PASSWORD` / `HASHED_PASSWORD` | 明文/哈希密码 |
+
+### 其他
+
+`ASN`, `AZURE_TENANT`, `CODE_REPOSITORY`, `EMAIL_ADDRESS`, `FILESYSTEM`, `GEOLOCATION`, `MOBILE_APP`, `ORG_STUB`, `PROTOCOL`, `RAW_DNS_RECORD`, `SOCIAL`, `STORAGE_BUCKET`, `URL_HINT`, `USERNAME`, `VHOST`, `WEB_PARAMETER`
+
+## 扫描模块
+
+| 模块 | 输入 | 输出 | 工具 |
+|------|------|------|------|
+| `input_module` | INPUT | DNS_NAME, URL_UNVERIFIED, ICON_PATH, IP_ADDRESS, IP_RANGE | `./bin/input.py` |
+| `fofa_module` | DNS_NAME, URL, URL_UNVERIFIED, IP_RANGE, ICON_PATH, IP_ADDRESS | DNS_NAME, IP_ADDRESS, URL_UNVERIFIED | `./bin/fofa.py` |
+| `dns_name_resolve_module` | DNS_NAME | IP_ADDRESS | dnsx + cdncheck |
+| `rustscan_module` | IP_ADDRESS | HOST_TCP_PORT_OPEN | rustscan (1-65535 SYN) |
+| `fscan_module` | HOST_TCP_PORT_OPEN | URL, VULNERABILITY, TECHNOLOGY, OPEN_TCP_PORT | fscan |
+| `httpx_module` | URL, URL_UNVERIFIED, OPEN_TCP_PORT | DNS_NAME, URL, ICON_PATH | httpx + `./bin/httpx.py` |
+| `katana_module` | URL | URL | katana (via xray proxy) |
+| `bbot_kitchen_sink_module` | DNS_NAME | 29 种 BBOT 事件 | bbot -p kitchen-sink |
+| `bbot_nuclear_meltdown_preset_module` | URL | 29 种 BBOT 事件 | bbot -p nuclei-intense dirbust-heavy lightfuzz-superheavy web-thorough |
+| `xray_passive_module` | INPUT (手动触发) | VULNERABILITY | xray webscan 被动代理 |
 
 ## 扫描链路
 
 ```
-DOMAIN → subfinder/dnsx_brute → SUBDOMAIN → dnsx_resolve → IP
-IP → rustscan → PORT_OPEN (127.0.0.1:[22,80,443])
-PORT_OPEN → httpx → LIVE_URL + 403_URL + URL_INFO
-PORT_OPEN → nmap → SERVICE/OS/CERT/VULN/FINGERPRINT...
-PORT_OPEN → fscan → SERVICE/VULN/TECH
-LIVE_URL → feroxbuster/katana/jsfinder → URL/JS_URL/403_URL
-LIVE_URL → nuclei/afrog → VULNERABILITY
-LIVE_URL → observer_ward → FINGERPRINT
-LIVE_URL → wafw00f → WAF
-403_URL  → bypass403 → URL/LIVE_URL
-JS_URL   → secretfinder → VULNERABILITY
-SUBDOMAIN → tlsx → CERT_INFO/SUBDOMAIN/FINGERPRINT
-LIVE_URL → arjun → URL (with discovered params)
+INPUT → input_module → DNS_NAME / URL / IP_ADDRESS / IP_RANGE / ICON_PATH
+
+DNS_NAME → ip_resolve → IP_ADDRESS (过滤 CDN)
+DNS_NAME → bbot_kitchen_sink → {29种BBOT事件}
+DNS_NAME → fofa → DNS_NAME / IP_ADDRESS / URL
+
+IP_ADDRESS → rustscan → HOST_TCP_PORT_OPEN → fscan → URL / VULNERABILITY / TECHNOLOGY / OPEN_TCP_PORT
+IP_ADDRESS → fofa → DNS_NAME / IP_ADDRESS / URL
+
+URL → httpx → DNS_NAME / URL / ICON_PATH
+URL → bbot_nuclear_meltdown → {29种BBOT事件}
+URL → katana → (xray 被动代理)
+URL → fofa → ...
+
+HOST_TCP_PORT_OPEN → fscan → URL/VULNERABILITY/TECHNOLOGY
+OPEN_TCP_PORT → httpx → DNS_NAME/URL/ICON_PATH
 ```
+
+## 黑名单系统
+
+### 文件默认规则（`black_list.cfg`）
+
+系统默认黑名单，手动编辑文件后通过 Web 面板"重载文件规则"或调用 `reload_file_rules()` 生效。
+
+```
+# 格式: 事件类型:匹配模式:匹配值
+# * 表示匹配所有事件类型
+# 匹配模式: contains(正则) | suffix | prefix | ip_range
+# 匹配忽略大小写
+
+DNS_NAME:suffix:cloudflare.com
+DNS_NAME:contains:awsdns-
+IP_ADDRESS:ip_range:104.16.0.0/12
+*:suffix:qq.com
+```
+
+### Redis 动态规则
+
+通过 Web 面板（事件管理 → 黑名单管理 tab）动态增删，立即生效。适合临时封禁或运行时补充。
+
+### 检查流程
+
+事件入队 `push_event()` 时依次检查：
+1. 文件规则（内存缓存）→ 命中则丢弃
+2. Redis 规则（实时查询）→ 命中则丢弃
+3. 均未命中 → 正常入队
 
 ## 部署
 
 ### 依赖
 - Python 3.10+
 - Redis
-- Go (用于编译 ProjectDiscovery 工具)
+- Go（编译 ProjectDiscovery 工具）
+- BBOT v2.8.6
 
 ### 一键安装
 
@@ -68,29 +136,22 @@ cd FlowScan3
 bash setup.sh
 ```
 
-setup.sh 自动完成：
-1. 安装系统依赖（git, python3, golang, redis-server）
-2. 配置 Redis 密码（从 config.yaml 读取）
-3. 安装 Python 依赖（PyYAML, redis）
-4. 执行 `python3 main.py init` 安装所有扫描工具
+setup.sh 自动完成：系统依赖 → Redis 配置 → Python 依赖 → 扫描工具安装。
 
 ### 配置文件
 
-`config.yaml`:
+`config.yaml` 关键配置项：
+
 ```yaml
 redis:
-  host: 127.0.0.1
+  listen_host: 0.0.0.0    # Redis 监听地址
+  remote_host: 127.0.0.1  # Worker 连接 Redis 地址
   port: 6379
-  password: "your-password"
-  db: 0
+  password: ""
 
 web_config:
   host: 0.0.0.0
   port: 8080
-  username: admin
-  password: admin
-  session_ttl: 3600
-  secret_key: change-me-in-production
 
 worker:
   idle_sleep_seconds: 1.0
@@ -99,13 +160,34 @@ worker:
 
 fofa:
   api_key: YOUR_FOFA_API_KEY
-  base_url: https://fofa.info
-  query_policies: ...
+
+bbot:
+  securitytrails_api_key: YOUR_KEY      # SecurityTrails API
+  virustotal_api_key: YOUR_KEY          # VirusTotal API
+  github_workflows_api_key: YOUR_KEY    # GitHub API
+
+xray_listen_http_proxy: 0.0.0.0:7777    # Xray 代理监听
+xray_remote_http_proxy: http://127.0.0.1:7777  # Xray 代理地址（katana 用）
 
 ai_analysis:
-  base_url: https://api.openai.com/v1
+  base_url: https://api.openai.com/v1   # 或 DeepSeek: https://api.deepseek.com/v1
   api_key: YOUR_API_KEY
   model: gpt-4o-mini
+  timeout_seconds: 120
+  max_events: 5000                      # 单次分析最多发送的事件数（上限 5000）
+  log_api_key: YOUR_LOG_API_KEY         # AI 日志 API 访问密钥
+  loop_interval_minutes: 0              # 全局默认定时间隔（0=不开启）
+```
+
+`black_list.cfg` 文件默认规则示例：
+```
+# === Cloudflare ===
+DNS_NAME:suffix:cloudflare.com
+DNS_NAME:suffix:cloudflare.net
+IP_ADDRESS:ip_range:104.16.0.0/12
+
+# === 关键词特征 ===
+*:contains:awsdns-
 ```
 
 ## 使用
@@ -113,27 +195,18 @@ ai_analysis:
 ### 启动 Worker
 
 ```bash
-# 普通模式
 python3 main.py worker --pool-size 20
-
-# Debug 模式（记录完整命令输出到日志）
-python3 main.py worker --pool-size 20 --debug
-
-# 指定节点标识
-python3 main.py worker --node-id my-node-1
+python3 main.py worker --pool-size 20 --debug    # debug 模式
 ```
 
 ### 注入事件
 
 ```bash
-# 注入域名开始扫描
-python3 main.py inject --event-type DOMAIN --value example.com
+# CLI
+python3 main.py inject --event-type DNS_NAME --value example.com
 
-# 注入 IP
-python3 main.py inject --event-type IP --value 1.2.3.4
-
-# 批量注入（通过 Web UI）
-# 访问 http://127.0.0.1:8080 → 事件管理 → 批量添加事件
+# Web UI（推荐）: http://127.0.0.1:8080 → 事件管理 → 批量添加
+# 不写 [类型] 前缀默认识别为 INPUT → 由 input_module 自动分类
 ```
 
 ### Web 控制面板
@@ -144,13 +217,13 @@ python3 main.py web --port 8080
 
 功能页面：
 - **仪表盘**：Redis 状态、事件/节点/工具数量、队列统计
-- **事件查询**：按类型/值/路径查询事件，查看事件树
-- **事件管理**：批量注入/删除/清空，JSON 全量导出/恢复
-- **AI 分析**：选择事件类型，向 LLM 提问分析扫描结果
-- **执行流程**：vis.js 可视化工具间事件流向
-- **模板测试**：在线编辑 YAML 模块，实时测试 transform/check/install/scan/parse
-- **执行日志**：查看/下载 Redis 日志
-- **Redis 命令**：直接执行 Redis 命令，含持久化/恢复命令参考
+- **事件管理**：批量注入/删除/清空/搜索，JSON 状态导出/恢复。**黑名单管理 tab**：查看文件默认规则（只读），增删 Redis 动态规则（立即生效），实时测试匹配
+- **事件图谱**：可视化事件树，点击展开子事件，搜索链路追溯
+- **AI 分析**：选事件类型 → LLM 分析 → 自动执行 5 种动作（add/del/blacklist_add/blacklist_del/log），支持定时调度。上下文自动附带最近 AI 日志以避免重复
+- **执行流程**：vis.js 可视化工具间事件流向，节点可无限次拖动
+- **模板实验室**：YAML 在线编辑 → validate/check/install/transform/scan/parse 六步测试
+- **Redis 命令**：直接执行 Redis 命令
+- **Xray 代理**：`bash start_xray.sh` 启动被动代理，katana 通过代理爬取
 
 ### 查看状态
 
@@ -158,64 +231,73 @@ python3 main.py web --port 8080
 python3 main.py status
 ```
 
-## 安全注意事项
+## AI 分析动作类型
 
-### 代码执行风险
-YAML 模块中的 `input_transform_code` 和 `output_parse_code` 通过 Python `exec()` 执行。虽然代码在受限沙箱中运行（白名单 builtins），但 `__import__` 是允许的——这意味着模块代码可以导入任意 Python 模块（如 `os`、`subprocess`）。**任何能编写 YAML 模块的人都能在 Worker 节点上执行任意系统命令。**
+AI 可在回答末尾输出 JSON 动作块，系统自动解析并执行。执行顺序固定为：删除事件 → 删除黑名单 → 增加黑名单 → 增加事件 → 存储日志。
 
-### 命令注入风险
-模块的 `command_template` 通过 `{{variable}}` 占位符渲染。如果 transform 代码没有使用 `shlex.quote()` 对变量进行 shell 转义，存在命令注入风险。
+| 动作 | 说明 | 约束 |
+|------|------|------|
+| `add` | 注入新事件到扫描队列 | — |
+| `del` | 移除无效/误报事件 | — |
+| `blacklist_add` | 添加 Redis 动态黑名单规则 | 仅在用户明确要求或 ≥5 条独立证据时使用 |
+| `blacklist_del` | 删除 Redis 动态黑名单规则 | 仅用户明确要求或确认规则已不再适用 |
+| `log` | 记录分析日志 | 最近日志已在上下文中，如无必要不重复 |
 
-### Web 面板安全
-- 默认用户名密码 `admin/admin`，务必修改
-- Flask session 使用 `secret_key`，务必改为随机字符串
-- Flask 开发服务器无 HTTPS，生产环境应使用 Nginx 反向代理 + TLS
-- 无速率限制，暴力破解风险
-
-### Redis 安全
-- 密码明文存储在 `config.yaml` 中
-- 如果 Redis bgsave 失败（磁盘满/权限问题），所有写操作被阻塞，扫描完全停止
-- 修复：`redis-cli CONFIG SET stop-writes-on-bgsave-error no`
-
-### 网络扫描合规
-FlowScan3 执行主动网络扫描（端口扫描、目录爆破、漏洞探测）。在对非授权目标使用时可能违反法律法规。**仅扫描你有明确授权的目标。**
-
-### 事件删除的竞态条件
-通过 Web UI 删除事件时，正在执行中的任务不会被中止，可能产生孤儿子事件。删除操作会写入 `fs3:cancelled` 标记（24h TTL），后续子事件入队时会检查该标记。
-
-### 模块来源
-`modules/` 目录下的 YAML 文件包含可执行代码。仅加载来自可信来源的模块。
+6 个 toggle 开关可在页面独立控制每种动作的执行权限。
 
 ## 目录结构
 
 ```
 FlowScan3/
-├── main.py              # 入口（worker/web/inject/init/status）
-├── config.yaml           # 主配置
-├── setup.sh              # 一键部署脚本
-├── requirements.txt      # Python 依赖
-├── modules/              # 工具 YAML 定义（18个）
-├── flowscan3/            # 核心引擎
-│   ├── worker.py         # Worker 主循环
-│   ├── pipeline.py       # 事件处理管线
-│   ├── redis_store.py    # Redis 操作封装（含 Lua 原子锁）
-│   ├── tool_module.py    # 工具模块加载
-│   ├── code_runner.py    # 沙箱执行器
-│   ├── config.py         # 配置/模板渲染
-│   ├── installer.py      # 工具安装
-│   └── utils.py          # 工具函数
-├── web_app/              # Web 控制面板
-│   ├── __init__.py       # Flask 应用 + 路由
-│   ├── templates/        # Jinja2 模板
-│   └── static/           # CSS/JS
-├── prompts/              # AI prompt 模板
-├── state_snapshots/      # 状态导出 JSON
-└── wordlists/            # 字典文件
+├── main.py                  # 入口（worker/web/inject/init/status）
+├── config.yaml              # 主配置
+├── black_list.cfg           # 文件默认黑名单（event_type:match_mode:value 格式）
+├── start_xray.sh            # Xray 被动代理启动脚本
+├── setup.sh                 # 一键部署
+├── requirements.txt         # Python 依赖
+├── modules/                 # 工具 YAML 定义（10个）
+├── flowscan3/               # 核心引擎
+│   ├── worker.py            # Worker 主循环 + ThreadPoolExecutor
+│   ├── pipeline.py          # transform → render → exec → parse → publish
+│   ├── redis_store.py       # Redis 操作（含 Lua 原子锁 + 黑名单拦截）
+│   ├── tool_module.py       # YAML → ToolModule 加载
+│   ├── code_runner.py       # 沙箱 exec() 执行器
+│   ├── config.py            # YAML 读取 + 模板渲染
+│   ├── installer.py         # 工具初始化和安装
+│   ├── utils.py             # shell 命令执行
+│   └── filter.py            # 黑名单引擎（文件规则 + Redis 规则，4 种匹配模式）
+├── bin/                     # 配套脚本
+│   ├── input.py             # 资产提取器（INPUT→事件）
+│   ├── fofa.py              # FOFA 查询客户端
+│   ├── httpx.py             # httpx JSONL 清洗+资产抽取
+│   └── xray/                # Xray 配置和 CA 证书
+├── web_app/                 # Web 控制面板
+│   ├── __init__.py          # Flask 应用 + 路由（含黑名单/ AI 动作 API）
+│   ├── templates/           # Jinja2 模板（14个页面）
+│   └── static/              # CSS/JS
+├── tools/                   # 工具脚本
+│   ├── randomize_secrets.py # 随机化 config.yaml 密钥
+│   ├── migrate_blacklist.py # 黑名单格式迁移脚本（旧→新）
+│   ├── ufw_setup.py         # UFW 防火墙配置
+│   └── swap_setup.py        # 交换空间配置
+├── prompts/                 # AI prompt 模板
+│   └── ai_analysis.txt      # AI 分析 system prompt（含动作说明和约束）
+├── state_snapshots/         # 状态导出 JSON
+└── wordlists/               # 字典文件
 ```
+
+## 安全注意事项
+
+- **代码执行风险**：YAML 模块中的 `input_transform_code` 和 `output_parse_code` 通过 Python `exec()` 在受限沙箱中执行。虽然 builtins 是白名单，但 `__import__` 可用——模块作者可执行任意系统命令，仅加载可信来源的模块
+- **命令注入**：transform 代码必须使用 `shlex.quote()` 对变量做 shell 转义
+- **Web 面板**：修改默认用户名密码和 secret_key，生产环境使用 Nginx 反向代理 + TLS
+- **Redis 密码**：密码明文在 config.yaml 中。若 `bgsave` 失败磁盘满，所有写操作阻塞——执行 `redis-cli CONFIG SET stop-writes-on-bgsave-error no`
+- **AI 黑名单自动化**：`blacklist_add`/`blacklist_del` 开关默认开启。AI 仅在用户明确要求或 ≥5 条独立证据时才会添加黑名单规则；删除仅限于 Redis 动态规则，不影响文件规则
+- **网络扫描合规**：仅扫描有明确授权的目标
 
 ## 扩展模块
 
-创建新模块只需添加一个 YAML 文件：
+创建新模块只需添加一个 YAML 文件到 `modules/`：
 
 ```yaml
 name: my_tool_module
@@ -234,7 +316,7 @@ allowed_output_events:
 - VULNERABILITY
 io_contract:
   input_events:
-  - LIVE_URL
+  - URL
   input_transform_code: |
     import shlex
     value = data["value"].strip()
@@ -249,3 +331,23 @@ execution:
         results.append({"VULNERABILITY": json.dumps(item)})
     return results
 ```
+
+## 故障排查
+
+### Worker 计数器死锁
+Worker 崩溃（OOM/SIGKILL）后 `fs3:running:*` 计数器可能永久卡死：
+```bash
+redis-cli KEYS "fs3:running:*"  # 查看
+redis-cli DEL "fs3:running:<node>:<tool>"  # 手动恢复
+```
+
+### Redis bgsave 阻塞
+```bash
+redis-cli CONFIG SET stop-writes-on-bgsave-error no
+```
+
+### 黑名单规则不生效
+1. 确认事件值格式与规则匹配模式一致
+2. 日志中搜索 `[BLACKLIST-FILE]` 或 `[BLACKLIST-REDIS]` 查看拦截记录
+3. 使用 Web 面板"实时测试"功能验证规则是否命中
+4. 文件规则修改后需要点击"重载文件规则"或重启 Worker

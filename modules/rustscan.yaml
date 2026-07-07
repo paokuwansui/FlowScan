@@ -6,7 +6,7 @@ check:
   exclude_keyword: not found
 install:
   steps:
-  - cd "$HOME/.local/bin" && wget https://github.com/bee-san/RustScan/releases/download/2.4.1/x86_64-linux-rustscan.tar.gz.zip && unzip x86_64-linux-rustscan.tar.gz.zip && tar -zxvf x86_64-linux-rustscan.tar.gz
+  - cd "$HOME/.local/bin" && wget https://github.com/bee-san/RustScan/releases/download/2.4.1/x86_64-linux-rustscan.tar.gz.zip && unzip x86_64-linux-rustscan.tar.gz.zip && tar -zxvf x86_64-linux-rustscan.tar.gz && rm -f x86_64-linux-rustscan.tar.gz.zip x86_64-linux-rustscan.tar.gz
   install_timeout_seconds: 1800
 runtime:
   max_concurrency: 4
@@ -23,7 +23,7 @@ io_contract:
         return []
     return [{"target": value, "target_q": shlex.quote(value)}]
 execution:
-  command: rustscan -a {{target_q}} -r 1-65535 --scripts none -b 4500 -t 1500 -u 15000 -g 2>/dev/null
+  command: 'python ./flowscan3/filter.py {{target_q}} && rustscan -a {{target_q}} -r 1-65535 --scripts none -b 4500 -t 1500 -u 15000 -g 2>/dev/null'
   output_parse_code: |
     results = []
     seen = set()

@@ -13,7 +13,9 @@ runtime:
   max_concurrency: 8
   exec_timeout_seconds: 180
 allowed_output_events:
-  - INPUT
+  - DNS_NAME
+  - URL
+  - ICON_PATH
 io_contract:
   input_events:
   - URL
@@ -24,23 +26,16 @@ io_contract:
     value = data["value"].strip()
     return [{"target": value, "target_q": shlex.quote(value)}]
 execution:
-  command: httpx -title -favicon -tls-probe -status-code -json -silent -u {{target_q}} -threads 50
+  command: $HOME/.local/bin/httpx -title -favicon -tls-probe -status-code -json -silent -u {{target_q}} -threads 50 | python ./bin/httpx.py
   output_parse_code: |
     import json
-    def clean_httpx_record(data: str) -> dict:
+    temp_list = []
+    for line in data["stdout"].strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
         try:
-            data = json.loads(data.replace('\\',''))
-            data["tls"] = data["tls"]["subject_an"]
-            data.pop("timestamp", None)
-            data.pop("a", None)
-            data.pop("cname", None)
-            data.pop("tech", None)
-            data.pop("resolvers", None)
-            data = json.dumps(data, ensure_ascii=False)
+            temp_list.append(json.loads(line))
         except:
-            pass
-        return data
-    output = []
-    for line in data["stdout"].splitlines():
-        output.append({"INPUT":clean_httpx_record(line)})
-    return output
+            continue
+    return temp_list

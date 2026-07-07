@@ -55,7 +55,7 @@ io_contract:
     return [{"value": shlex.quote(data["value"])}]
 
 execution:
-  command: bbot -t {{value}} -p nuclei-intense dirbust-heavy lightfuzz-superheavy web-thorough --allow-deadly --json --brief -y -em json csv txt
+  command: bbot -t {{value}} -p nuclei-intense dirbust-heavy lightfuzz-superheavy web-thorough --allow-deadly --json --brief -y -em json csv txt --exclude-cdn
   output_parse_code: |
     import json
     result = []
