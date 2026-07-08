@@ -90,6 +90,7 @@ with open(conf_path, encoding="utf-8", errors="replace") as fh:
 bind_seen = False
 port_seen = False
 pass_seen = False
+bgsave_seen = False
 out = []
 
 for line in lines:
@@ -120,6 +121,13 @@ for line in lines:
             pass_seen = True
         continue
 
+    # stop-writes-on-bgsave-error
+    if stripped.startswith("stop-writes-on-bgsave-error ") or stripped.startswith("# stop-writes-on-bgsave-error "):
+        if not bgsave_seen:
+            out.append("stop-writes-on-bgsave-error no\n")
+            bgsave_seen = True
+        continue
+
     out.append(line)
 
 if not bind_seen:
@@ -129,6 +137,8 @@ if not port_seen:
 if not pass_seen and password:
     qp = shlex.quote(password)
     out.append(f"requirepass {qp}\n")
+if not bgsave_seen:
+    out.append("\nstop-writes-on-bgsave-error no\n")
 
 sys.stdout.write("".join(out))
 PY
@@ -136,7 +146,7 @@ PY
 sudo install -m 0644 "$TMP_CONF" "$REDIS_CONF"
 rm -f "$TMP_CONF"
 
-echo "  redis.conf updated: bind=${LISTEN_HOST} port=${PORT} requirepass=$( [[ -n "$PASSWORD" ]] && echo 'set' || echo 'disabled' )"
+echo "  redis.conf updated: bind=${LISTEN_HOST} port=${PORT} requirepass=$( [[ -n "$PASSWORD" ]] && echo 'set' || echo 'disabled' ) bgsave_write=always"
 
 # ── Step 4: Start Redis & verify ──
 echo ""

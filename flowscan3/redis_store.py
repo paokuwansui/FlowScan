@@ -197,12 +197,6 @@ class FlowScanRedis:
         if mark_done:
             self.conn.zrem(f"fs3:pending:{tool_name}", fp)
 
-    def mark_command_executed(self, cmd: str) -> None:
-        self.conn.sadd("fs3:install:commands", hashlib.sha256(cmd.encode()).hexdigest())
-
-    def is_command_executed(self, cmd: str) -> bool:
-        return bool(self.conn.sismember("fs3:install:commands", hashlib.sha256(cmd.encode()).hexdigest()))
-
     def register_node(self, node_id: str, info: Dict[str, Any], ttl: int = 45) -> None:
         pipe = self.conn.pipeline()
         pipe.sadd("fs3:nodes", node_id)

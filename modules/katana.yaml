@@ -27,4 +27,9 @@ io_contract:
 execution:
   command: katana -u {{target_q}} -proxy {{config.xray_remote_http_proxy}} -tlsi -hl -jc -xhr -fsu -c 5 -rl 20 -silent
   output_parse_code: |
-      return []
+    results = []
+    for line in data["stdout"].strip().splitlines():
+        line = line.strip()
+        if line:
+            results.append({"URL": line})
+    return results

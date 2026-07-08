@@ -16,7 +16,7 @@ import uuid
 from datetime import datetime
 from functools import wraps
 from typing import Any, Dict, Iterable, List, Optional
-from flowscan3.filter import _fingerprint
+
 import yaml
 
 from flask import (
@@ -34,6 +34,7 @@ from flask import (
 from flowscan3.code_runner import CodeExecutionError, run_input_transform, run_output_parse
 from flowscan3.config import load_yaml, render_template as render_command_template
 from flowscan3.filter import (
+    _fingerprint,
     add_redis_rule,
     delete_redis_rule,
     get_file_rules,

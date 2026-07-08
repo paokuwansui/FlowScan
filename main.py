@@ -53,15 +53,15 @@ def main() -> int:
         app.run(host=host, port=port, debug=args.debug)
         return 0
 
-    redis_client = connect_redis(config, args)
-
     if args.mode == "init":
-        result = init_all(args.modules_dir, config, redis_client)
+        result = init_all(args.modules_dir, config, None)
         ready = sum(1 for ok in result.values() if ok)
         print(f"[INIT] ready {ready}/{len(result)}")
         for name, ok in result.items():
             print(f"  {name}: {'READY' if ok else 'NOT_READY'}")
         return 0 if ready == len(result) else 1
+
+    redis_client = connect_redis(config, args)
 
     if args.mode == "inject":
         if not args.value:

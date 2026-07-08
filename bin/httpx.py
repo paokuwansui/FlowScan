@@ -185,6 +185,11 @@ def clean_httpx_jsonl(text: str) -> str:
                 host = obj.get("host") or ""
                 if host:
                     obj["_location_url"] = f"{scheme}://{host}{location}"
+        # 丢弃 http:// + 400 的无价值输出（目标仅支持 HTTPS，协议不匹配）
+        url = str(obj.get("url", "") or "")
+        status = str(obj.get("status_code", "") or "")
+        if url.startswith("http://") and status == "400":
+            continue
         lines.append(json.dumps(obj, ensure_ascii=False))
     return "\n".join(lines)
 

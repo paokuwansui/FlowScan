@@ -66,6 +66,6 @@ execution:
                 obj = json.loads(line)
                 if isinstance(obj, dict) and "type" in obj and "data" in obj:
                     result.append({obj["type"]: obj["data"]})
-            except Exception:
+            except:
                 continue
     return result

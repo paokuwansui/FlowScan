@@ -18,19 +18,13 @@ def ensure_tool(tool: ToolModule, config: Dict[str, Any], redis_client: Optional
     for raw_cmd in tool.install_steps:
         cmd = render_template(raw_cmd, {}, config)
         if is_local_command_done(cmd):
-            print(f"[INIT] {tool.name} skip local: {cmd}")
-            continue
-        if redis_client and redis_client.is_command_executed(cmd):
-            print(f"[INIT] {tool.name} skip global: {cmd}")
-            mark_local_command(cmd)
+            print(f"[INIT] {tool.name} skip: {cmd}")
             continue
         mark_local_command(cmd)
         ok, output, code = run_cmd(cmd, timeout=tool.install_timeout)
         if not ok:
             print(f"[INIT] {tool.name} install failed exit={code}: {cmd}\n{output[-1000:]}")
             return False
-        if redis_client:
-            redis_client.mark_command_executed(cmd)
         print(f"[INIT] {tool.name} ok: {cmd}")
     return check_tool_installed(check_cmd, tool.expect_keyword, tool.exclude_keyword, timeout=30)
 
