@@ -356,7 +356,7 @@ def _register_routes(app: Flask) -> None:
     @login_required
     def event_tree():
         redis = app.config["get_redis"]()
-        roots = [event for event in _list_events(redis, limit=5000) if event.get("root_fp") == event.get("fingerprint")]
+        roots = [event for event in _list_events(redis, limit=5000) if not event.get("parent_fp")]
         roots.sort(key=lambda item: float(item.get("created_at") or 0), reverse=True)
         return render_template("event_tree.html", roots=roots[:200])
 
@@ -364,7 +364,11 @@ def _register_routes(app: Flask) -> None:
     @login_required
     def event_tree_children(fingerprint: str):
         redis = app.config["get_redis"]()
-        children = [event for event in _list_events(redis, limit=5000) if event.get("parent_fp") == fingerprint]
+        children: List[Dict[str, Any]] = []
+        for fp in (redis.conn.smembers(f"fs3:children:{fingerprint}") or []):
+            event = redis.get_event(fp)
+            if event:
+                children.append(event)
         groups: Dict[str, List[Dict[str, Any]]] = {}
         for child in children:
             groups.setdefault(child.get("event_type", "?"), []).append(child)
@@ -1189,7 +1193,7 @@ def _event_path(redis: FlowScanRedis, fp: str) -> List[Dict[str, Any]]:
 
 
 def _children_fps(redis: FlowScanRedis, parent_fp: str) -> List[str]:
-    return [event["fingerprint"] for event in _list_events(redis, limit=100000) if event.get("parent_fp") == parent_fp]
+    return list(redis.conn.smembers(f"fs3:children:{parent_fp}") or [])
 
 
 def _remove_event(redis: FlowScanRedis, fp: str, remove_children: bool = True) -> int:
@@ -1206,6 +1210,7 @@ def _remove_event(redis: FlowScanRedis, fp: str, remove_children: bool = True) -
     event_type = event.get("event_type", "")
     pipe = redis.conn.pipeline()
     pipe.delete(f"fs3:event:{fp}")
+    pipe.delete(f"fs3:children:{fp}")
     pipe.srem("fs3:event:set", fp)
     pipe.srem("fs3:event:all", fp)
     pipe.srem(f"fs3:events:type:{event_type}", fp)
@@ -1225,7 +1230,7 @@ def _remove_event(redis: FlowScanRedis, fp: str, remove_children: bool = True) -
 def _clear_all_events(redis: FlowScanRedis) -> int:
     count = int(redis.conn.scard("fs3:event:all") or 0)
     keys = []
-    for pattern in ("fs3:event:*", "fs3:events:type:*", "fs3:done:*", "fs3:lock:*", "fs3:pending:*", "fs3:consumers:*", "fs3:running:*", "fs3:cancelled:*"):
+    for pattern in ("fs3:event:*", "fs3:events:type:*", "fs3:children:*", "fs3:done:*", "fs3:lock:*", "fs3:pending:*", "fs3:consumers:*", "fs3:running:*", "fs3:cancelled:*"):
         keys.extend(list(redis.conn.scan_iter(pattern)))
     keys.extend(["fs3:event:set", "fs3:event:all", "fs3:event:new", "fs3:stats:event_type"])
     if keys:

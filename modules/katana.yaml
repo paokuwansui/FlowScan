@@ -25,11 +25,38 @@ io_contract:
         value = "http://" + value
     return [{"target": value, "target_q": shlex.quote(value)}]
 execution:
-  command: katana -u {{target_q}} -proxy {{config.xray_remote_http_proxy}} -tlsi -hl -jc -xhr -fsu -c 5 -rl 20 -silent
+  command: katana -u {{target_q}} -proxy {{config.xray_remote_http_proxy}} -field-scope rdn -crawl-scope 1 -hl -jc -xhr -fsu -c 5 -rl 20 -silent
   output_parse_code: |
+    from urllib.parse import urlparse, parse_qs, urlencode
+
+    _STATIC_EXT = {".js",".css",".png",".ico",".woff",".woff2",".svg",
+        ".jpg",".jpeg",".gif",".webp",".ttf",".eot",".otf",
+        ".map",".pdf",".zip",".tar",".gz",".mp4",".mp3"}
+    _NOISE_PARAMS = {"utm_source","utm_medium","utm_campaign","utm_term",
+        "utm_content","fbclid","gclid","_ga","ref","source",
+        "yclid","msclkid","twclid","igshid"}
+
     results = []
+    seen = set()
     for line in data["stdout"].strip().splitlines():
-        line = line.strip()
-        if line:
-            results.append({"URL": line})
+        url = line.strip()
+        if not url:
+            continue
+        # 静态资源后缀
+        path = urlparse(url).path.lower()
+        if any(path.endswith(ext) for ext in _STATIC_EXT):
+            continue
+        # 超长 URL
+        if len(url) > 500:
+            continue
+        # 去重（剥离噪音参数后按 host+path 比对）
+        parsed = urlparse(url)
+        params = {k: v for k, v in parse_qs(parsed.query).items() if k not in _NOISE_PARAMS}
+        key = f"{parsed.netloc}{parsed.path}"
+        if params:
+            key += "?" + urlencode(sorted(params.items()), doseq=True)
+        if key in seen:
+            continue
+        seen.add(key)
+        results.append({"URL": url})
     return results

@@ -117,6 +117,9 @@ class FlowScanRedis:
         pipe.hincrby("fs3:stats:event_type", event_type, 1)
         for tool_name in self.consumers_for_event_type(event_type):
             pipe.zadd(f"fs3:pending:{tool_name}", {fp: float(now)})
+        # 维护父子反向索引，加速子事件查询和级联删除
+        if parent_fp:
+            pipe.sadd(f"fs3:children:{parent_fp}", fp)
         pipe.execute()
         self.log(f"[EVENT] {event_type}={value[:120]} fp={fp[:10]} source={source_tool}")
         return fp

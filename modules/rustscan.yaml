@@ -16,6 +16,7 @@ allowed_output_events:
 io_contract:
   input_events:
   - IP_ADDRESS
+  - IP_RANGE
   input_transform_code: |
     import shlex
     value = data["value"].strip()

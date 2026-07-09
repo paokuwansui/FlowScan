@@ -7,10 +7,10 @@ check:
 install:
   steps:
     - echo bbot not find
-  install_timeout_seconds: 3600
+  install_timeout_seconds: 10800
 runtime:
   max_concurrency: 2
-  exec_timeout_seconds: 3600
+  exec_timeout_seconds: 10800
 
 allowed_output_events:
   - ASN

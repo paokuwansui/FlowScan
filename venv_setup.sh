@@ -28,7 +28,7 @@ source "$VENV_PATH/bin/activate"
 pip install --upgrade pip
 
 echo "=== 5. 安装所需的 Python 依赖包 ==="
-pip install PyYAML redis flask tldextract cdncheck bbot
+pip install PyYAML redis flask tldextract bbot==2.8.6
 
 echo "=== 6. 创建 bbot 全局软链接 ==="
 # 使用绝对路径创建软链接，确保全局可访问

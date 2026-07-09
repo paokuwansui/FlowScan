@@ -3,10 +3,11 @@
 Quick UFW firewall setup.
 
 Usage:
-    python3 ufw_setup.py                          # ensure SSH open + enable UFW
-    python3 ufw_setup.py -ip 10.0.0.5 -port 6379 # also allow 10.0.0.5 to port 6379 tcp+udp
-    python3 ufw_setup.py -port 8080               # allow any IP to port 8080 tcp+udp
-    python3 ufw_setup.py status                   # show current rules
+    python3 ufw_setup.py                                # ensure SSH open + enable UFW
+    python3 ufw_setup.py -i 10.0.0.5 -p 6379             # allow 10.0.0.5 to port 6379 tcp+udp
+    python3 ufw_setup.py -p 6379,8080                    # allow any IP to ports 6379 and 8080
+    python3 ufw_setup.py -i 10.0.0.5,10.0.0.6 -p 6379    # allow two IPs to port 6379
+    python3 ufw_setup.py status                          # show current rules
 """
 
 import argparse
@@ -55,22 +56,14 @@ def ensure_ssh():
 
 def allow_port(port, ip=None):
     """Allow tcp+udp on port, optionally restricted to ip."""
-    proto = "tcp"
-    if ip:
-        rule = f"sudo ufw allow from {ip} to any port {port} proto tcp"
-        print(f"  Allow {ip} -> :{port}/tcp")
-    else:
-        rule = f"sudo ufw allow {port}/tcp"
-        print(f"  Allow any -> :{port}/tcp")
-    run(rule)
-
-    if ip:
-        rule = f"sudo ufw allow from {ip} to any port {port} proto udp"
-        print(f"  Allow {ip} -> :{port}/udp")
-    else:
-        rule = f"sudo ufw allow {port}/udp"
-        print(f"  Allow any -> :{port}/udp")
-    run(rule)
+    for proto in ("tcp", "udp"):
+        if ip:
+            rule = f"sudo ufw allow from {ip} to any port {port} proto {proto}"
+            print(f"  Allow {ip} -> :{port}/{proto}")
+        else:
+            rule = f"sudo ufw allow {port}/{proto}"
+            print(f"  Allow any -> :{port}/{proto}")
+        run(rule)
 
 
 def enable_ufw():
@@ -89,8 +82,8 @@ def show_status():
 
 def main():
     parser = argparse.ArgumentParser(description="UFW firewall quick setup")
-    parser.add_argument("-ip", default=None, help="Source IP to allow (omit for any)")
-    parser.add_argument("-port", type=int, default=None, help="Port to allow (tcp+udp)")
+    parser.add_argument("-i", "--ip",   default=None, help="来源 IP，逗号分隔多个，如: 10.0.0.1,10.0.0.2")
+    parser.add_argument("-p", "--port", default=None, help="开放端口，逗号分隔多个，如: 6379,8080")
     parser.add_argument("command", nargs="?", default="setup",
                         choices=["setup", "status"],
                         help="Action: setup (default) or status")
@@ -104,12 +97,20 @@ def main():
         print("UFW not installed. Run: sudo apt install ufw -y")
         sys.exit(1)
 
+    ips   = [x.strip() for x in args.ip.split(",") if x.strip()]   if args.ip   else []
+    ports = [x.strip() for x in args.port.split(",") if x.strip()] if args.port else []
+
     print("=== UFW Setup ===")
 
     ensure_ssh()
 
-    if args.port:
-        allow_port(args.port, ip=args.ip)
+    if ports:
+        for port in ports:
+            if ips:
+                for ip in ips:
+                    allow_port(port, ip)
+            else:
+                allow_port(port)
 
     enable_ufw()
 
