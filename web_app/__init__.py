@@ -148,10 +148,11 @@ def _register_routes(app: Flask) -> None:
         event_types = _event_types(redis)
         if search_val:
             term = search_val.lower()
-            events_list = [
-                event for event in _list_events(redis, limit=5000)
-                if term in (event.get("value") or "").lower()
-            ]
+            events_list = []
+            for fp in (redis.conn.smembers("fs3:event:all") or []):
+                event = redis.get_event(fp)
+                if event and term in (event.get("value") or "").lower():
+                    events_list.append(event)
         else:
             events_list = _list_events(redis, event_type=event_type, limit=limit, offset=offset)
         return render_template(
@@ -564,14 +565,20 @@ def _register_routes(app: Flask) -> None:
             schedules=schedules,
         )
 
-    @app.route("/ai-logs")
-    def ai_logs():
-        """AI 日记路由：支持浏览器查看（HTML）和 API 密钥访问（JSON）。"""
+    @app.route("/event-logs")
+    def event_logs():
+        """事件日记路由：支持浏览器查看（HTML）和 API 密钥访问（JSON）。
+        
+        API 参数:
+          ?api_key=xxx               → 返回 AI 分析日志 JSON
+          ?api_key=xxx&mode=events   → 返回扫描事件列表
+          ?api_key=xxx&mode=events&type=DNS_NAME&search=xxx  → 筛选
+          ?api_key=xxx&mode=stats    → 返回事件类型统计
+        """
         api_key = request.args.get("api_key", "") or request.headers.get("X-API-Key", "")
         config = load_yaml(app.config["CONFIG_PATH"])
         ai_cfg = _ai_config(config)
         log_api_key = ai_cfg.get("log_api_key", "")
-        # 登录用户或 API 密钥均可访问
         is_api = bool(api_key and log_api_key and api_key == log_api_key)
         is_web = flask_session.get("logged_in", False)
         if not is_api and not is_web:
@@ -580,9 +587,40 @@ def _register_routes(app: Flask) -> None:
             return redirect(url_for("login"))
 
         redis = app.config["get_redis"]()
+        mode = request.args.get("mode", "")
         fmt = request.args.get("format", "html" if is_web else "json")
 
-        # 读取所有日志
+        # ── mode=events: 返回扫描事件 ──
+        if mode == "events":
+            event_type = request.args.get("type", "")
+            search_term = request.args.get("search", "").strip().lower()
+            fp = request.args.get("fp", "").strip()
+            if fp:
+                evt = redis.get_event(fp)
+                path = _event_path(redis, fp) if evt else []
+                children = _children_fps(redis, fp)
+                return jsonify({"event": evt, "path": path, "children": children})
+            events = []
+            for raw_fp in (redis.conn.smembers(f"fs3:events:type:{event_type}" if event_type else "fs3:event:all") or []):
+                evt = redis.get_event(raw_fp)
+                if not evt:
+                    continue
+                if search_term and search_term not in (evt.get("value") or "").lower():
+                    continue
+                events.append(evt)
+                if len(events) >= 500:
+                    break
+            events.sort(key=lambda e: float(e.get("created_at") or 0), reverse=True)
+            return jsonify({"mode": "events", "count": len(events), "events": events})
+
+        # ── mode=stats: 返回事件统计 ──
+        if mode == "stats":
+            stats = {}
+            for k, v in (redis.conn.hgetall("fs3:stats:event_type") or {}).items():
+                stats[k] = int(v or 0)
+            return jsonify({"mode": "stats", "stats": stats})
+
+        # ── 默认: AI 分析日志 ──
         log_ids = redis.conn.zrevrange("fs3:ai:logs", 0, 500)
         entries = []
         for lid in log_ids:
@@ -594,7 +632,12 @@ def _register_routes(app: Flask) -> None:
         if fmt == "json" or is_api:
             return jsonify({"count": len(entries), "logs": entries})
 
-        return render_template("ai_logs.html", logs=entries, count=len(entries))
+        return render_template("event_logs.html", logs=entries, count=len(entries))
+
+    @app.route("/ai-logs")
+    def ai_logs():
+        """兼容旧路由，重定向到 /event-logs"""
+        return redirect(url_for("event_logs", **dict(request.args)))
 
     @app.route("/api/ai-schedule/create", methods=["POST"])
     @login_required
@@ -1217,12 +1260,11 @@ def _remove_event(redis: FlowScanRedis, fp: str, remove_children: bool = True) -
     pipe.lrem("fs3:event:new", 0, fp)
     # 保留取消标记，阻止运行中的任务产生孤儿子事件（24h TTL）
     pipe.setex(f"fs3:cancelled:{fp}", 86400, "1")
-    for key in redis.conn.scan_iter("fs3:pending:*"):
-        pipe.zrem(key, fp)
-    for key in redis.conn.scan_iter(f"fs3:done:*:{fp}"):
-        pipe.delete(key)
-    for key in redis.conn.scan_iter(f"fs3:lock:*:{fp}"):
-        pipe.delete(key)
+    # 从所有工具的 pending/done/lock 中移除（用已知工具名直接构造 key，避免 scan_iter）
+    for tool_name in (redis.conn.hkeys("fs3:tools") or []):
+        pipe.zrem(f"fs3:pending:{tool_name}", fp)
+        pipe.delete(f"fs3:done:{tool_name}:{fp}")
+        pipe.delete(f"fs3:lock:{tool_name}:{fp}")
     pipe.execute()
     return removed + 1
 

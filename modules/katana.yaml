@@ -17,7 +17,7 @@ allowed_output_events:
   - URL
 io_contract:
   input_events:
-    - URL
+    - FINDING
   input_transform_code: |
     import shlex
     value = data["value"].strip()
@@ -25,7 +25,7 @@ io_contract:
         value = "http://" + value
     return [{"target": value, "target_q": shlex.quote(value)}]
 execution:
-  command: katana -u {{target_q}} -proxy {{config.xray_remote_http_proxy}} -field-scope rdn -crawl-scope 1 -hl -jc -xhr -fsu -c 5 -rl 20 -silent
+  command: katana -u {{target_q}} -proxy {{config.xray_remote_http_proxy}} -field-scope rdn -crawl-scope 1 -hl -jc -xhr -fsu -c 5 -rl 20 -silent -no-sandbox
   output_parse_code: |
     from urllib.parse import urlparse, parse_qs, urlencode
 

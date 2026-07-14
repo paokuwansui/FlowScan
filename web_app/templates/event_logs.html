@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}事件日记{% endblock %}
+{% block content %}
+<div class="section">
+    <h1>事件日记</h1>
+
+    <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border);">
+        <a href="?tab=ai" class="log-tab-link" data-tab="ai"
+           style="padding:8px 20px;text-decoration:none;color:var(--text);border-bottom:2px solid transparent;margin-bottom:-2px;font-weight:500;"
+           id="tab-ai-link">AI 分析日志</a>
+        <a href="?tab=events" class="log-tab-link" data-tab="events"
+           style="padding:8px 20px;text-decoration:none;color:var(--text);border-bottom:2px solid transparent;margin-bottom:-2px;font-weight:500;"
+           id="tab-events-link">扫描事件总览</a>
+    </div>
+
+    {# ── Tab 1: AI 分析日志 ── #}
+    <div id="tab-ai">
+        <div class="card">
+            <h3>AI 分析日志 ({{ count }})</h3>
+            {% if logs %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>级别</th>
+                        <th>消息</th>
+                        <th>目标</th>
+                        <th>来源</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in logs %}
+                    <tr>
+                        <td style="font-size:0.78rem;white-space:nowrap;">{{ entry.created_at_iso or '-' }}</td>
+                        <td><span class="badge" style="background:rgba({% if entry.priority == 'high' %}248,81,73{% elif entry.priority == 'medium' %}210,153,34{% else %}100,100,100{% endif %},0.15);color:{% if entry.priority == 'high' %}var(--danger){% elif entry.priority == 'medium' %}#d29922{% else %}var(--text-muted){% endif %};">{{ entry.priority or 'medium' }}</span></td>
+                        <td class="value-cell">{{ entry.message or '-' }}</td>
+                        <td class="value-cell">{{ entry.target or '-' }}</td>
+                        <td style="font-size:0.78rem;color:var(--text-muted);">{{ entry.source or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">暂无 AI 分析日志</div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ── Tab 2: 扫描事件总览 ── #}
+    <div id="tab-events" style="display:none;">
+        <div class="card">
+            <h3>事件类型统计</h3>
+            <div id="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">
+                <span style="color:var(--text-muted);">加载中...</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>事件搜索</h3>
+            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+                <select id="event-type-filter" style="padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);">
+                    <option value="">全部类型</option>
+                </select>
+                <input type="text" id="event-search" placeholder="搜索事件值..."
+                       style="flex:1;min-width:200px;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:monospace;">
+                <button class="btn btn-sm btn-primary" onclick="loadEvents()">搜索</button>
+            </div>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>事件类型</th>
+                        <th>事件值</th>
+                        <th>来源</th>
+                        <th>时间</th>
+                    </tr>
+                </thead>
+                <tbody id="events-body">
+                    <tr><td colspan="4" style="text-align:center;color:var(--text-muted);">点击搜索加载事件</td></tr>
+                </tbody>
+            </table>
+            <div id="events-count" style="margin-top:8px;font-size:0.8rem;color:var(--text-muted);"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Tab 切换
+    var urlParams = new URLSearchParams(window.location.search);
+    var activeTab = urlParams.get('tab') || 'ai';
+    switchTab(activeTab);
+
+    document.querySelectorAll('.log-tab-link').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            var tab = this.getAttribute('data-tab');
+            switchTab(tab);
+            history.replaceState(null, '', '?tab=' + tab);
+        });
+    });
+});
+
+function switchTab(tab) {
+    document.getElementById('tab-ai').style.display = (tab === 'ai') ? '' : 'none';
+    document.getElementById('tab-events').style.display = (tab === 'events') ? '' : 'none';
+    document.querySelectorAll('.log-tab-link').forEach(function(l) {
+        l.style.borderBottomColor = 'transparent';
+        l.style.color = '';
+    });
+    document.getElementById('tab-' + tab + '-link').style.borderBottomColor = 'var(--accent)';
+    document.getElementById('tab-' + tab + '-link').style.color = 'var(--accent)';
+
+    if (tab === 'events') {
+        loadStats();
+        loadEventTypes();
+    }
+}
+
+// ── 事件统计 ──
+function loadStats() {
+    fetch('/event-logs?mode=stats')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var html = '';
+            var stats = data.stats || {};
+            if (Object.keys(stats).length === 0) {
+                document.getElementById('stats-grid').innerHTML = '<span style="color:var(--text-muted);">暂无统计数据</span>';
+                return;
+            }
+            var sorted = Object.entries(stats).sort(function(a, b) { return b[1] - a[1]; });
+            sorted.forEach(function(pair) {
+                html += '<div class="stat-card" style="padding:10px 14px;">' +
+                    '<div class="stat-value" style="font-size:1.2rem;">' + pair[1] + '</div>' +
+                    '<div class="stat-label" style="font-size:0.75rem;">' + esc(pair[0]) + '</div>' +
+                    '</div>';
+            });
+            document.getElementById('stats-grid').innerHTML = html;
+        })
+        .catch(function() {
+            document.getElementById('stats-grid').innerHTML = '<span style="color:var(--danger);">加载失败</span>';
+        });
+}
+
+function loadEventTypes() {
+    fetch('/event-logs?mode=stats')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var sel = document.getElementById('event-type-filter');
+            sel.innerHTML = '<option value="">全部类型</option>';
+            Object.keys(data.stats || {}).sort().forEach(function(t) {
+                sel.innerHTML += '<option value="' + esc(t) + '">' + esc(t) + '</option>';
+            });
+        });
+}
+
+// ── 事件搜索 ──
+function loadEvents() {
+    var type = document.getElementById('event-type-filter').value;
+    var search = document.getElementById('event-search').value.trim();
+    var params = 'mode=events';
+    if (type) params += '&type=' + encodeURIComponent(type);
+    if (search) params += '&search=' + encodeURIComponent(search);
+
+    var tbody = document.getElementById('events-body');
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">加载中...</td></tr>';
+
+    fetch('/event-logs?' + params)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var events = data.events || [];
+            document.getElementById('events-count').textContent = '共 ' + events.length + ' 条（最多显示 500）';
+
+            if (events.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">无匹配事件</td></tr>';
+                return;
+            }
+            tbody.innerHTML = events.map(function(evt) {
+                var ts = evt.created_at || evt.timestamp || '';
+                var timeStr = ts ? new Date(parseFloat(ts) * 1000).toLocaleString() : '-';
+                return '<tr>' +
+                    '<td><span class="badge badge-event">' + esc(evt.event_type || '?') + '</span></td>' +
+                    '<td class="value-cell">' + esc((evt.value || '').slice(0, 100)) + '</td>' +
+                    '<td>' + esc(evt.source_tool || '-') + '</td>' +
+                    '<td style="font-size:0.78rem;white-space:nowrap;">' + esc(timeStr) + '</td>' +
+                    '</tr>';
+            }).join('');
+        })
+        .catch(function() {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--danger);">加载失败</td></tr>';
+        });
+}
+
+function esc(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+</script>
+{% endblock %}

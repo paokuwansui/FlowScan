@@ -58,3 +58,11 @@ echo "[WORKER_SETUP] Installing bbot dependencies..."
 "$PROJECT_DIR/flowscan_venv/bin/bbot" --install-all-deps 2>&1 || echo "[WORKER_SETUP] [WARN] bbot --install-all-deps had issues; continuing"
 GOBIN="$HOME/.local/bin" GOCACHE="$HOME/.cache/go-tmp" go install -v github.com/projectdiscovery/cdncheck/cmd/cdncheck@latest
 python3 main.py init
+
+# ── Clean Go build residuals ──
+echo ""
+echo "[WORKER_SETUP] Cleaning Go build caches..."
+rm -rf "$HOME/.cache/go-build" 2>/dev/null || true
+rm -rf "$HOME/.cache/go-tmp" 2>/dev/null || true
+rm -rf "$HOME/go/tmp" 2>/dev/null || true
+echo "[WORKER_SETUP] Go build residuals cleaned"
