@@ -29,8 +29,7 @@ runtime:
   exec_timeout_seconds: 600
 allowed_output_events:
 - URL
-- VULNERABILITY
-- TECHNOLOGY
+- FINDING
 - OPEN_TCP_PORT
 
 io_contract:
@@ -85,7 +84,7 @@ execution:
 
             # 2. 提取 VULNERABILITY（保持原样）
             elif data_type == "VULN":
-                result.append({"VULNERABILITY": line})
+                result.append({"FINDING": line})
 
             # 3. 动态提取 SERVICE 相关的指纹与 URL
             elif data_type == "SERVICE":
@@ -114,7 +113,7 @@ execution:
                 if tech_name and host and port:
                     # 核心改变：不仅带上目标和动态指纹，还直接把当前行的原始 JSON 塞进去，确保不丢失任何字段
                     result.append({
-                        "TECHNOLOGY": f"{host}:{port}|{tech_name}|{line}"
+                        "FINDING": f"{host}:{port}|{tech_name}|{line}"
                     })
 
         except json.JSONDecodeError:

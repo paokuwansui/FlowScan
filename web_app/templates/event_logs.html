@@ -11,6 +11,9 @@
         <a href="?tab=events" class="log-tab-link" data-tab="events"
            style="padding:8px 20px;text-decoration:none;color:var(--text);border-bottom:2px solid transparent;margin-bottom:-2px;font-weight:500;"
            id="tab-events-link">扫描事件总览</a>
+        <a href="?tab=api" class="log-tab-link" data-tab="api"
+           style="padding:8px 20px;text-decoration:none;color:var(--text);border-bottom:2px solid transparent;margin-bottom:-2px;font-weight:500;"
+           id="tab-api-link">API 调用示例</a>
     </div>
 
     {# ── Tab 1: AI 分析日志 ── #}
@@ -79,6 +82,29 @@
                 </tbody>
             </table>
             <div id="events-count" style="margin-top:8px;font-size:0.8rem;color:var(--text-muted);"></div>
+        </div>
+    </div>
+
+    {# ── Tab 3: API 调用示例 ── #}
+    <div id="tab-api" style="display:none;">
+        <div class="card">
+            <h3>API 密钥</h3>
+            <p class="help-text">输入 <code>config.yaml</code> 中 <code>ai_analysis.log_api_key</code> 的值，下方示例会自动替换。</p>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <input type="text" id="api-key-input" placeholder="输入 API Key..."
+                       oninput="updateApiExamples()"
+                       style="flex:1;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:monospace;">
+                <button class="btn btn-sm btn-secondary" onclick="toggleApiKeyVisibility()" id="toggle-key-btn">显示</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>调用示例</h3>
+            <p class="help-text">输入 API Key 后点击"一键复制全部用法"粘贴给其他 Agent。</p>
+            <div style="margin-bottom:12px;">
+                <button class="btn btn-primary" onclick="copyAllExamples()">📋 一键复制全部用法</button>
+            </div>
+            <div id="api-examples"></div>
         </div>
     </div>
 </div>
@@ -170,7 +196,7 @@ function loadEvents() {
         .then(function(r) { return r.json(); })
         .then(function(data) {
             var events = data.events || [];
-            document.getElementById('events-count').textContent = '共 ' + events.length + ' 条（最多显示 500）';
+            document.getElementById('events-count').textContent = '共 ' + events.length + ' 条';
 
             if (events.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">无匹配事件</td></tr>';
@@ -196,5 +222,102 @@ function esc(s) {
     if (!s) return '';
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+
+// ── API 示例 ──
+var API_TEMPLATES = [
+    {title: '获取 AI 分析日志', cmd: 'curl -s "{base}/event-logs?api_key={key}"'},
+    {title: '获取事件统计',     cmd: 'curl -s "{base}/event-logs?api_key={key}&mode=stats"'},
+    {title: '获取全部事件',     cmd: 'curl -s "{base}/event-logs?api_key={key}&mode=events"', warn: '如无必要请不要获取全部事件，优先使用 type 或 search 参数按需筛选'},
+    {title: '按类型筛选事件',   cmd: 'curl -s "{base}/event-logs?api_key={key}&mode=events&type=DNS_NAME"'},
+    {title: '搜索事件值',       cmd: 'curl -s "{base}/event-logs?api_key={key}&mode=events&search=example.com"'},
+    {title: '查单个事件详情',   cmd: 'curl -s "{base}/event-logs?api_key={key}&mode=events&fp=<指纹>"'},
+];
+
+function updateApiExamples() {
+    var key = document.getElementById('api-key-input').value.trim() || 'YOUR_API_KEY';
+    var base = window.location.origin;
+    var html = '';
+    API_TEMPLATES.forEach(function(t, i) {
+        var cmd = t.cmd.replace('{base}', base).replace('{key}', key);
+        html += '<div style="margin-bottom:12px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:var(--bg);">' +
+                '<strong style="font-size:0.85rem;">' + esc(t.title) + '</strong>' +
+                '<button class="btn btn-sm btn-primary" style="padding:3px 10px;font-size:0.72rem;" onclick="copyExample(' + i + ')">复制</button>' +
+            '</div>' +
+            '<pre id="api-cmd-' + i + '" style="margin:0;padding:10px 12px;background:var(--surface);border-top:1px solid var(--border);font-family:monospace;font-size:0.82rem;white-space:pre-wrap;word-break:break-all;color:var(--text);">' + esc(cmd) + '</pre>' +
+            (t.warn ? '<div style="padding:6px 12px;background:rgba(210,153,34,0.08);border-top:1px solid rgba(210,153,34,0.2);font-size:0.78rem;color:#d29922;">⚠ ' + esc(t.warn) + '</div>' : '') +
+            '</div>';
+    });
+    document.getElementById('api-examples').innerHTML = html || '<div class="empty-state">上方输入 API Key 后显示示例</div>';
+}
+
+function copyAllExamples() {
+    var key = document.getElementById('api-key-input').value.trim() || 'YOUR_API_KEY';
+    var base = window.location.origin;
+    var text = 'FlowScan3 事件日记 API 调用方法\n' +
+               '基础地址: ' + base + '\n' +
+               'API Key: ' + key + '\n\n';
+    API_TEMPLATES.forEach(function(t) {
+        var cmd = t.cmd.replace('{base}', base).replace('{key}', key);
+        text += '## ' + t.title + '\n' + cmd + '\n';
+        if (t.warn) text += '⚠ ' + t.warn + '\n';
+        text += '\n';
+    });
+    navigator.clipboard.writeText(text).then(function() {
+        var btn = document.querySelector('#tab-api .btn-primary');
+        var orig = btn.innerHTML;
+        btn.innerHTML = '✅ 已复制到剪贴板';
+        setTimeout(function() { btn.innerHTML = orig; }, 2000);
+    }).catch(function() {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+        document.body.removeChild(ta);
+        alert('已复制到剪贴板');
+    });
+}
+
+function copyExample(i) {
+    var el = document.getElementById('api-cmd-' + i);
+    if (!el) return;
+    var text = el.textContent || el.innerText;
+    navigator.clipboard.writeText(text).then(function() {
+        var btn = el.parentElement.querySelector('button');
+        var orig = btn.textContent;
+        btn.textContent = '已复制!';
+        btn.style.background = '#2ea043';
+        setTimeout(function() { btn.textContent = orig; btn.style.background = ''; }, 1500);
+    }).catch(function() {
+        // fallback
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        alert('已复制到剪贴板');
+    });
+}
+
+function toggleApiKeyVisibility() {
+    var inp = document.getElementById('api-key-input');
+    var btn = document.getElementById('toggle-key-btn');
+    if (inp.type === 'password') {
+        inp.type = 'text';
+        btn.textContent = '隐藏';
+    } else {
+        inp.type = 'password';
+        btn.textContent = '显示';
+    }
+}
+
+// 初始加载 API 示例 tab 时自动生成
+var origSwitchTab = switchTab;
+switchTab = function(tab) {
+    origSwitchTab(tab);
+    if (tab === 'api') updateApiExamples();
+};
 </script>
 {% endblock %}

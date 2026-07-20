@@ -22,15 +22,18 @@ worker:
   idle_sleep_seconds: 1.0
   scan_batch_size: 200
   max_local_pending: 40
+  
+bbot:
+  port_range: 1-65535
+  securitytrails_api_key: 
+  virustotal_api_key: 
+  github_workflows_api_key: 
 
 fofa:
   api_key: YOUR_FOFA_API_KEY
   base_url: https://fofa.info
 
-bbot:
-  securitytrails_api_key: 
-  virustotal_api_key: 
-  github_workflows_api_key: 
+
 
 ai_analysis:
   base_url: https://api.openai.com/v1

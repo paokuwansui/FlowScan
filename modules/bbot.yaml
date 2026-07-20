@@ -1,4 +1,4 @@
-name: bbot_kitchen_sink_module
+name: bbot_module
 description: everything everywhere all at once
 check:
   command: echo --true--
@@ -10,7 +10,7 @@ install:
   install_timeout_seconds: 10800
 runtime:
   max_concurrency: 2
-  exec_timeout_seconds: 10800
+  exec_timeout_seconds: 86400
 
 allowed_output_events:
   - ASN
@@ -18,6 +18,7 @@ allowed_output_events:
   - CODE_REPOSITORY
   - DNS_NAME
   - DNS_NAME_UNRESOLVED
+  - DNS_NAME_UNVERIFIED
   - EMAIL_ADDRESS
   - FILESYSTEM
   - FINDING
@@ -41,8 +42,7 @@ allowed_output_events:
   - URL_HINT
   - URL_UNVERIFIED
   - USERNAME
-  - VHOST
-  - VULNERABILITY
+  - VIRTUAL_HOST
   - WAF
   - WEBSCREENSHOT
   - WEB_PARAMETER
@@ -55,7 +55,13 @@ io_contract:
     return [{"value": shlex.quote(data["value"])}]
 
 execution:
-  command: 'python ./flowscan3/filter.py {{value}} && bbot -t {{value}} -p kitchen-sink --allow-deadly -c modules.securitytrails.api_key={{config.bbot.securitytrails_api_key}} -c modules.virustotal.api_key={{config.bbot.virustotal_api_key}} -c modules.github_workflows.api_key={{config.bbot.github_workflows_api_key}} --json --brief -y -em json csv txt --exclude-cdn'
+  command: python ./flowscan3/filter.py {{value}} && python ./bin/is_root_domain.py {{value}} &&
+    bbot -t {{value}} 
+    -p subdomain-enum cloud-enum code-enum email-enum spider web paramminer waf-bypass wayback nuclei-budget tech-detect virtualhost-heavy webbrute-heavy lightfuzz-heavy
+    -m portscan bypass403
+    --json --brief -y -em json csv txt --exclude-cdn
+    -c modules.securitytrails.api_key={{config.bbot.securitytrails_api_key}} -c modules.virustotal.api_key={{config.bbot.virustotal_api_key}} -c modules.github_workflows.api_key={{config.bbot.github_workflows_api_key}} -c modules.portscan.ports={{config.bbot.port_range}} 
+
   output_parse_code: |
     import json
     result = []

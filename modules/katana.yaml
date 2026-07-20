@@ -14,10 +14,10 @@ runtime:
   max_concurrency: 3
   exec_timeout_seconds: 1800
 allowed_output_events:
-  - URL
+  - FINDING
 io_contract:
   input_events:
-    - FINDING
+    - URL
   input_transform_code: |
     import shlex
     value = data["value"].strip()
@@ -58,5 +58,5 @@ execution:
         if key in seen:
             continue
         seen.add(key)
-        results.append({"URL": url})
+        results.append({"FINDING": url})
     return results

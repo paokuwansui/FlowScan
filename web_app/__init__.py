@@ -608,8 +608,6 @@ def _register_routes(app: Flask) -> None:
                 if search_term and search_term not in (evt.get("value") or "").lower():
                     continue
                 events.append(evt)
-                if len(events) >= 500:
-                    break
             events.sort(key=lambda e: float(e.get("created_at") or 0), reverse=True)
             return jsonify({"mode": "events", "count": len(events), "events": events})
 

@@ -1,0 +1,43 @@
+name: nmap_module
+description: Nmap 深度扫描 — 版本/OS/漏洞脚本检测
+check:
+  command: nmap --version 2>&1 || true
+  expect_keyword: Nmap
+  exclude_keyword: not found
+install:
+  steps:
+    - sudo apt install -y nmap
+  install_timeout_seconds: 600
+runtime:
+  max_concurrency: 2
+  exec_timeout_seconds: 1800
+allowed_output_events:
+  - FINDING
+io_contract:
+  input_events:
+    - HOST_TCP_PORT_OPEN
+  input_transform_code: |
+    import shlex
+    value = data["value"].strip()
+    if not value or " -> " not in value:
+        return []
+    host, ports_part = value.split(" -> ", 1)
+    host = host.strip()
+    ports = ports_part.strip().strip("[]").replace(" ", "")
+    return [{"host": host, "ports": ports, "host_q": shlex.quote(host), "ports_q": shlex.quote(ports)}]
+
+execution:
+  command: nmap -sV -O -A -T4 --script=vuln -p {{ports_q}} {{host_q}} 2>/dev/null
+  output_parse_code: |
+    results = []
+    host = ""
+    for line in data["stdout"].splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith("Nmap scan report for "):
+            host = line.replace("Nmap scan report for ", "").strip()
+            continue
+        if host:
+            results.append({"FINDING": "host=" + host + " | " + line})
+    return results
