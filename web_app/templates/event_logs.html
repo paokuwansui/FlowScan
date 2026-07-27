@@ -131,6 +131,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function switchTab(tab) {
     document.getElementById('tab-ai').style.display = (tab === 'ai') ? '' : 'none';
     document.getElementById('tab-events').style.display = (tab === 'events') ? '' : 'none';
+    document.getElementById('tab-api').style.display = (tab === 'api') ? '' : 'none';
     document.querySelectorAll('.log-tab-link').forEach(function(l) {
         l.style.borderBottomColor = 'transparent';
         l.style.color = '';
@@ -225,12 +226,37 @@ function esc(s) {
 
 // ── API 示例 ──
 var API_TEMPLATES = [
-    {title: '获取 AI 分析日志', cmd: 'curl -s "{base}/event-logs?api_key={key}"'},
-    {title: '获取事件统计',     cmd: 'curl -s "{base}/event-logs?api_key={key}&mode=stats"'},
-    {title: '获取全部事件',     cmd: 'curl -s "{base}/event-logs?api_key={key}&mode=events"', warn: '如无必要请不要获取全部事件，优先使用 type 或 search 参数按需筛选'},
-    {title: '按类型筛选事件',   cmd: 'curl -s "{base}/event-logs?api_key={key}&mode=events&type=DNS_NAME"'},
-    {title: '搜索事件值',       cmd: 'curl -s "{base}/event-logs?api_key={key}&mode=events&search=example.com"'},
-    {title: '查单个事件详情',   cmd: 'curl -s "{base}/event-logs?api_key={key}&mode=events&fp=<指纹>"'},
+    {
+        title: '获取 AI 分析日志',
+        desc: '返回 FlowScan3 中所有 AI 分析产生的事件日志，包含漏洞发现、风险评估、扫描建议等。每条日志含优先级(high/medium/low)、消息内容、关联目标和时间戳。适用于了解系统当前安全态势。',
+        cmd: 'curl -s "{base}/event-logs?api_key={key}"'
+    },
+    {
+        title: '获取事件类型统计',
+        desc: '返回各类扫描事件的数量分布（如 DNS_NAME: 1234, URL: 567, VULNERABILITY: 89 等）。用于快速了解扫描进度和资产分布概况，无需拉取全量事件数据。',
+        cmd: 'curl -s "{base}/event-logs?api_key={key}&mode=stats"'
+    },
+    {
+        title: '获取全部事件（慎用）',
+        desc: '返回所有扫描事件的完整列表。事件按创建时间倒序排列。包含事件类型、值、来源工具、指纹、父子关系等信息。⚠ 数据量大时请优先使用下方按类型筛选或搜索接口，避免拉取全量数据。',
+        cmd: 'curl -s "{base}/event-logs?api_key={key}&mode=events"',
+        warn: '如无必要请不要获取全部事件，优先使用 type 或 search 参数按需筛选'
+    },
+    {
+        title: '按类型筛选事件',
+        desc: '仅返回指定类型的事件。将 type 参数替换为需要查询的事件类型，如 DNS_NAME、URL、IP_ADDRESS、VULNERABILITY、FINDING、TECHNOLOGY、HOST_TCP_PORT_OPEN 等。适合聚焦某一类资产或漏洞进行深入分析。',
+        cmd: 'curl -s "{base}/event-logs?api_key={key}&mode=events&type=DNS_NAME"'
+    },
+    {
+        title: '搜索事件值',
+        desc: '在所有事件中模糊搜索匹配指定关键词的事件值（忽略大小写）。适合快速定位特定域名、IP、URL或漏洞名称。将 search 参数替换为要搜索的关键词。',
+        cmd: 'curl -s "{base}/event-logs?api_key={key}&mode=events&search=example.com"'
+    },
+    {
+        title: '查单个事件详情',
+        desc: '通过事件指纹(fp)查看单个事件的详细信息及其父子关系链。返回事件本体、从根事件到该事件的完整路径(path)，以及该事件的直接子事件列表(children)。将 fp 参数替换为事件指纹。',
+        cmd: 'curl -s "{base}/event-logs?api_key={key}&mode=events&fp=<指纹>"'
+    }
 ];
 
 function updateApiExamples() {
@@ -244,6 +270,7 @@ function updateApiExamples() {
                 '<strong style="font-size:0.85rem;">' + esc(t.title) + '</strong>' +
                 '<button class="btn btn-sm btn-primary" style="padding:3px 10px;font-size:0.72rem;" onclick="copyExample(' + i + ')">复制</button>' +
             '</div>' +
+            (t.desc ? '<div style="padding:8px 12px;font-size:0.8rem;color:var(--text-muted);line-height:1.5;border-top:1px solid var(--border);">' + esc(t.desc) + '</div>' : '') +
             '<pre id="api-cmd-' + i + '" style="margin:0;padding:10px 12px;background:var(--surface);border-top:1px solid var(--border);font-family:monospace;font-size:0.82rem;white-space:pre-wrap;word-break:break-all;color:var(--text);">' + esc(cmd) + '</pre>' +
             (t.warn ? '<div style="padding:6px 12px;background:rgba(210,153,34,0.08);border-top:1px solid rgba(210,153,34,0.2);font-size:0.78rem;color:#d29922;">⚠ ' + esc(t.warn) + '</div>' : '') +
             '</div>';
@@ -259,46 +286,89 @@ function copyAllExamples() {
                'API Key: ' + key + '\n\n';
     API_TEMPLATES.forEach(function(t) {
         var cmd = t.cmd.replace('{base}', base).replace('{key}', key);
-        text += '## ' + t.title + '\n' + cmd + '\n';
+        text += '## ' + t.title + '\n';
+        if (t.desc) text += t.desc + '\n\n';
+        text += cmd + '\n';
         if (t.warn) text += '⚠ ' + t.warn + '\n';
         text += '\n';
     });
-    navigator.clipboard.writeText(text).then(function() {
-        var btn = document.querySelector('#tab-api .btn-primary');
-        var orig = btn.innerHTML;
-        btn.innerHTML = '✅ 已复制到剪贴板';
-        setTimeout(function() { btn.innerHTML = orig; }, 2000);
-    }).catch(function() {
-        var ta = document.createElement('textarea');
-        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
-        document.body.appendChild(ta); ta.select(); document.execCommand('copy');
-        document.body.removeChild(ta);
-        alert('已复制到剪贴板');
-    });
+
+    var copied = false;
+    var btn = document.querySelector('#tab-api .btn-primary');
+
+    // 优先用 Clipboard API
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+            copied = true;
+            showCopyResult(btn, true);
+        }).catch(function() {
+            fallbackCopy(text, btn);
+        });
+    } else {
+        fallbackCopy(text, btn);
+    }
+}
+
+function fallbackCopy(text, btn) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    ta.style.top = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try {
+        var ok = document.execCommand('copy');
+        showCopyResult(btn, ok);
+    } catch(e) {
+        showCopyResult(btn, false);
+    }
+    document.body.removeChild(ta);
+}
+
+function showCopyResult(btn, ok) {
+    if (!btn) return;
+    var orig = btn.innerHTML;
+    btn.innerHTML = ok ? '✅ 已复制到剪贴板' : '❌ 复制失败，请手动选择';
+    setTimeout(function() { btn.innerHTML = orig; }, 2000);
 }
 
 function copyExample(i) {
     var el = document.getElementById('api-cmd-' + i);
     if (!el) return;
     var text = el.textContent || el.innerText;
-    navigator.clipboard.writeText(text).then(function() {
-        var btn = el.parentElement.querySelector('button');
-        var orig = btn.textContent;
-        btn.textContent = '已复制!';
-        btn.style.background = '#2ea043';
-        setTimeout(function() { btn.textContent = orig; btn.style.background = ''; }, 1500);
-    }).catch(function() {
-        // fallback
-        var ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-        alert('已复制到剪贴板');
-    });
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+            flashCopyBtn(el);
+        }).catch(function() {
+            fallbackCopySingle(text, el);
+        });
+    } else {
+        fallbackCopySingle(text, el);
+    }
+}
+
+function fallbackCopySingle(text, el) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { document.execCommand('copy'); } catch(e) {}
+    document.body.removeChild(ta);
+    flashCopyBtn(el);
+}
+
+function flashCopyBtn(el) {
+    var btn = el.parentElement.querySelector('button');
+    if (!btn) return;
+    var orig = btn.textContent;
+    btn.textContent = '已复制!';
+    btn.style.background = '#2ea043';
+    setTimeout(function() { btn.textContent = orig; btn.style.background = ''; }, 1500);
 }
 
 function toggleApiKeyVisibility() {
