@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}资产截图{% endblock %}
+{% block content %}
+<div class="page-head">
+    <h1>资产截图 / 图标</h1>
+    <p class="page-sub">存活 URL 的 headless 截图与 favicon 图标资产</p>
+</div>
+
+{# ── Tab 切换 ── #}
+<nav class="tabs">
+    <a href="?tab=screenshot" class="tab shot-tab-link {% if tab != 'icon' %}active{% endif %}" data-tab="screenshot">截图展示<span class="cnt">{{ shots|length }}</span></a>
+    <a href="?tab=icon" class="tab shot-tab-link {% if tab == 'icon' %}active{% endif %}" data-tab="icon">图标展示<span class="cnt">{{ icons|length }}</span></a>
+</nav>
+
+{# 截图分栏 #}
+<div id="tab-screenshot" {% if tab == 'icon' %}style="display:none"{% endif %}>
+    {% if shots %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px;">
+        {% for s in shots %}
+        <div class="card" style="padding:0;overflow:hidden;">
+            <a href="{{ s.url }}" target="_blank" title="打开 {{ s.url }}">
+                <img src="data:image/png;base64,{{ s.b64 }}" alt="{{ s.url }}"
+                     style="width:100%;display:block;background:#fff;" loading="lazy">
+            </a>
+            <div style="padding:10px 14px;border-top:1px solid var(--border);">
+                <div class="mono" style="font-size:0.75rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ s.url }}">{{ s.url }}</div>
+                <div class="mono" style="color:var(--text-faint);margin-top:4px;font-size:0.7rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ s.path }}">📁 {{ s.path }}</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card">
+        <div class="empty-state">暂无截图<br><br><span style="font-size:0.85rem;">screenshot 模块会对存活的 URL 用 chromium headless 截图，结果会自动出现在这里。</span></div>
+    </div>
+    {% endif %}
+</div>
+
+{# 图标分栏 #}
+<div id="tab-icon" {% if tab != 'icon' %}style="display:none"{% endif %}>
+    {% if icons %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">
+        {% for i in icons %}
+        <div class="card" style="display:flex;align-items:center;gap:14px;padding:12px 14px;margin-bottom:0;">
+            <img src="data:{{ i.mime }};base64,{{ i.b64 }}" alt="{{ i.url }}"
+                 style="width:42px;height:42px;object-fit:contain;flex-shrink:0;background:#fff;border-radius:6px;">
+            <div style="min-width:0;">
+                <div class="mono" style="font-size:0.76rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ i.url }}">{{ i.url }}</div>
+                <div class="mono" style="color:var(--text-faint);margin-top:3px;font-size:0.68rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ i.path }}">📁 {{ i.path }}</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card">
+        <div class="empty-state">暂无图标<br><br><span style="font-size:0.85rem;">icon 模块会下载 favicon（ICON_PATH）存 reports/icons，结果会自动出现在这里。</span></div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.shot-tab-link').forEach(function(link) {
+    link.addEventListener('click', function(e) {
+        var targetTab = this.getAttribute('data-tab');
+        e.preventDefault();
+        document.getElementById('tab-screenshot').style.display = (targetTab === 'screenshot') ? '' : 'none';
+        document.getElementById('tab-icon').style.display = (targetTab === 'icon') ? '' : 'none';
+        document.querySelectorAll('.shot-tab-link').forEach(function(l) { l.classList.remove('active'); });
+        this.classList.add('active');
+        history.replaceState(null, '', '?tab=' + targetTab);
+    });
+});
+</script>
+{% endblock %}

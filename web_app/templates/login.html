@@ -1,18 +1,35 @@
 {% extends "base.html" %}
 {% block title %}登录{% endblock %}
 {% block content %}
-<div class="login-box">
-    <h2>FlowScan3 控制面板</h2>
-    <form method="POST">
-        <div class="form-group">
-            <label for="username">用户名</label>
-            <input type="text" id="username" name="username" required>
+<div class="login-wrap">
+    <div class="login-box">
+        <div class="login-brand">
+            <span class="logo-mark">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <circle cx="12" cy="12" r="8.4"/><circle cx="12" cy="12" r="3.8"/>
+                    <path d="M12 12 L18.5 5.5" stroke-linecap="round"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/>
+                </svg>
+            </span>
+            <h2>FlowScan</h2>
         </div>
-        <div class="form-group">
-            <label for="password">密码</label>
-            <input type="password" id="password" name="password" required>
-        </div>
-        <button type="submit" class="btn btn-primary">登录</button>
-    </form>
+        <p class="login-sub">
+            EVENT-DRIVEN SCAN ORCHESTRATOR<br>
+            安全扫描控制台
+        </p>
+        <form method="POST">
+            <div class="form-group">
+                <label for="username">用户名</label>
+                <input type="text" id="username" name="username" placeholder="username" required autofocus>
+            </div>
+            <div class="form-group">
+                <label for="password">密码</label>
+                <input type="password" id="password" name="password" placeholder="••••••••" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg">
+                登 录
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+        </form>
+    </div>
 </div>
 {% endblock %}

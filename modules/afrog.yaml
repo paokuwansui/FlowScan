@@ -1,0 +1,38 @@
+name: afrog_module
+description: Afrog 漏洞扫描 — 仅对存活 URL 运行 high/critical PoC，输出高可信漏洞事件
+runtime:
+  max_concurrency: 2
+allowed_output_events:
+- VULNERABILITY
+io_contract:
+  input_events:
+  - URL
+  input_transform_code: |
+    import shlex
+    value = data["value"].strip()
+    if not value.startswith(("http://", "https://")):
+        value = "http://" + value
+    return [{"target": value, "target_q": shlex.quote(value)}]
+execution:
+  # afrog 3.5.6: -silent 文本输出一行一条漏洞(序号 时间 poc-id 严重度 目标)
+  # -doh 禁用 HTML 报告; -nc 去色; 命令尾部清理中断残留的 resume 状态文件
+  command: 'afrog -t {{target_q}} -S high,critical -c 15 -rl 60 -rlt 8 -timeout 15 -retries 1 -silent -nc -doh 2>/dev/null; rc=$?; rm -f afrog-resume-*.afg; exit $rc'
+  output_parse_code: |
+    import re
+    results = []
+    seen = set()
+    # 行格式: 001 08-12 02:28:48 test-http-200 HIGH http://127.0.0.1:18097/
+    pat = re.compile(r"^\s*\d+\s+\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s+(\S+)\s+(\S+)\s+(\S+)\s*$")
+    for line in data["stdout"].splitlines():
+        line = line.strip()
+        m = pat.match(line)
+        if not m:
+            continue
+        poc, severity, target = m.group(1), m.group(2), m.group(3)
+        if severity.lower() not in ("high", "critical"):
+            continue
+        value = "[afrog][%s] %s @ %s" % (severity.upper(), poc, target)
+        if value not in seen:
+            seen.add(value)
+            results.append({"VULNERABILITY": value})
+    return results

@@ -1,16 +1,7 @@
 name: input_module
 description: 自动将输入转换成程序内部需要的类型
-check:
-  command: 'echo --True--'
-  expect_keyword: --True--
-  exclude_keyword: not found
-install:
-  steps:
-  - echo --True--
-  install_timeout_seconds: 1200
 runtime:
   max_concurrency: 8
-  exec_timeout_seconds: 120
 allowed_output_events:
   - DNS_NAME
   - URL_UNVERIFIED

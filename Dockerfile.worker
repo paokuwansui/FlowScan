@@ -1,0 +1,104 @@
+# ============================================================================
+# FlowScan3 Worker 节点镜像(全扫描工具链)
+# 构建: docker build -f Dockerfile.worker -t flowscan:worker .
+# 基础: Kali rolling(naabu/feroxbuster 等工具仅 Kali 源提供)
+# 工具安装统一走 install/*.sh(单一来源,脚本幂等,worker 启动时也复用)
+# ============================================================================
+FROM kalilinux/kali-rolling:latest
+
+# ────────────────────────────────────────────────────────────────────────────
+# 第 0 层:统一 Kali apt 源为清华镜像
+# 官方 http.kali.org 是 302 重定向,会随机落到各镜像站(mirror.wane.kr 已不可达,
+# 某些包只在不可达镜像有候选 → apt 装包失败 exit 100)。清华与 pip 同源,已验证可达。
+# ────────────────────────────────────────────────────────────────────────────
+RUN printf 'Types: deb\nURIs: http://mirrors.tuna.tsinghua.edu.cn/kali\nSuites: kali-rolling\nComponents: main contrib non-free non-free-firmware\nSigned-By: /usr/share/keyrings/kali-archive-keyring.gpg\n' > /etc/apt/sources.list.d/kali.sources
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    HOME=/root \
+    PATH=/usr/local/bin:/root/.local/bin:/usr/bin:/bin \
+    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+
+# ────────────────────────────────────────────────────────────────────────────
+# 第 1 层:基础构建依赖(git/curl/python 等)
+# 工具安装不在此层,统一走 install/*.sh(见第 2 层)
+# 注意:模块 YAML 的命令统一用 `python`(系统解释器),依赖必须装进系统 python
+# (不能只装 venv/flowscan-python),否则 input/fofa/httpx 等模块 import 即崩
+# ────────────────────────────────────────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git \
+        unzip \
+        curl \
+        wget \
+        ca-certificates \
+        redis-tools \
+        python3 \
+        python3-venv \
+        python3-pip \
+    && ln -sf /usr/bin/python3 /usr/bin/python \
+    && pip3 install --break-system-packages --no-cache-dir \
+        PyYAML \
+        redis \
+        flask \
+        tldextract \
+        requests \
+    && rm -rf /var/lib/apt/lists/*
+
+# ────────────────────────────────────────────────────────────────────────────
+# 第 2 层:工具安装(复用 install/*.sh,单一来源;脚本幂等,已装则跳过)
+# install/*.sh 与 modules/*.yaml 文件名一一对应,worker 启动时也按需执行
+# ────────────────────────────────────────────────────────────────────────────
+WORKDIR /app
+COPY install/ /app/install/
+RUN bash /app/install/arjun.sh \
+ && bash /app/install/amass.sh \
+ && bash /app/install/feroxbuster.sh \
+ && bash /app/install/naabu.sh \
+ && bash /app/install/nmap.sh \
+ && bash /app/install/nuclei.sh \
+ && bash /app/install/subfinder.sh \
+ && bash /app/install/whatweb.sh \
+ && bash /app/install/ip_resolve.sh \
+ && bash /app/install/afrog.sh \
+ && bash /app/install/httpx.sh \
+ && bash /app/install/katana.sh \
+ && bash /app/install/fofa.sh \
+ && bash /app/install/ksubdomain.sh \
+ && bash /app/install/whois.sh \
+ && bash /app/install/medusa.sh \
+ && bash /app/install/screenshot.sh
+
+# ────────────────────────────────────────────────────────────────────────────
+# 第 3 层:Python 依赖层(独立 venv,工具脚本所需)
+# flowscan-python 用 wrapper 脚本而非软链:
+# venv 的 python 靠 argv[0] 路径定位 pyvenv.cfg,软链会解析到系统 python 丢失 venv 依赖
+# ────────────────────────────────────────────────────────────────────────────
+RUN python3 -m venv /opt/flowscan-venv && \
+    /opt/flowscan-venv/bin/pip install --no-cache-dir \
+        PyYAML \
+        redis \
+        flask \
+        tldextract \
+        requests \
+    && printf '#!/bin/sh\nexec /opt/flowscan-venv/bin/python3 "$@"\n' > /usr/local/bin/flowscan-python \
+    && chmod +x /usr/local/bin/flowscan-python
+
+# ────────────────────────────────────────────────────────────────────────────
+# 项目代码
+# ────────────────────────────────────────────────────────────────────────────
+COPY . /app
+COPY wordlists/ /app/wordlists/
+
+# 兼容模块命令中的 $HOME/.local/bin 引用(容器内 HOME=/root)
+RUN mkdir -p /root/.local/bin && \
+    for t in afrog httpx dnsx cdncheck katana fofax ksubdomain; do \
+        [ -e "/usr/local/bin/$t" ] && ln -sf "/usr/local/bin/$t" "/root/.local/bin/$t" || true; \
+    done
+
+# ────────────────────────────────────────────────────────────────────────────
+# 入口(默认 worker)
+# ────────────────────────────────────────────────────────────────────────────
+COPY docker/entrypoint.sh /usr/local/bin/flowscan-entrypoint.sh
+RUN chmod +x /usr/local/bin/flowscan-entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/flowscan-entrypoint.sh"]
+CMD ["worker"]

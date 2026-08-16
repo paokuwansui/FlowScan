@@ -1,16 +1,7 @@
 name: nmap_module
-description: Nmap 深度扫描 — 版本/OS/漏洞脚本检测
-check:
-  command: nmap --version 2>&1 || true
-  expect_keyword: Nmap
-  exclude_keyword: not found
-install:
-  steps:
-    - sudo apt install -y nmap
-  install_timeout_seconds: 600
+description: Nmap 深度扫描 — 版本/OS/漏洞脚本检测，每个端口一条 FINDING(JSON 结构)
 runtime:
   max_concurrency: 2
-  exec_timeout_seconds: 1800
 allowed_output_events:
   - FINDING
 io_contract:
@@ -27,17 +18,56 @@ io_contract:
     return [{"host": host, "ports": ports, "host_q": shlex.quote(host), "ports_q": shlex.quote(ports)}]
 
 execution:
-  command: nmap -sV -O -A -T4 --script=vuln -p {{ports_q}} {{host_q}} 2>/dev/null
+  # -oX - 直出 XML 到 stdout(不落盘),normal 输出自动转 stderr 被丢弃
+  command: nmap -sV -O -A -T4 --script=vuln -p {{ports_q}} {{host_q}} -oX - 2>/dev/null
   output_parse_code: |
+    import json
+    import xml.etree.ElementTree as ET
+
     results = []
-    host = ""
-    for line in data["stdout"].splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        if line.startswith("Nmap scan report for "):
-            host = line.replace("Nmap scan report for ", "").strip()
-            continue
-        if host:
-            results.append({"FINDING": "host=" + host + " | " + line})
+    try:
+        root = ET.fromstring(data["stdout"] or "")
+    except:
+        return []
+
+    for host in root.iter("host"):
+        addr = host.find("address")
+        ip = addr.get("addr", "") if addr is not None else ""
+        hostnames = [hn.get("name", "") for hn in host.iter("hostname") if hn.get("name")]
+        hostname = hostnames[0] if hostnames else ""
+
+        for port in host.iter("port"):
+            portid = port.get("portid", "")
+            protocol = port.get("protocol", "")
+            if not portid:
+                continue
+
+            state_el = port.find("state")
+            state = state_el.get("state", "") if state_el is not None else ""
+
+            svc = port.find("service")
+            service = {}
+            if svc is not None:
+                for key in ("name", "product", "version", "extrainfo", "ostype"):
+                    val = svc.get(key)
+                    if val:
+                        service[key] = val
+
+            # 仅端口直属 script(vuln 脚本结果),不递归 host 级 script
+            scripts = []
+            for sc in port.findall("script"):
+                sid = sc.get("id", "")
+                if sid:
+                    scripts.append({"id": sid, "output": sc.get("output", "")})
+
+            item = {
+                "host": ip,
+                "hostname": hostname,
+                "port": portid,
+                "protocol": protocol,
+                "state": state,
+                "service": service,
+                "scripts": scripts,
+            }
+            results.append({"FINDING": json.dumps(item, ensure_ascii=False)})
     return results

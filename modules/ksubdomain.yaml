@@ -1,0 +1,33 @@
+name: ksubdomain_module
+description: ksubdomain 无状态子域名爆破 — 高速发包枚举，输出 DNS_NAME 事件(需 root/CAP_NET_RAW)
+runtime:
+  max_concurrency: 2
+allowed_output_events:
+  - DNS_NAME
+
+io_contract:
+  input_events:
+    - DNS_NAME
+  input_transform_code: |
+    import shlex
+    # 清洗域名:去空格/末尾点号/统一小写
+    domain = data["value"].strip().strip(".").lower()
+    if not domain or "." not in domain:
+        return []
+    return [{"domain": domain, "domain_q": shlex.quote(domain)}]
+
+execution:
+  # -silent 仅输出域名; -skip-wild 跳过泛解析
+  # 无状态 UDP 发包需要 root/CAP_NET_RAW,非 root 运行会失败(pipeline 记录日志)
+  command: ksubdomain -d {{domain_q}} -f wordlists/subdomains.txt -silent -skip-wild 2>/dev/null
+  output_parse_code: |
+    results = []
+    seen = set()
+    for line in data["stdout"].splitlines():
+        # 每行取第一个 token(兼容 "域名" 或 "域名 IP" 格式)
+        host = (line.split()[0] if line.split() else "").strip().lower().strip(".")
+        if not host or "." not in host or host in seen:
+            continue
+        seen.add(host)
+        results.append({"DNS_NAME": host})
+    return results

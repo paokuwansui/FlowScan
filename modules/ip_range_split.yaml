@@ -1,0 +1,30 @@
+name: ip_range_split_module
+description: IP_RANGE 网段展开为单个 IP_ADDRESS 事件,供后续模块逐 IP 消费
+runtime:
+  max_concurrency: 4
+allowed_output_events:
+  - IP_ADDRESS
+
+io_contract:
+  input_events:
+    - IP_RANGE
+  input_transform_code: |
+    import shlex
+    return [{"value": shlex.quote(data["value"])}]
+
+execution:
+  command: python ./bin/ip_range_split.py {{value}}
+  output_parse_code: |
+    import json
+    temp_list = []
+    for line in data["stdout"].strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            # 解析单行 JSON 并添加到列表
+            ip_obj = json.loads(line)
+            temp_list.append(ip_obj)
+        except:
+            continue
+    return temp_list

@@ -1,17 +1,7 @@
 name: httpx_module
-description: httpx HTTP 探活 — 探测 URL/端口存活，提取标题/技术栈/状态码/图标/证书等汇总为 URL_INFO，403 单独输出
-check:
-  command: $HOME/.local/bin/httpx -version
-  expect_keyword: Current Version
-  exclude_keyword: not found
-install:
-  steps:
-  - mkdir -p "$HOME/.local/bin" "$HOME/.cache/go-tmp"
-  - GOBIN="$HOME/.local/bin" GOCACHE="$HOME/.cache/go-tmp" go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
-  install_timeout_seconds: 1200
+description: httpx HTTP 探活 — 探测 URL/端口存活，提取标题/技术栈/状态码/图标/证书等汇总为 URL_INFO
 runtime:
   max_concurrency: 8
-  exec_timeout_seconds: 180
 allowed_output_events:
   - DNS_NAME
   - URL
@@ -26,7 +16,7 @@ io_contract:
     value = data["value"].strip()
     return [{"target": value, "target_q": shlex.quote(value)}]
 execution:
-  command: $HOME/.local/bin/httpx -title -favicon -tls-probe -status-code -json -silent -u {{target_q}} -threads 50 | python ./bin/httpx.py
+  command: httpx -title -favicon -tls-probe -status-code -json -silent -u {{target_q}} -threads 50 | python ./bin/httpx.py
   output_parse_code: |
     import json
     temp_list = []

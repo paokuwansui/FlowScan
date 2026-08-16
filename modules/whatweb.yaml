@@ -1,0 +1,55 @@
+name: whatweb_module
+description: WhatWeb 网站指纹识别 — 对 URL 提取技术栈/框架/版本，输出 TECHNOLOGY
+runtime:
+  max_concurrency: 3
+allowed_output_events:
+- TECHNOLOGY
+io_contract:
+  input_events:
+  - URL
+  input_transform_code: |
+    import shlex
+    value = data["value"].strip()
+    if not value.startswith(("http://", "https://")):
+        value = "http://" + value
+    return [{"target": value, "target_q": shlex.quote(value)}]
+execution:
+  command: 'f=$(mktemp /tmp/ww.XXXXXX.json); trap "rm -f $f" EXIT; whatweb -q --no-errors --log-json="$f" {{target_q}} >/dev/null 2>&1; cat "$f" 2>/dev/null'
+  output_parse_code: |
+    import json
+    from urllib.parse import urlparse
+
+    results = []
+    seen = set()
+    # 噪音插件:无技术指纹价值的元信息
+    NOISE = {"IP", "Country", "Title", "HTTPServer"}
+
+    try:
+        arr = json.loads(data["stdout"] or "[]")
+    except:
+        return []
+    if not isinstance(arr, list):
+        return []
+
+    for item in arr:
+        if not isinstance(item, dict):
+            continue
+        target = item.get("target") or ""
+        if not target.startswith(("http://", "https://")):
+            continue
+        netloc = urlparse(target).netloc
+        plugins = item.get("plugins") or {}
+        for name, info in plugins.items():
+            if name in NOISE:
+                continue
+            if not isinstance(info, dict):
+                continue
+            version = (info.get("version") or [None])
+            version = version[0] if version else None
+            tech = name + (("/" + str(version)) if version else "")
+            raw = json.dumps({name: info}, ensure_ascii=False)
+            value = f"{netloc}|{tech}|{raw}"
+            if value not in seen:
+                seen.add(value)
+                results.append({"TECHNOLOGY": value})
+    return results

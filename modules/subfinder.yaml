@@ -1,0 +1,31 @@
+name: subfinder_module
+description: Subfinder 被动子域名枚举 — 从根域名发现子域名，输出 DNS_NAME 事件
+runtime:
+  max_concurrency: 3
+allowed_output_events:
+  - DNS_NAME
+
+io_contract:
+  input_events:
+    - DNS_NAME
+  input_transform_code: |
+    import shlex
+    # 清洗域名:去空格/末尾点号/统一小写
+    domain = data["value"].strip().strip(".").lower()
+    if not domain or "." not in domain:
+        return []
+    return [{"domain": domain, "domain_q": shlex.quote(domain)}]
+
+execution:
+  command: subfinder -d {{domain_q}} -silent -all -recursive -timeout 25 -rl 20 2>/dev/null
+  output_parse_code: |
+    results = []
+    seen = set()
+    for line in data["stdout"].splitlines():
+        # 清洗:去空格/小写/去末尾点号
+        host = line.strip().lower().strip(".")
+        if not host or "." not in host or host in seen:
+            continue
+        seen.add(host)
+        results.append({"DNS_NAME": host})
+    return results

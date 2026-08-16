@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Xray报告{% endblock %}
+{% block content %}
+<div class="page-head">
+    <h1>Xray 被动扫描报告</h1>
+    <p class="page-sub">chaitin xray 被动代理实时漏洞报告（reports/xray_out.json · xray_out.html）</p>
+</div>
+
+{% set sev_badge = {'critical': 'badge-danger', 'high': 'badge-warn', 'medium': 'badge-event', 'low': 'badge-muted', 'info': 'badge-muted'} %}
+
+{# ── Tab 切换 ── #}
+{% if findings or html_exists %}
+<nav class="tabs">
+    <a href="?tab=json" class="tab {% if tab == 'json' %}active{% endif %}">JSON 报告<span class="cnt">{{ findings|length }}</span></a>
+    <a href="?tab=html" class="tab {% if tab == 'html' %}active{% endif %}">HTML 报告</a>
+</nav>
+{% endif %}
+
+{# ── JSON 报告 Tab：结构化漏洞列表 ── #}
+<div id="tab-json" {% if tab != 'json' %}style="display:none"{% endif %}>
+    {% if findings %}
+    <div class="mini-stats" style="margin-bottom:16px;">
+        <div class="mini-stat">
+            <span class="ms-value">{{ findings|length }}</span>
+            <span class="ms-label">发现总数</span>
+        </div>
+        <div class="mini-stat">
+            <span class="ms-value" style="color:var(--danger);">{{ sev_counts.critical }}</span>
+            <span class="ms-label">Critical</span>
+        </div>
+        <div class="mini-stat">
+            <span class="ms-value" style="color:var(--warning);">{{ sev_counts.high }}</span>
+            <span class="ms-label">High</span>
+        </div>
+        <div class="mini-stat">
+            <span class="ms-value" style="color:var(--accent);">{{ sev_counts.medium }}</span>
+            <span class="ms-label">Medium</span>
+        </div>
+        <div class="mini-stat">
+            <span class="ms-value" style="color:var(--text-muted);">{{ sev_counts.low + sev_counts.info }}</span>
+            <span class="ms-label">Low / Info</span>
+        </div>
+    </div>
+    <div style="display:grid;gap:12px;">
+        {% for f in findings %}
+        <div class="card" style="padding:14px 16px;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+                <span class="badge {{ sev_badge[f.severity] }}">{{ f.severity }}</span>
+                <span class="mono" style="color:var(--accent);font-size:0.82rem;">{{ f.plugin }}</span>
+                {% if f.vuln_class %}
+                <span class="badge badge-purple">{{ f.vuln_class }}</span>
+                {% endif %}
+                {% if f.create_time_iso %}
+                <span class="mono" style="margin-left:auto;color:var(--text-faint);font-size:0.7rem;">{{ f.create_time_iso }}</span>
+                {% endif %}
+            </div>
+            {% if f.url %}
+            <div class="mono" style="font-size:0.78rem;word-break:break-all;margin-bottom:6px;">
+                {{ f.url }}{% if f.port %} <span style="color:var(--text-faint);">({{ f.host or '?' }}:{{ f.port }})</span>{% endif %}
+            </div>
+            {% endif %}
+            {% if f.payload %}
+            <pre class="mono" style="margin:0;padding:10px 12px;background:rgba(3,7,15,.55);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:0.75rem;white-space:pre-wrap;word-break:break-all;max-height:180px;overflow-y:auto;">{{ (f.payload or '')[:900] }}{% if f.payload|length > 900 %}…{% endif %}</pre>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center;">
+        <a class="btn btn-sm btn-primary" href="{{ url_for('xray_report_json') }}" target="_blank">原始 JSON</a>
+        <button class="btn btn-sm" onclick="location.reload()">刷新状态</button>
+    </div>
+    {% else %}
+    <div class="empty-state" style="margin-top:30px;">
+        <p>xray 还没有输出 JSON 报告（<code>reports/xray_out.json</code>）</p>
+    </div>
+    {% endif %}
+</div>
+
+{# ── HTML 报告 Tab：iframe 展示 ── #}
+<div id="tab-html" {% if tab != 'html' %}style="display:none"{% endif %}>
+    {% if html_exists %}
+    <div class="card">
+        <div class="card-title">
+            <span style="font-size:0.85rem;color:var(--text-muted);">
+                报告文件 <code>xray_out.html</code> · <b class="mono" style="color:var(--text);">{{ size }}</b> 字节 · 更新于 {{ mtime }}
+            </span>
+            <div class="action-buttons">
+                <button class="btn btn-sm" onclick="location.reload()">刷新状态</button>
+                <button class="btn btn-sm" onclick="var f=document.getElementById('xray-frame'); f.src=f.src;">重载报告</button>
+                <a class="btn btn-sm btn-primary" href="{{ url_for('xray_report_raw') }}" target="_blank">新窗口打开</a>
+            </div>
+        </div>
+    </div>
+    <iframe id="xray-frame" src="{{ url_for('xray_report_raw') }}"
+            style="width:100%;height:78vh;border:1px solid var(--border);border-radius:var(--radius);background:#fff;"></iframe>
+    {% else %}
+    <div class="empty-state" style="margin-top:30px;">
+        <p>xray 还没有输出 HTML 报告（<code>reports/xray_out.html</code>）</p>
+    </div>
+    {% endif %}
+</div>
+
+{% if not findings and not html_exists %}
+<div class="card" style="padding:0;overflow:hidden;">
+    <div style="text-align:center;padding:70px 24px;">
+        <div style="font-size:2.2rem;color:var(--accent);text-shadow:0 0 18px rgba(34,211,238,.5);margin-bottom:14px;">
+            <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="vertical-align:-6px;">
+                <circle cx="12" cy="12" r="8.4"/><circle cx="12" cy="12" r="3.8"/>
+                <path d="M12 12 L18.5 5.5" stroke-linecap="round"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/>
+            </svg>
+        </div>
+        <h3 style="justify-content:center;margin-bottom:8px;">xray 还没有输出被动扫描报告</h3>
+        <p class="help-text" style="margin:0 auto 10px;max-width:560px;">
+            xray 被动代理运行时会同时把扫描结果写到 <code>reports/xray_out.json</code> 与 <code>reports/xray_out.html</code>。<br>
+            请确认主节点容器内 xray 已启动（默认监听 <code>7777</code>，见 <code>start_xray.sh</code>），并把目标流量（浏览器或 katana）导向该代理。
+        </p>
+        <button class="btn btn-sm" onclick="location.reload()">刷新状态</button>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,42 +1,44 @@
 {% extends "base.html" %}
 {% block title %}执行流程{% endblock %}
 {% block content %}
-<div class="section">
+<div class="page-head">
     <h1>执行流程</h1>
-    <p class="text-muted">按工具 YAML 的输入/输出事件契约绘制工具间流程；边上的文字是上游工具输出、下游工具消费的事件类型。</p>
+    <p class="page-sub">按工具 YAML 的输入/输出事件契约绘制工具间流程；边上的文字是上游工具输出、下游工具消费的事件类型</p>
+</div>
 
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-value" id="flow-tool-count">{{ graph.stats.tool_count }}</div>
-            <div class="stat-label">工具节点</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value" id="flow-event-count">{{ graph.stats.event_type_count }}</div>
-            <div class="stat-label">事件类型</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value" id="flow-edge-count">{{ graph.stats.edge_count }}</div>
-            <div class="stat-label">产消费边</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value" id="flow-total-count">{{ graph.stats.event_total }}</div>
-            <div class="stat-label">累计事件</div>
-        </div>
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value" id="flow-tool-count">{{ graph.stats.tool_count }}</div>
+        <div class="stat-label">工具节点</div>
     </div>
+    <div class="stat-card">
+        <div class="stat-value" id="flow-event-count">{{ graph.stats.event_type_count }}</div>
+        <div class="stat-label">事件类型</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="flow-edge-count">{{ graph.stats.edge_count }}</div>
+        <div class="stat-label">产消费边</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="flow-total-count">{{ graph.stats.event_total }}</div>
+        <div class="stat-label">累计事件</div>
+    </div>
+</div>
 
-    <div class="card" style="margin-bottom:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+<div class="card" style="padding:12px 16px;">
+    <div class="action-buttons" style="align-items:center;">
         <button class="btn btn-sm btn-primary" onclick="refreshFlow()">刷新状态</button>
         <button class="btn btn-sm" onclick="network.fit({animation:true})">适配视图</button>
         <span class="badge badge-tool">工具节点</span>
-        <span style="color:#8b949e;font-size:0.85rem;">暗色节点 = disabled / 占位模块</span>
-        <span style="color:#3fb950;font-size:0.85rem;">绿色事件点 = 高扇出事件或未被消费的输出事件</span>
-        <span style="color:#58a6ff;font-size:0.85rem;">边 = 事件流向</span>
-        <span style="color:var(--text-muted);font-size:0.85rem;">节点标签 R/P = Running/Pending</span>
-        <span style="color:var(--text-muted);font-size:0.85rem;">鼠标悬停工具节点只显示 YAML 执行命令</span>
+        <span class="badge badge-muted">暗色 = disabled / 占位模块</span>
+        <span class="badge badge-event">绿色事件点 = 高扇出 / 未被消费</span>
+        <span class="legend-line" style="--lc:#22d3ee;">边 = 事件流向</span>
+        <span class="legend-text">节点标签 R/P = Running/Pending</span>
+        <span class="legend-text">悬停工具节点查看 YAML 执行命令</span>
     </div>
-
-    <div id="flow-graph" style="width:100%;height:calc(100vh - 270px);min-height:560px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);"></div>
 </div>
+
+<div id="flow-graph" style="width:100%;height:calc(100vh - 300px);min-height:520px;background:rgba(3,7,15,0.6);border:1px solid var(--border);border-radius:var(--radius);"></div>
 {% endblock %}
 
 {% block scripts %}
@@ -44,6 +46,8 @@
 <style>
 #flow-graph canvas { display: block; }
 .vis-network:focus { outline: none; }
+.legend-line::before { content:""; display:inline-block; width:14px; height:2px; margin-right:6px; background:var(--lc,#22d3ee); vertical-align:3px; box-shadow:0 0 6px var(--lc,#22d3ee); }
+.legend-text { color: var(--text-muted); font-size: 0.82rem; }
 </style>
 <script>
 var graph = {{ graph | tojson | safe }};
@@ -54,26 +58,26 @@ var options = {
     groups: {
         tool: {
             shape: 'box',
-            color: { background: '#161b22', border: '#58a6ff', highlight: { background: '#1c2333', border: '#79c0ff' } },
-            font: { color: '#e6edf3', size: 13, face: 'monospace' },
+            color: { background: '#0c1322', border: '#22d3ee', highlight: { background: '#12203a', border: '#7dd3fc' } },
+            font: { color: '#d9e4f7', size: 13, face: 'monospace' },
             margin: { top: 8, bottom: 8, left: 12, right: 12 }
         },
         disabled: {
             shape: 'box',
-            color: { background: '#2d1f1f', border: '#8b949e', highlight: { background: '#362626', border: '#f85149' } },
-            font: { color: '#8b949e', size: 13, face: 'monospace' },
+            color: { background: '#1a1216', border: '#3d3040', highlight: { background: '#241419', border: '#fb7185' } },
+            font: { color: '#7d8fb5', size: 13, face: 'monospace' },
             margin: { top: 8, bottom: 8, left: 12, right: 12 }
         },
         event: {
             shape: 'dot',
-            color: { background: '#12251b', border: '#3fb950', highlight: { background: '#163520', border: '#56d364' } },
-            font: { color: '#e6edf3', size: 12, face: 'monospace' },
+            color: { background: '#0b1f18', border: '#34d399', highlight: { background: '#0f2b20', border: '#6ee7b7' } },
+            font: { color: '#d9e4f7', size: 12, face: 'monospace' },
             margin: 8
         }
     },
     edges: {
-        color: { color: '#58a6ff', highlight: '#79c0ff', hover: '#79c0ff' },
-        font: { color: '#c9d1d9', size: 11, face: 'sans-serif', align: 'middle', strokeWidth: 3, strokeColor: '#0d1117' },
+        color: { color: '#22d3ee', highlight: '#7dd3fc', hover: '#7dd3fc' },
+        font: { color: '#a9bcdd', size: 11, face: 'sans-serif', align: 'middle', strokeWidth: 3, strokeColor: '#05080f' },
         width: 1.4,
         arrows: { to: { enabled: true, scaleFactor: 0.65 } },
         smooth: { type: 'dynamic', roundness: 0.25 }

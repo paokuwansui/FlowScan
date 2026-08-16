@@ -1,16 +1,78 @@
 {% extends "base.html" %}
 {% block title %}AI 分析{% endblock %}
 {% block content %}
-<div class="section">
+<div class="page-head">
     <h1>AI 分析</h1>
+    <p class="page-sub">定时分析 · Agent 自主扫描 · 事件日记 · 模型与 MCP/Skill 配置</p>
+</div>
 
-    <div class="stats-grid" style="grid-template-columns:1fr 1fr 1fr;">
+{# ── Tab 切换 ── #}
+<nav class="tabs">
+    <a href="?tab=agent" class="tab ai-tab-link {% if tab == 'agent' %}active{% endif %}" data-tab="agent">Agent 实时交互</a>
+    <a href="?tab=schedule" class="tab ai-tab-link {% if tab == 'schedule' %}active{% endif %}" data-tab="schedule">定时任务模式</a>
+    <a href="?tab=logs" class="tab ai-tab-link {% if tab == 'logs' %}active{% endif %}" data-tab="logs">事件日记</a>
+    <a href="?tab=config" class="tab ai-tab-link {% if tab == 'config' %}active{% endif %}" data-tab="config">AI 配置</a>
+</nav>
+
+{# ── 定时任务模式 Tab ── #}
+<div id="tab-agent" {% if tab != 'agent' %}style="display:none"{% endif %}>
+    <div class="layout-2col-side">
+        <div>
+            <div class="card">
+                <h3>历史会话</h3>
+                <a class="btn" href="?tab=agent&new_session=1" id="new-session-btn" style="width:100%;margin-bottom:10px;display:block;text-align:center;">+ 新建会话</a>
+                <div id="session-list" style="max-height:58vh;overflow:auto;"></div>
+            </div>
+        </div>
+        <div style="min-width:0;">
+            <div class="card">
+                <h3 id="current-title">Agent 会话</h3>
+                <p class="help-text">
+                    输入任务后 Agent 自主循环：查看事件 → 注入扫描 → 看增量 → 再决策，直到收敛。
+                    危险工具（删除/黑名单/网络/Python/命令/MCP）按审批模式执行（自动放行 / AI 审批 / 人工审批），全部落审计，下方可展开查看。
+                </p>
+                <div id="agent-trajectory" class="chat-box" style="max-height:52vh;margin-bottom:12px;"></div>
+                <div style="display:flex;gap:10px;align-items:flex-start;">
+                    <textarea id="agent-message" rows="3" class="form-control" placeholder="例如：对 example.com 做一次完整外部侦察，找出高危资产" aria-label="Agent 任务输入" style="flex:1;"></textarea>
+                    <button class="btn btn-primary" id="agent-send-btn" onclick="runAgent()" style="white-space:nowrap;">发送</button>
+                </div>
+                <span class="help-text" id="agent-input-hint" style="margin:6px 0 0;font-family:var(--font-mono);font-size:0.72rem;">回车发送 · Shift+回车换行</span>
+                <details style="margin-top:12px;">
+                    <summary>审计记录（危险工具执行历史）</summary>
+                    <div id="agent-audit" style="margin-top:8px;font-family:var(--font-mono);font-size:0.76rem;max-height:30vh;overflow:auto;"></div>
+                </details>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ── 新建会话模态框 ── #}
+{# 新建会话模态框:类名用 fs3-modal-backdrop(旧 style.css 的 .modal-backdrop 规则不再匹配,
+   避免旧 CSS 缓存里的 display:none !important 覆盖内联样式);内联关键样式 + !important 双保险 #}
+<div id="new-session-modal" class="fs3-modal-backdrop" style="display:none !important;position:fixed;top:0;right:0;bottom:0;left:0;z-index:1000;background:rgba(2,5,12,0.78);align-items:center;justify-content:center;">
+    <div class="fs3-modal-card" style="background:var(--surface);border:1px solid var(--border-bright);border-radius:14px;padding:26px;width:92%;max-width:480px;box-shadow:0 0 60px rgba(34,211,238,0.12),0 24px 60px rgba(0,0,0,0.5);">
+        <h3>新建 Agent 会话</h3>
+        <div class="form-group">
+            <label for="new-session-name">会话名称（留空默认「新会话」）</label>
+            <input type="text" id="new-session-name" class="form-control" maxlength="60"
+                   placeholder="例如：example.com 外部侦察">
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">
+            <button class="btn" onclick="closeNewSessionModal()">取消</button>
+            <button class="btn btn-primary" id="new-session-confirm" onclick="confirmNewSession()">创建会话</button>
+        </div>
+    </div>
+</div>
+
+{# ── 事件日记 Tab ── #}
+<div id="tab-schedule" {% if tab != 'schedule' %}style="display:none"{% endif %}>
+    <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-value">{{ event_types|length }}</div>
             <div class="stat-label">可选事件类型</div>
         </div>
         <div class="stat-card">
-            <div class="stat-value">{{ result.event_count if result else context_events|length }}</div>
+            <div class="stat-value" id="stat-context">-</div>
             <div class="stat-label">本次上下文事件</div>
         </div>
         <div class="stat-card">
@@ -22,15 +84,16 @@
     <div class="card">
         <h3>分析配置</h3>
         <p class="help-text">
-            手动点击"发送给 AI 分析"时，会把系统提示词、所选事件结果、最近 AI 日志和你的问题一起发送给 AI。
-            AI 回答末尾如果包含结构化 actions，系统会按下方勾选框自动执行；执行顺序固定为 删除事件 → 删除黑名单 → 增加黑名单 → 增加事件 → 存储日志。
+            点击"发送给 AI 分析"后后台异步调用 AI，页面自动刷新进度，不再阻塞。
+            上方勾选的动作用类型会在分析完成后<strong>自动执行</strong>；未勾选的类型进入下方「动作预览」审核列表，由你点「一键执行剩余动作」才落地。
+            执行顺序固定为 删除事件 → 删除黑名单 → 增加黑名单 → 增加事件 → 存储日志。
         </p>
         <form id="ai-analysis-form" method="POST" action="{{ url_for('ai_analysis') }}">
             <div class="form-group">
-                <label style="display:block;margin-bottom:8px;color:var(--text-muted);">选择事件类型</label>
-                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;max-height:260px;overflow:auto;border:1px solid var(--border);border-radius:var(--radius);padding:10px;background:var(--bg);">
+                <label>选择事件类型</label>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:7px;max-height:250px;overflow:auto;border:1px solid var(--border);border-radius:var(--radius);padding:12px;background:rgba(3,7,15,0.5);">
                     {% for et in event_types %}
-                    <label style="display:flex;align-items:center;gap:7px;font-family:monospace;font-size:0.86rem;">
+                    <label style="display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:0.84rem;cursor:pointer;color:var(--text);">
                         <input type="checkbox" name="event_types" value="{{ et }}" {% if et in selected_types %}checked{% endif %}>
                         {{ et }}
                     </label>
@@ -40,61 +103,61 @@
                 </div>
             </div>
 
-            <div class="form-row" style="align-items:center;gap:10px;margin:10px 0;flex-wrap:wrap;">
-                <label>最多发送事件数
-                    <input type="number" name="max_events" value="{{ max_events }}" min="1" max="5000"
-                           style="width:110px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:monospace;">
-                </label>
-                <label>定时分析间隔（分钟）
-                    <input type="number" name="loop_interval" value="0" min="0" max="1440"
-                           style="width:110px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:monospace;">
-                </label>
-                <span class="help-text">0 表示不新增定时任务；新增后不会被前端手动问询影响。</span>
-            </div>
-
-            <div class="form-row" style="align-items:center;gap:16px;margin:10px 0;flex-wrap:wrap;">
-                <span style="color:var(--text-muted);font-size:0.82rem;">自动执行动作：</span>
-                <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:0.85rem;">
-                    <input type="checkbox" name="toggle_add" value="1" {% if toggles.add %}checked{% endif %}>
-                    <span class="badge" style="background:rgba(63,185,80,0.15);color:#3fb950;">增加事件</span>
-                </label>
-                <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:0.85rem;">
-                    <input type="checkbox" name="toggle_del" value="1" {% if toggles.del %}checked{% endif %}>
-                    <span class="badge" style="background:rgba(248,81,73,0.15);color:var(--danger);">删除事件</span>
-                </label>
-                <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:0.85rem;">
-                    <input type="checkbox" name="toggle_del_children" value="1" {% if toggles.del_children %}checked{% endif %}>
-                    <span class="badge" style="background:rgba(248,81,73,0.10);color:var(--danger);">删除时同时删除子事件</span>
-                </label>
-            </div>
-            <div class="form-row" style="align-items:center;gap:16px;margin:0 0 10px 0;flex-wrap:wrap;">
-                <span style="color:transparent;font-size:0.82rem;user-select:none;">自动执行动作：</span>
-                <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:0.85rem;">
-                    <input type="checkbox" name="toggle_blacklist_add" value="1" {% if toggles.blacklist_add %}checked{% endif %}>
-                    <span class="badge" style="background:rgba(138,80,255,0.15);color:#b386ff;">增加黑名单</span>
-                </label>
-                <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:0.85rem;">
-                    <input type="checkbox" name="toggle_blacklist_del" value="1" {% if toggles.blacklist_del %}checked{% endif %}>
-                    <span class="badge" style="background:rgba(230,140,50,0.15);color:#e68c32;">删除黑名单</span>
-                </label>
-                <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:0.85rem;">
-                    <input type="checkbox" name="toggle_log" value="1" {% if toggles.log %}checked{% endif %}>
-                    <span class="badge" style="background:rgba(210,153,34,0.15);color:#d29922;">存储日志</span>
-                </label>
+            <div class="form-row" style="margin:12px 0;">
+                <div class="form-group" style="margin:0;">
+                    <label for="max_events">最多发送事件数</label>
+                    <input type="number" id="max_events" name="max_events" value="{{ max_events }}" min="1" max="5000" class="form-control" style="width:130px;font-family:var(--font-mono);">
+                </div>
+                <div class="form-group" style="margin:0;">
+                    <label for="loop_interval">定时分析间隔（分钟）</label>
+                    <input type="number" id="loop_interval" name="loop_interval" value="0" min="0" max="1440" class="form-control" style="width:130px;font-family:var(--font-mono);">
+                </div>
+                <span class="help-text" style="margin:0 0 10px;">0 表示不新增定时任务；新增后不会被前端手动问询影响。</span>
             </div>
 
             <div class="form-group">
-                <label style="display:block;margin-bottom:8px;color:var(--text-muted);">用户问题</label>
-                <textarea name="question" rows="6" placeholder="例如：从这些扫描事件里找出最值得继续验证的资产和下一步扫描建议。"
-                          style="width:100%;font-family:monospace;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:10px;resize:vertical;">{{ question }}</textarea>
+                <label>自动执行动作（勾选=分析完成后自动执行该类型动作；不勾选=进入预览审核列表手动执行）</label>
+                <div style="display:flex;gap:14px;flex-wrap:wrap;border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;background:rgba(3,7,15,0.5);">
+                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.85rem;">
+                        <input type="checkbox" name="toggle_add" value="1" {% if toggles.add %}checked{% endif %}>
+                        <span class="badge badge-tool">增加事件</span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.85rem;">
+                        <input type="checkbox" name="toggle_del" value="1" {% if toggles.del %}checked{% endif %}>
+                        <span class="badge badge-danger">删除事件</span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.85rem;">
+                        <input type="checkbox" name="toggle_del_children" value="1" {% if toggles.del_children %}checked{% endif %}>
+                        <span class="badge badge-danger">删除时同时删除子事件</span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.85rem;">
+                        <input type="checkbox" name="toggle_blacklist_add" value="1" {% if toggles.blacklist_add %}checked{% endif %}>
+                        <span class="badge badge-purple">增加黑名单</span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.85rem;">
+                        <input type="checkbox" name="toggle_blacklist_del" value="1" {% if toggles.blacklist_del %}checked{% endif %}>
+                        <span class="badge badge-warn">删除黑名单</span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.85rem;">
+                        <input type="checkbox" name="toggle_log" value="1" {% if toggles.log %}checked{% endif %}>
+                        <span class="badge badge-node">存储日志</span>
+                    </label>
+                </div>
             </div>
 
-            <div class="form-row" style="gap:10px;flex-wrap:wrap;">
-                <button type="submit" class="btn btn-primary" formaction="{{ url_for('ai_analysis') }}">发送给 AI 分析</button>
+            <div class="form-group">
+                <label for="question">用户问题</label>
+                <textarea id="question" name="question" rows="6" class="form-control" placeholder="例如：从这些扫描事件里找出最值得继续验证的资产和下一步扫描建议。"></textarea>
+            </div>
+
+            <div class="form-row" style="gap:10px;">
+                <button type="button" class="btn btn-primary" onclick="submitAnalysis()">发送给 AI 分析</button>
                 <button type="submit" class="btn" formaction="{{ url_for('ai_schedule_create') }}">增加定时状态</button>
             </div>
         </form>
     </div>
+
+    <div id="ai-result"></div>
 
     <div class="card">
         <h3>定时分析事件</h3>
@@ -103,40 +166,53 @@
         <table class="table">
             <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>间隔</th>
+                    <th style="width:110px;">ID</th>
+                    <th style="width:70px;">间隔</th>
+                    <th style="width:90px;">启停</th>
                     <th>事件类型</th>
-                    <th>开关</th>
-                    <th>运行次数</th>
-                    <th>上次/下次</th>
-                    <th>状态</th>
-                    <th>操作</th>
+                    <th style="width:130px;">自动执行</th>
+                    <th style="width:70px;">运行次数</th>
+                    <th style="width:210px;">上次/下次</th>
+                    <th style="width:110px;">状态</th>
+                    <th style="width:130px;">操作</th>
                 </tr>
             </thead>
             <tbody>
                 {% for item in schedules %}
                 <tr>
                     <td class="fp-cell">{{ item.schedule_id }}</td>
-                    <td>{{ item.interval_minutes }} 分钟</td>
-                    <td class="value-cell">{{ item.selected_types|join(', ') }}</td>
+                    <td class="mono">{{ item.interval_minutes }} 分钟</td>
                     <td>
-                        {% if item.toggles.add %}<span class="badge">增</span>{% endif %}
-                        {% if item.toggles.del %}<span class="badge">删</span>{% endif %}
-                        {% if item.toggles.del and item.toggles.del_children %}<span class="badge">删子</span>{% endif %}
-                        {% if item.toggles.blacklist_add %}<span class="badge">黑+</span>{% endif %}
-                        {% if item.toggles.blacklist_del %}<span class="badge">黑-</span>{% endif %}
-                        {% if item.toggles.log %}<span class="badge">记</span>{% endif %}
+                        {% if item.enabled %}
+                        <button type="button" class="btn btn-sm btn-success" onclick="toggleSchedule('{{ item.schedule_id }}')" title="点击暂停">运行中</button>
+                        {% else %}
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="toggleSchedule('{{ item.schedule_id }}')" title="点击启用">已暂停</button>
+                        {% endif %}
                     </td>
-                    <td>{{ item.run_count }}</td>
-                    <td style="font-size:0.78rem;color:var(--text-muted);">
+                    <td class="value-cell">
+                        {% for t in item.selected_types %}<span class="badge badge-event" style="margin:1px;">{{ t }}</span>{% endfor %}
+                    </td>
+                    <td>
+                        {% if item.toggles.add %}<span class="badge badge-tool">增</span>{% endif %}
+                        {% if item.toggles.del %}<span class="badge badge-danger">删</span>{% endif %}
+                        {% if item.toggles.del and item.toggles.del_children %}<span class="badge badge-danger">删子</span>{% endif %}
+                        {% if item.toggles.blacklist_add %}<span class="badge badge-purple">黑+</span>{% endif %}
+                        {% if item.toggles.blacklist_del %}<span class="badge badge-warn">黑-</span>{% endif %}
+                        {% if item.toggles.log %}<span class="badge badge-node">记</span>{% endif %}
+                    </td>
+                    <td class="mono">{{ item.run_count }}</td>
+                    <td style="font-size:0.76rem;color:var(--text-muted);font-family:var(--font-mono);">
                         上次: {{ item.last_run_iso or '-' }}<br>
                         下次: {{ item.next_run_iso or '-' }}
                     </td>
-                    <td>{{ item.last_status }}{% if item.last_error %}<br><span style="color:var(--danger);">{{ item.last_error[:120] }}</span>{% endif %}</td>
+                    <td>
+                        <span class="badge {% if item.last_status == 'ok' %}badge-tool{% elif item.last_status == 'error' %}badge-danger{% else %}badge-muted{% endif %}">{{ item.last_status }}</span>
+                        {% if item.last_error %}<br><span style="color:var(--danger);font-size:0.76rem;">{{ item.last_error[:120] }}</span>{% endif %}
+                    </td>
                     <td style="white-space:nowrap;">
-                        <a class="btn" href="{{ url_for('ai_schedule_detail', schedule_id=item.schedule_id) }}">详情</a>
+                        <a class="btn btn-sm btn-secondary" href="{{ url_for('ai_schedule_detail', schedule_id=item.schedule_id) }}">详情</a>
                         <form method="POST" action="{{ url_for('ai_schedule_delete', schedule_id=item.schedule_id) }}" style="display:inline;" onsubmit="return confirm('确认删除这个定时 AI 分析任务？');">
-                            <button type="submit" class="btn btn-danger">删除</button>
+                            <button type="submit" class="btn btn-sm btn-danger">删除</button>
                         </form>
                     </td>
                 </tr>
@@ -144,66 +220,1026 @@
             </tbody>
         </table>
         {% else %}
-        <div class="empty-state">暂无定时分析事件。设置大于 0 的分钟数并点击“增加定时状态”。</div>
+        <div class="eq-empty" style="margin:16px 0 4px;">
+            <div class="eq-empty-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+                    <circle cx="12" cy="12" r="8.5"/>
+                    <path d="M12 7v5l3.2 2"/>
+                </svg>
+            </div>
+            <h2>暂无定时分析事件</h2>
+            <p>设置大于 0 的分析间隔(分钟)并点击「增加定时状态」,系统会按间隔自动执行 AI 分析。</p>
+        </div>
         {% endif %}
     </div>
-
-    {% if action_results %}
-    <div class="card">
-        <h3>自动执行结果</h3>
-        <table class="table">
-            <thead><tr><th>类型</th><th>详情</th><th>状态</th></tr></thead>
-            <tbody>
-                {% for ar in action_results %}
-                <tr>
-                    <td>{{ ar.type }}</td>
-                    <td class="value-cell">
-                        {% if ar.type in ('add', 'del') %}
-                        <span class="badge badge-event">{{ ar.event_type }}</span> {{ ar.value }}
-                        {% elif ar.type in ('blacklist_add', 'blacklist_del') %}
-                        <span class="badge badge-event">{{ ar.event_type }}</span>:{{ ar.match_mode }}:{{ ar.value }}
-                        {% elif ar.type == 'log' %}
-                        {{ ar.log_id }}
-                        {% else %}-{% endif %}
-                    </td>
-                    <td>{{ ar.note }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% endif %}
-
-    {% if result %}
-    <div class="card">
-        <h3>AI 回答</h3>
-        {% if result.ok %}
-        <pre style="white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px;color:var(--text);font-family:inherit;line-height:1.55;">{{ result.answer }}</pre>
-        <p class="help-text">解析到 {{ result.parsed_action_count or 0 }} 个结构化动作，实际执行 {{ result.action_count or 0 }} 个动作。</p>
-        {% else %}
-        <div class="flash error">{{ result.error }}</div>
-        {% endif %}
-    </div>
-    {% endif %}
-
-    {% if context_events %}
-    <div class="card">
-        <h3>发送上下文预览</h3>
-        <table class="table">
-            <thead><tr><th>类型</th><th>值</th><th>来源</th><th>指纹</th></tr></thead>
-            <tbody>
-                {% for evt in context_events[:100] %}
-                <tr>
-                    <td><span class="badge badge-event">{{ evt.event_type }}</span></td>
-                    <td class="value-cell">{{ evt.value }}</td>
-                    <td>{{ evt.source_tool or '-' }}</td>
-                    <td class="fp-cell">{{ evt.fingerprint[:16] }}...</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% if context_events|length > 100 %}<p class="help-text">仅预览前 100 条，实际发送 {{ context_events|length }} 条。</p>{% endif %}
-    </div>
-    {% endif %}
 </div>
+
+{# ── 事件日记 Tab(组件化:直接 include 共享片段,替代 iframe 嵌入) ── #}
+<div id="tab-logs" {% if tab != 'logs' %}style="display:none"{% endif %}>
+    <script>window.FS3_EMBEDDED_LOGS = true;</script>
+    {% include "event_logs_content.html" %}
+</div>
+
+{# ── AI 配置 Tab ── #}
+<div id="tab-config" {% if tab != 'config' %}style="display:none"{% endif %}>
+    <div class="card">
+        <h3>AI 配置</h3>
+        <p class="help-text">保存到 config.yaml 的 ai_analysis 段，下次 AI 分析 / Agent 生效。API Key 显示为脱敏值，留空或保持 **** 则不变更。</p>
+        <div class="form-group">
+            <label for="cfg-base_url">Base URL</label>
+            <input type="text" id="cfg-base_url" class="form-control" placeholder="https://api.deepseek.com/v1" style="font-family:var(--font-mono);">
+        </div>
+        <div class="form-group">
+            <label for="cfg-api_key">API Key</label>
+            <input type="password" id="cfg-api_key" class="form-control" placeholder="sk-..." autocomplete="off" style="font-family:var(--font-mono);">
+        </div>
+        <div class="form-group">
+            <label for="cfg-model">模型</label>
+            <div class="form-row" style="flex-wrap:nowrap;align-items:stretch;">
+                <div id="model-dropdown-wrap" class="model-dropdown-wrap" style="flex:1;">
+                    <input type="text" id="cfg-model" class="form-control" placeholder="deepseek-chat" autocomplete="off"
+                           style="width:100%;font-family:var(--font-mono);">
+                    <div id="model-dropdown" class="model-dropdown" style="display:none;"></div>
+                </div>
+                <button type="button" class="btn btn-sm" id="fetch-models-btn" onclick="fetchModels()">获取模型</button>
+            </div>
+            <span class="help-text" id="models-status" style="margin:4px 0 0;font-family:var(--font-mono);"></span>
+        </div>
+        <div class="form-row" style="gap:14px;margin:12px 0;">
+            <div class="form-group" style="margin:0;">
+                <label for="cfg-timeout_seconds">超时（秒）</label>
+                <input type="number" id="cfg-timeout_seconds" min="1" max="600" class="form-control" style="width:110px;font-family:var(--font-mono);">
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label for="cfg-max_events">最多事件数</label>
+                <input type="number" id="cfg-max_events" min="1" max="5000" class="form-control" style="width:110px;font-family:var(--font-mono);">
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label for="cfg-agent_max_iterations">Agent 最大迭代</label>
+                <input type="number" id="cfg-agent_max_iterations" min="1" max="1000" class="form-control" style="width:110px;font-family:var(--font-mono);">
+            </div>
+        </div>
+        <div class="form-row" style="gap:14px;margin:12px 0;">
+            <div class="form-group" style="margin:0;">
+                <label for="cfg-agent_scan_gap_seconds">扫描间隔（秒）</label>
+                <input type="number" id="cfg-agent_scan_gap_seconds" min="0" max="120" class="form-control" style="width:110px;font-family:var(--font-mono);">
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label for="cfg-agent_context_max_chars">上下文预算（字符）</label>
+                <input type="number" id="cfg-agent_context_max_chars" min="10000" max="500000" class="form-control" style="width:150px;font-family:var(--font-mono);">
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label for="cfg-reasoning_effort">思考强度</label>
+                <select id="cfg-reasoning_effort" class="form-control" style="width:150px;">
+                    <option value="off">off（不思考）</option>
+                    <option value="low">low（轻度）</option>
+                    <option value="medium">medium（中度）</option>
+                    <option value="high">high（深度）</option>
+                </select>
+                <span class="help-text" style="margin:4px 0 0;">off=不传思考参数（原行为）；low/medium/high=开启思考并控制强度（deepseek-chat 需模型支持 thinking/reasoning_effort）</span>
+            </div>
+        </div>
+        <div class="form-row" style="gap:24px;margin:12px 0;align-items:center;">
+            <label style="display:flex;align-items:center;gap:7px;cursor:pointer;"><input type="checkbox" id="cfg-agent_plan_mode"> Plan-Execute 计划模式</label>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span style="color:var(--text-muted);font-size:0.82rem;">危险操作审批模式：</span>
+                <div class="segmented" id="approval-mode-seg">
+                    <button type="button" data-mode="auto">自动放行</button>
+                    <button type="button" data-mode="ai">AI 审批</button>
+                    <button type="button" data-mode="human">人工审批</button>
+                </div>
+                <span class="help-text" style="margin:0;" id="approval-mode-hint"></span>
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="cfg-log_api_key">日志 API Key（可选，供 /event-logs 的 API 模式鉴权）</label>
+            <input type="password" id="cfg-log_api_key" class="form-control" placeholder="留空则 API 模式不可用" autocomplete="off" style="font-family:var(--font-mono);">
+        </div>
+        <div style="margin-top:14px;display:flex;align-items:center;">
+            <button class="btn btn-primary" onclick="saveAiConfig()">保存配置</button>
+            <span id="cfg-status" style="margin-left:12px;font-size:0.85rem;font-family:var(--font-mono);"></span>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>MCP 配置</h3>
+        <p class="help-text">MCP server 供 AI/Agent 调用外部工具（如 yakit 的 DNSLog 验证）。配置保存到 config.yaml 的 mcp 段。</p>
+        <label style="display:flex;align-items:center;gap:7px;margin-bottom:12px;cursor:pointer;">
+            <input type="checkbox" id="mcp-enabled"> 启用 MCP
+        </label>
+        <div id="mcp-server-list" style="margin-bottom:12px;"></div>
+        <div class="form-row" style="border-top:1px solid var(--border);padding-top:14px;">
+            <input type="text" id="mcp-name" class="form-control" placeholder="名称" aria-label="MCP 名称" style="width:130px;font-family:var(--font-mono);">
+            <select id="mcp-type" class="form-control" aria-label="MCP 类型" style="width:110px;font-family:var(--font-mono);" onchange="mcpTypeChanged()">
+                <option value="sse">sse</option><option value="http">http</option><option value="stdio">stdio</option>
+            </select>
+            <input type="text" id="mcp-url" class="form-control" placeholder="URL（如 http://127.0.0.1:11432/sse）" aria-label="MCP URL" style="flex:1;min-width:220px;font-family:var(--font-mono);">
+            <input type="text" id="mcp-command" class="form-control" placeholder="stdio 命令（如 npx @modelcontextprotocol/server-filesystem /tmp）" aria-label="MCP 命令" style="flex:1;min-width:220px;font-family:var(--font-mono);display:none;">
+            <button class="btn btn-primary" onclick="addMcpServer()" style="white-space:nowrap;">添加</button>
+        </div>
+        <div style="margin-top:12px;display:flex;align-items:center;">
+            <button class="btn" onclick="saveMcpConfig()">保存 MCP 配置</button>
+            <span id="mcp-status" style="margin-left:10px;font-size:0.85rem;font-family:var(--font-mono);"></span>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Skill 加载</h3>
+        <p class="help-text">加载技能库（网络安全 skill）到 AI 分析 / Agent 的 system prompt</p>
+        <label style="display:flex;align-items:center;gap:7px;margin-bottom:10px;cursor:pointer;">
+            <input type="checkbox" id="skill-enabled" checked> 启用 Skill 加载
+        </label>
+        <p class="help-text" style="margin:0 0 10px;">列表中的 skill 用<b>滑块开关</b>选择：<b>打开</b> = 全文加载到 AI 分析 / Agent 的 system prompt（全文加载上限 10 个，超出部分静默不注入，请只开最常用的）；<b>关闭</b> = 渐进式加载（注入索引，Agent 需要时按需调用 load_skill 取全文，大技能分段读取）。</p>
+        <div class="form-row" style="margin-bottom:10px;">
+            <input type="text" id="skill-search" class="form-control" placeholder="搜索 skill（名称/描述）..." aria-label="搜索 skill" style="flex:1;min-width:220px;font-family:var(--font-mono);" oninput="renderSkillList()">
+            <select id="skill-category" class="form-control" aria-label="skill 分类" style="width:150px;font-family:var(--font-mono);" onchange="renderSkillList()">
+                <option value="">全部分类</option>
+            </select>
+        </div>
+        <div id="skill-available" style="max-height:320px;overflow:auto;border:1px solid var(--border);border-radius:var(--radius);padding:10px;background:rgba(3,7,15,0.5);"></div>
+        <div style="margin-top:10px;">
+            <div style="color:var(--text-muted);font-size:0.82rem;margin-bottom:6px;">已加载技能列表（<span id="skill-loaded-count">0</span> 个）：</div>
+            <div id="skill-loaded-list" style="font-size:0.78rem;word-break:break-all;display:flex;gap:6px;flex-wrap:wrap;"></div>
+        </div>
+        <div style="margin-top:10px;display:flex;align-items:center;">
+            <button class="btn" onclick="saveSkillConfig()">保存 Skill 配置</button>
+            <span id="skill-status" style="margin-left:10px;font-size:0.85rem;font-family:var(--font-mono);"></span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ══════════ 通用 ══════════
+function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ══════════ Tab 切换 ══════════
+document.querySelectorAll('.ai-tab-link').forEach(function(link) {
+    link.addEventListener('click', function(e) {
+        var targetTab = this.getAttribute('data-tab');
+        e.preventDefault();
+        document.getElementById('tab-schedule').style.display = (targetTab === 'schedule') ? '' : 'none';
+        document.getElementById('tab-agent').style.display = (targetTab === 'agent') ? '' : 'none';
+        document.getElementById('tab-logs').style.display = (targetTab === 'logs') ? '' : 'none';
+        document.getElementById('tab-config').style.display = (targetTab === 'config') ? '' : 'none';
+        document.querySelectorAll('.ai-tab-link').forEach(function(l) {
+            l.classList.toggle('active', l.getAttribute('data-tab') === targetTab);
+        });
+        history.replaceState(null, '', '?tab=' + targetTab);
+        if (targetTab === 'agent') loadSessions();
+        if (targetTab === 'config') loadAiConfig();
+    });
+});
+
+// ══════════ 定时任务模式(AI 分析) ══════════
+let currentTaskId = null;
+const RUN_URL = '{{ url_for("ai_analysis_run") }}';
+const EXECUTE_URL = '{{ url_for("ai_actions_execute") }}';
+
+function actionBadge(type) {
+    const cls = {
+        add: 'badge-tool',
+        del: 'badge-danger',
+        blacklist_add: 'badge-purple',
+        blacklist_del: 'badge-warn',
+        log: 'badge-node'
+    };
+    return '<span class="badge ' + (cls[type] || 'badge-muted') + '">' + escapeHtml(type) + '</span>';
+}
+
+function actionDetail(a) {
+    if (a.type === 'add' || a.type === 'del') {
+        return '<span class="badge badge-event">' + escapeHtml(a.event_type) + '</span> ' + escapeHtml(a.value);
+    }
+    if (a.type === 'blacklist_add' || a.type === 'blacklist_del') {
+        return '<span class="badge badge-event">' + escapeHtml(a.event_type) + '</span>:' + escapeHtml(a.match_mode) + ':' + escapeHtml(a.value);
+    }
+    if (a.type === 'log') {
+        return escapeHtml(a.message) + ' <span class="help-text">[' + escapeHtml(a.priority) + ']</span>';
+    }
+    return JSON.stringify(a);
+}
+
+function renderActionResults(results) {
+    if (!results || !results.length) return '';
+    let html = '<h3>执行结果</h3><table class="table"><thead><tr><th>类型</th><th>详情</th><th>状态</th></tr></thead><tbody>';
+    for (const ar of results) {
+        html += '<tr><td>' + actionBadge(ar.type) + '</td><td class="value-cell">' + escapeHtml(ar.note || '') + '</td><td>' + (ar.ok === false ? '<span style="color:var(--danger);">失败</span>' : '<span style="color:var(--success);">成功</span>') + '</td></tr>';
+    }
+    html += '</tbody></table>';
+    return html;
+}
+
+async function submitAnalysis() {
+    const form = document.getElementById('ai-analysis-form');
+    const fd = new FormData(form);
+    const resultBox = document.getElementById('ai-result');
+    resultBox.innerHTML = '<div class="card"><h3>AI 分析中…</h3><p class="help-text">后台异步调用 AI，请稍候（每 2 秒自动刷新）。</p></div>';
+    try {
+        const resp = await fetch(RUN_URL, {method: 'POST', body: fd});
+        const data = await resp.json();
+        if (!data.ok) {
+            resultBox.innerHTML = '<div class="flash error">' + escapeHtml(data.error || '启动失败') + '</div>';
+            return;
+        }
+        currentTaskId = data.task_id;
+        pollTask(data.task_id);
+    } catch (e) {
+        resultBox.innerHTML = '<div class="flash error">启动失败：' + escapeHtml(e.message) + '</div>';
+    }
+}
+
+async function pollTask(taskId) {
+    const resultBox = document.getElementById('ai-result');
+    for (let i = 0; i < 300; i++) {
+        await new Promise(r => setTimeout(r, 2000));
+        try {
+            const resp = await fetch('/api/ai-task/' + taskId);
+            if (!resp.ok) continue;
+            const task = await resp.json();
+            if (task.status === 'running') continue;
+            if (task.status === 'error') {
+                resultBox.innerHTML = '<div class="flash error">AI 分析出错：' + escapeHtml(task.error || '') + '</div>';
+                return;
+            }
+            renderResult(task);
+            return;
+        } catch (e) {
+            resultBox.innerHTML = '<div class="flash error">轮询失败：' + escapeHtml(e.message) + '</div>';
+            return;
+        }
+    }
+    resultBox.innerHTML = '<div class="flash error">分析超时，请稍后查看 AI 日志。</div>';
+}
+
+function renderResult(task) {
+    const resultBox = document.getElementById('ai-result');
+    const r = task.result || {};
+    document.getElementById('stat-context').textContent = task.context_events ? task.context_events.length : 0;
+    let html = '<div class="card"><h3>AI 回答</h3>';
+    if (r.ok) {
+        html += window.FS3MdBox(r.answer || '');
+    } else {
+        html += '<div class="flash error">' + escapeHtml(r.error || 'AI 调用失败') + '</div>';
+    }
+    const actions = task.parsed_actions || [];
+    if (actions.length) {
+        html += '<h3>动作预览（待审核）</h3>';
+        html += '<table class="table"><thead><tr><th style="width:140px;">类型</th><th>详情</th></tr></thead><tbody>';
+        for (const a of actions) {
+            html += '<tr><td>' + actionBadge(a.type) + '</td><td class="value-cell">' + actionDetail(a) + '</td></tr>';
+        }
+        html += '</tbody></table>';
+        if (task.executed) {
+            html += '<p class="help-text">已执行完毕。</p>';
+            html += renderActionResults(task.action_results || []);
+        } else {
+            const autoRes = task.auto_action_results || [];
+            if (autoRes.length) {
+                html += '<h3>已自动执行（勾选的类型）</h3>';
+                html += renderActionResults(autoRes);
+            }
+            html += '<div class="form-row" style="gap:10px;margin-top:10px;align-items:center;">';
+            html += '<button class="btn btn-primary" onclick="executeActions(\'' + currentTaskId + '\')">一键执行剩余动作</button>';
+            html += '<span class="help-text" style="margin:0;">共 ' + actions.length + ' 个动作待确认，执行顺序固定。</span>';
+            html += '</div>';
+        }
+    } else {
+        const autoRes = task.auto_action_results || [];
+        if (autoRes.length) {
+            html += '<h3>已自动执行（勾选的类型）</h3>';
+            html += renderActionResults(autoRes);
+            html += '<p class="help-text">其余动作类型未勾选自动执行，且 AI 未产出对应动作。</p>';
+        } else {
+            html += '<p class="help-text">AI 未输出结构化动作，无需执行。</p>';
+        }
+    }
+    html += '</div>';
+    resultBox.innerHTML = html;
+    resultBox.scrollIntoView({behavior: 'smooth'});
+}
+
+async function executeActions(taskId) {
+    try {
+        await fetch(EXECUTE_URL, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({task_id: taskId})
+        });
+        const r2 = await fetch('/api/ai-task/' + taskId);
+        const task = await r2.json();
+        renderResult(task);
+    } catch (e) {
+        alert('执行失败：' + e.message);
+    }
+}
+
+async function toggleSchedule(id) {
+    try {
+        const resp = await fetch('/api/ai-schedule/' + id + '/toggle', {method: 'POST'});
+        const data = await resp.json();
+        if (data.ok) { location.reload(); }
+        else { alert(data.error || '切换失败'); }
+    } catch (e) {
+        alert('切换失败：' + e.message);
+    }
+}
+
+// ══════════ Agent 实时交互 ══════════
+let currentSessionId = null;
+let lastTs = 0;
+let polling = false;
+let agentRunning = false;   // 会话是否在运行(HITL 挂起也算)
+let agentQueueLen = 0;      // 已排队消息数
+
+const SESSIONS_URL = '{{ url_for("agent_sessions") }}';
+const CREATE_URL = '{{ url_for("agent_session_create") }}';
+const AGENT_RUN_URL = '{{ url_for("agent_run") }}';
+
+async function loadSessions() {
+    const resp = await fetch(SESSIONS_URL);
+    const data = await resp.json();
+    const list = document.getElementById('session-list');
+    if (!data.sessions || !data.sessions.length) {
+        list.innerHTML = '<span class="empty">暂无会话</span>';
+        return;
+    }
+    let html = '';
+    for (const s of data.sessions) {
+        html += '<div class="list-item ' + (s.session_id === currentSessionId ? 'selected' : '') + '" onclick="selectSession(\'' + s.session_id + '\', \'' + jsEscape(s.title) + '\')">' +
+                '<div class="li-title">' + escapeHtml(s.title) + '</div>' +
+                '<div class="li-meta">' +
+                '<span class="mono">' + escapeHtml(s.created_at_iso || '') + '</span>' +
+                '<span onclick="event.stopPropagation();deleteSession(\'' + s.session_id + '\')" style="color:var(--danger);cursor:pointer;">✕ 删</span>' +
+                '</div></div>';
+    }
+    list.innerHTML = html;
+}
+
+function jsEscape(s) {
+    return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+function newSession() {
+    const modal = document.getElementById('new-session-modal');
+    const input = document.getElementById('new-session-name');
+    // setProperty + important:旧 style.css 缓存若有 display:none !important 也能被覆盖
+    modal.style.setProperty('display', 'flex', 'important');
+    input.value = '';
+    setTimeout(function() { input.focus(); }, 30);
+}
+
+// 渐进增强:「+ 新建会话」是链接(?tab=agent&new_session=1,无 JS 时直接创建兜底);
+// JS 正常时拦截点击,弹窗输入名称;弹窗逻辑异常时放行链接走服务端兜底
+document.getElementById('new-session-btn').addEventListener('click', function(e) {
+    e.preventDefault();
+    try {
+        newSession();
+    } catch (err) {
+        window.location.href = this.href;
+    }
+});
+
+function closeNewSessionModal() {
+    document.getElementById('new-session-modal').style.setProperty('display', 'none', 'important');
+}
+
+async function confirmNewSession() {
+    const title = (document.getElementById('new-session-name').value || '').trim() || '新会话';
+    closeNewSessionModal();
+    try {
+        const resp = await fetch(CREATE_URL, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({title: title})});
+        const data = await resp.json();
+        if (data.ok) {
+            selectSession(data.session.session_id, data.session.title);
+            loadSessions();
+        } else {
+            alert(data.error || '创建失败');
+        }
+    } catch (e) {
+        alert('创建会话失败: ' + e.message);
+    }
+}
+
+// 新建会话弹窗:回车创建 / Esc 取消 / 点击遮罩关闭
+document.getElementById('new-session-name').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); confirmNewSession(); }
+    else if (e.key === 'Escape') { closeNewSessionModal(); }
+});
+document.getElementById('new-session-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeNewSessionModal();
+});
+
+async function deleteSession(id) {
+    if (!confirm('确认删除该会话及其历史？')) return;
+    await fetch('/api/agent/session/' + id + '/delete', {method: 'POST'});
+    if (id === currentSessionId) {
+        currentSessionId = null;
+        document.getElementById('agent-trajectory').innerHTML = '';
+        document.getElementById('current-title').textContent = 'Agent 会话';
+    }
+    loadSessions();
+}
+
+async function selectSession(id, title) {
+    currentSessionId = id;
+    lastTs = 0;
+    agentRunning = false;
+    agentQueueLen = 0;
+    document.getElementById('agent-trajectory').innerHTML = '';
+    document.getElementById('agent-audit').innerHTML = '';
+    document.getElementById('current-title').textContent = (title || ('Agent 会话 #' + id));
+    loadSessions();
+    const state = await fetchMessages(false);
+    await loadAudit();
+    // 恢复运行/排队状态提示
+    if (state && (state.status === 'running' || state.status === 'awaiting_hitl')) {
+        agentRunning = true;
+        agentQueueLen = state.queue_length || 0;
+    }
+    updateInputHint();
+    // 刷新页面后恢复 HITL 待批准操作（否则批准按钮丢失，会话卡死在 awaiting_hitl）
+    if (state && state.status === 'awaiting_hitl') {
+        await loadPending();
+    }
+}
+
+function updateInputHint() {
+    const el = document.getElementById('agent-input-hint');
+    if (!el) return;
+    if (agentRunning) {
+        let text = '运行中：回车=排队发送 · Ctrl+回车=打断并发送 · Shift+回车换行';
+        if (agentQueueLen > 0) text += '（已排队 ' + agentQueueLen + ' 条）';
+        el.textContent = text;
+        el.style.color = 'var(--warning)';
+    } else {
+        el.textContent = '回车发送 · Shift+回车换行';
+        el.style.color = '';
+    }
+}
+
+async function sendAgentMessage(mode) {
+    const msg = document.getElementById('agent-message').value.trim();
+    if (!currentSessionId) { alert('请先新建或选择一个会话'); return; }
+    if (!msg) { alert('任务描述不能为空'); return; }
+    document.getElementById('agent-message').value = '';
+    const resp = await fetch(AGENT_RUN_URL, {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({session_id: currentSessionId, message: msg, mode: mode})});
+    const data = await resp.json();
+    if (!data.ok) { alert(data.error || '启动失败'); return; }
+    if (data.queued) {
+        // 排队成功(运行中回车 / Ctrl+回车打断):不动轮询,只更新提示
+        agentQueueLen = data.queue_length || 0;
+        agentRunning = true;
+        updateInputHint();
+        await fetchMessages(false);
+        return;
+    }
+    agentRunning = true;
+    agentQueueLen = 0;
+    updateInputHint();
+    lastTs = 0;
+    await fetchMessages(false);
+    pollLoop();
+}
+
+function runAgent() {
+    sendAgentMessage('normal');
+}
+
+// 对话框实时交互:回车发送/排队,Ctrl+回车打断并发送,Shift+回车换行(中文组词回车不触发)
+document.getElementById('agent-message').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+        e.preventDefault();
+        sendAgentMessage((e.ctrlKey || e.metaKey) ? 'interrupt' : 'normal');
+    }
+});
+
+async function fetchMessages(incremental) {
+    let url = '/api/agent/session/' + currentSessionId + '/messages';
+    if (incremental && lastTs > 0) url += '?after=' + lastTs;
+    const resp = await fetch(url);
+    const data = await resp.json();
+    const box = document.getElementById('agent-trajectory');
+    for (const m of data.messages || []) {
+        if (m.ts > lastTs) lastTs = m.ts;
+        box.appendChild(renderMessage(m));
+    }
+    box.scrollTop = box.scrollHeight;
+    return data.state || {};
+}
+
+function renderMessage(m) {
+    const div = document.createElement('div');
+    const role = m.role;
+    if (role === 'user') {
+        div.className = 'msg msg-user';
+        div.innerHTML = '<div class="role-tag">▶ 你</div>' +
+                        '<div class="bubble">' + escapeHtml(m.content) + '</div>';
+    } else if (role === 'assistant') {
+        div.className = 'msg msg-ai';
+        let html = '<div class="role-tag">◆ AI</div>';
+        if (m.reasoning) {
+            html += '<details class="reasoning"><summary>🧠 推理过程</summary>' +
+                    '<div>' + escapeHtml(m.reasoning) + '</div></details>';
+        }
+        if (m.content) html += '<div class="bubble">' + window.FS3MdBox(m.content) + '</div>';
+        if (m.tool_calls && m.tool_calls.length) {
+            for (const tc of m.tool_calls) {
+                const fn = tc.function || {};
+                html += '<div class="tool-call">' + escapeHtml(fn.name) + '(' + escapeHtml(fn.arguments || '') + ')</div>';
+            }
+        }
+        div.innerHTML = html;
+    } else if (role === 'tool') {
+        div.className = 'msg msg-tool';
+        div.innerHTML = '<div class="role-tag">↳ ' + escapeHtml(m.name || '') + ' 返回</div>' +
+                        '<div class="bubble">' + escapeHtml(m.content || '') + '</div>';
+    } else if (role === 'system') {
+        div.className = 'msg msg-system';
+        div.innerHTML = '<div class="role-tag">⚙ 系统</div>' +
+                        '<div class="bubble">' + escapeHtml(m.content) + '</div>';
+    } else if (role === 'error') {
+        div.className = 'msg';
+        div.innerHTML = '<div class="flash error">' + escapeHtml(m.content) + '</div>';
+    } else {
+        div.className = 'msg';
+        div.innerHTML = '<div style="color:var(--text-muted);">' + escapeHtml(JSON.stringify(m)) + '</div>';
+    }
+    return div;
+}
+
+async function pollLoop() {
+    if (polling) return;
+    polling = true;
+    try {
+        for (let i = 0; i < 300; i++) {
+            await new Promise(r => setTimeout(r, 2000));
+            const state = await fetchMessages(true);
+            if (state.status === 'awaiting_hitl') {
+                agentRunning = true;
+                agentQueueLen = state.queue_length || 0;
+                updateInputHint();
+                await loadPending();
+                return;
+            }
+            if (state.status === 'done' || state.status === 'error' || state.status === 'interrupted') {
+                agentRunning = false;
+                agentQueueLen = state.queue_length || 0;
+                updateInputHint();
+                loadSessions();
+                await loadAudit();
+                return;
+            }
+            // running:刷新排队数提示
+            agentRunning = true;
+            agentQueueLen = state.queue_length || 0;
+            updateInputHint();
+        }
+        agentRunning = false;
+        agentQueueLen = 0;
+        updateInputHint();
+    } finally {
+        polling = false;
+    }
+}
+
+async function loadPending() {
+    if (!currentSessionId) return;
+    const resp = await fetch('/api/agent/session/' + currentSessionId + '/pending');
+    const data = await resp.json();
+    const box = document.getElementById('agent-trajectory');
+    for (const p of data.pending || []) {
+        const div = document.createElement('div');
+        div.id = 'hitl-' + p.pending_id;
+        div.style.cssText = 'border:1px solid rgba(251,191,36,0.5);border-radius:var(--radius);padding:11px;margin-bottom:10px;background:rgba(251,191,36,0.07);box-shadow:0 0 16px rgba(251,191,36,0.10);';
+        div.innerHTML = '<div style="color:var(--warning);font-weight:600;">⚠️ 危险操作待批准</div>' +
+                        '<div style="margin-top:4px;font-family:var(--font-mono);font-size:0.8rem;white-space:pre-wrap;word-break:break-all;">' + escapeHtml(p.name) + '(' + escapeHtml(JSON.stringify(p.args)) + ')</div>' +
+                        '<div style="margin-top:8px;display:flex;gap:8px;">' +
+                        '<button class="btn btn-sm btn-primary" onclick="hitlAction(\'' + p.pending_id + '\',\'approve\')">批准</button>' +
+                        '<button class="btn btn-sm btn-danger" onclick="hitlAction(\'' + p.pending_id + '\',\'reject\')">拒绝</button></div>';
+        box.appendChild(div);
+    }
+    box.scrollTop = box.scrollHeight;
+}
+
+async function hitlAction(pendingId, action) {
+    const resp = await fetch('/api/agent/session/' + currentSessionId + '/hitl', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({action: action, pending_id: pendingId})});
+    const data = await resp.json();
+    if (!data.ok) { alert(data.error || '处理失败'); return; }
+    const el = document.getElementById('hitl-' + pendingId);
+    if (el) el.remove();
+    agentRunning = true;
+    updateInputHint();
+    lastTs = 0;
+    await fetchMessages(false);
+    pollLoop();
+}
+
+async function loadAudit() {
+    if (!currentSessionId) return;
+    const resp = await fetch('/api/agent/session/' + currentSessionId + '/audit');
+    const data = await resp.json();
+    const box = document.getElementById('agent-audit');
+    if (!data.audit || !data.audit.length) { box.innerHTML = '<span class="empty">暂无审计记录</span>'; return; }
+    let html = '';
+    for (const e of data.audit) {
+        html += '<div style="border-bottom:1px solid var(--border);padding:6px 0;">' +
+                '<span class="badge badge-danger">' + escapeHtml(e.tool) + '</span> ' +
+                '<span style="color:var(--text-muted);">(' + escapeHtml(e.duration) + 's)</span><br>' +
+                '<div>' + escapeHtml(e.args || '') + '</div>' +
+                '<div style="color:var(--text-muted);">→ ' + escapeHtml(e.result || '') + '</div></div>';
+    }
+    box.innerHTML = html;
+}
+
+// ══════════ 审批模式分段选择器 ══════════
+let currentApprovalMode = 'auto';
+const APPROVAL_HINTS = {
+    auto: '危险工具直接执行，仅落审计',
+    ai: '执行前由 AI 安全审批员审核（不确定/越界即拒绝）',
+    human: '执行前暂停等待人工批准（HITL）',
+};
+
+function setApprovalMode(mode) {
+    if (!APPROVAL_HINTS[mode]) mode = 'auto';
+    currentApprovalMode = mode;
+    document.querySelectorAll('#approval-mode-seg button').forEach(function(b) {
+        b.classList.toggle('selected', b.dataset.mode === mode);
+    });
+    document.getElementById('approval-mode-hint').textContent = APPROVAL_HINTS[mode] || '';
+}
+document.querySelectorAll('#approval-mode-seg button').forEach(function(b) {
+    b.addEventListener('click', function() { setApprovalMode(b.dataset.mode); });
+});
+
+async function loadAiConfig() {
+    const resp = await fetch('/api/ai-config');
+    const data = await resp.json();
+    if (!data.ok) return;
+    const c = data.config || {};
+    document.getElementById('cfg-base_url').value = c.base_url || '';
+    document.getElementById('cfg-api_key').value = c.api_key || '';
+    document.getElementById('cfg-api_key').placeholder = c.api_key_masked ? '已配置（保持 **** 则不变更）' : 'sk-...';
+    document.getElementById('cfg-model').value = c.model || '';
+    document.getElementById('cfg-timeout_seconds').value = c.timeout_seconds || 120;
+    document.getElementById('cfg-max_events').value = c.max_events || 200;
+    document.getElementById('cfg-agent_max_iterations').value = c.agent_max_iterations || 50;
+    document.getElementById('cfg-agent_scan_gap_seconds').value = c.agent_scan_gap_seconds || 5;
+    document.getElementById('cfg-agent_context_max_chars').value = c.agent_context_max_chars || 60000;
+    document.getElementById('cfg-reasoning_effort').value = c.reasoning_effort || 'off';
+    document.getElementById('cfg-agent_plan_mode').checked = !!c.agent_plan_mode;
+    setApprovalMode(c.agent_approval_mode || 'auto');
+    document.getElementById('cfg-log_api_key').value = c.log_api_key || '';
+    loadMcpConfig();
+    loadSkillConfig();
+}
+
+async function fetchModels() {
+    const btn = document.getElementById('fetch-models-btn');
+    const statusEl = document.getElementById('models-status');
+    btn.disabled = true;
+    statusEl.textContent = '获取中...';
+    statusEl.style.color = 'var(--text-muted)';
+    try {
+        const resp = await fetch('/api/ai-config/models', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                base_url: document.getElementById('cfg-base_url').value.trim(),
+                api_key: document.getElementById('cfg-api_key').value.trim(),
+            })
+        });
+        const data = await resp.json();
+        if (data.ok && data.models && data.models.length) {
+            const list = document.getElementById('model-dropdown');
+            list.innerHTML = data.models.map(function(m) {
+                return '<div class="md-item" data-model="' + escapeHtml(m) + '">' + escapeHtml(m) + '</div>';
+            }).join('');
+            const cur = document.getElementById('cfg-model').value.trim();
+            if (!cur) {
+                document.getElementById('cfg-model').value = data.models[0];
+            }
+            openModelDropdown();
+            statusEl.textContent = '✓ 获取到 ' + data.count + ' 个模型（点击输入框下拉选择）';
+            statusEl.style.color = 'var(--success)';
+        } else {
+            statusEl.textContent = '✗ ' + (data.error || '未获取到模型');
+            statusEl.style.color = 'var(--danger)';
+        }
+    } catch (e) {
+        statusEl.textContent = '✗ 请求失败: ' + e.message;
+        statusEl.style.color = 'var(--danger)';
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+// ── 模型下拉框(主题化,替代原生 datalist) ──
+// 显示/隐藏用内联 display(不依赖 .model-dropdown.open CSS 类,
+// 旧 style.css 缓存缺失该类规则时下拉也能正常显示——同新建会话弹窗的修复思路)
+function openModelDropdown() {
+    const list = document.getElementById('model-dropdown');
+    if (!list.querySelector('.md-item')) return;
+    list.style.display = 'block';
+    list.classList.add('open'); // 保留类供主题样式,但可见性以内联为准
+    // 打开时显示全部(输入过滤由 input 事件驱动;若按输入框当前值过滤,
+    // 保存的 model 与 API 返回的 id 不完全一致时会误滤成"没有匹配的模型")
+    filterModelDropdown('');
+}
+
+function closeModelDropdown() {
+    const list = document.getElementById('model-dropdown');
+    list.style.display = 'none';
+    list.classList.remove('open');
+}
+
+function filterModelDropdown(q) {
+    const list = document.getElementById('model-dropdown');
+    const items = list.querySelectorAll('.md-item');
+    const query = (q || '').trim().toLowerCase();
+    let shown = 0;
+    items.forEach(function(it) {
+        const hit = !query || (it.getAttribute('data-model') || '').toLowerCase().indexOf(query) !== -1;
+        it.style.display = hit ? '' : 'none';
+        if (hit) shown++;
+    });
+    const empty = list.querySelector('.md-empty');
+    if (empty) empty.remove();
+    if (!shown) {
+        const el = document.createElement('div');
+        el.className = 'md-empty';
+        el.textContent = '没有匹配的模型';
+        list.appendChild(el);
+    }
+}
+
+(function initModelDropdown() {
+    const input = document.getElementById('cfg-model');
+    const list = document.getElementById('model-dropdown');
+    let suppressOpen = false; // 选中条目后回聚焦输入框时,不重新打开下拉
+    // 点击条目选中(mousedown 先于 blur 执行)
+    list.addEventListener('mousedown', function(e) {
+        const item = e.target.closest('.md-item');
+        if (item) {
+            input.value = item.getAttribute('data-model');
+            closeModelDropdown();
+            suppressOpen = true;
+            input.focus();
+            e.preventDefault();
+        }
+    });
+    input.addEventListener('focus', function() {
+        if (suppressOpen) { suppressOpen = false; return; }
+        openModelDropdown();
+    });
+    // 输入框已聚焦时再点击也应重新打开下拉(点击已聚焦元素不触发 focus)
+    input.addEventListener('click', function() {
+        if (!suppressOpen) openModelDropdown();
+    });
+    input.addEventListener('input', function() { openModelDropdown(); });
+    input.addEventListener('keydown', function(e) {
+        const items = list.querySelectorAll('.md-item');
+        const visible = Array.prototype.filter.call(items, function(it) { return it.style.display !== 'none'; });
+        let active = Array.prototype.findIndex.call(visible, function(it) { return it.classList.contains('active'); });
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            if (!visible.length) return;
+            e.preventDefault();
+            if (!list.classList.contains('open')) openModelDropdown();
+            const items2 = list.querySelectorAll('.md-item');
+            const visible2 = Array.prototype.filter.call(items2, function(it) { return it.style.display !== 'none'; });
+            active = Array.prototype.findIndex.call(visible2, function(it) { return it.classList.contains('active'); });
+            items2.forEach(function(it) { it.classList.remove('active'); });
+            const next = e.key === 'ArrowDown'
+                ? (active + 1) % visible2.length
+                : (active - 1 + visible2.length) % visible2.length;
+            visible2[next].classList.add('active');
+            visible2[next].scrollIntoView({block: 'nearest'});
+        } else if (e.key === 'Enter') {
+            if (active !== -1 && list.classList.contains('open')) {
+                e.preventDefault();
+                input.value = visible[active].getAttribute('data-model');
+                closeModelDropdown();
+            } else {
+                closeModelDropdown();
+            }
+        } else if (e.key === 'Escape') {
+            closeModelDropdown();
+        }
+    });
+    // 点击组件外部关闭(获取模型按钮本身除外,避免按钮点击与打开逻辑互斥)
+    document.addEventListener('click', function(e) {
+        const wrap = document.getElementById('model-dropdown-wrap');
+        if (wrap && !wrap.contains(e.target) && !(e.target.closest && e.target.closest('#fetch-models-btn'))) {
+            closeModelDropdown();
+        }
+    });
+})();
+
+async function saveAiConfig() {
+    const body = {
+        base_url: document.getElementById('cfg-base_url').value.trim(),
+        api_key: document.getElementById('cfg-api_key').value.trim(),
+        model: document.getElementById('cfg-model').value.trim(),
+        timeout_seconds: parseInt(document.getElementById('cfg-timeout_seconds').value) || 120,
+        max_events: parseInt(document.getElementById('cfg-max_events').value) || 200,
+        agent_max_iterations: parseInt(document.getElementById('cfg-agent_max_iterations').value) || 50,
+        agent_scan_gap_seconds: parseInt(document.getElementById('cfg-agent_scan_gap_seconds').value) || 5,
+        agent_context_max_chars: parseInt(document.getElementById('cfg-agent_context_max_chars').value) || 60000,
+        reasoning_effort: document.getElementById('cfg-reasoning_effort').value,
+        agent_plan_mode: document.getElementById('cfg-agent_plan_mode').checked,
+        agent_approval_mode: currentApprovalMode,
+        log_api_key: document.getElementById('cfg-log_api_key').value.trim(),
+    };
+    const statusEl = document.getElementById('cfg-status');
+    statusEl.textContent = '保存中...';
+    statusEl.style.color = 'var(--text-muted)';
+    const resp = await fetch('/api/ai-config', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+    const data = await resp.json();
+    if (data.ok) {
+        statusEl.textContent = '✓ 已保存';
+        statusEl.style.color = 'var(--success)';
+        await loadAiConfig();
+    } else {
+        statusEl.textContent = '保存失败: ' + (data.error || '');
+        statusEl.style.color = 'var(--danger)';
+    }
+}
+
+// ══════════ MCP 配置 ══════════
+let mcpServers = [];
+
+async function loadMcpConfig() {
+    const resp = await fetch('/api/mcp/servers');
+    const data = await resp.json();
+    if (!data.ok) return;
+    document.getElementById('mcp-enabled').checked = !!data.enabled;
+    mcpServers = data.servers || [];
+    renderMcpServers();
+}
+
+function renderMcpServers() {
+    const list = document.getElementById('mcp-server-list');
+    if (!mcpServers.length) { list.innerHTML = '<span class="empty">暂无 MCP server，下方添加</span>'; return; }
+    let html = '';
+    for (let i = 0; i < mcpServers.length; i++) {
+        const s = mcpServers[i];
+        html += '<div style="display:flex;gap:8px;align-items:center;border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 12px;margin-bottom:6px;">' +
+                '<span class="badge badge-purple">' + escapeHtml(s.name) + '</span>' +
+                '<span class="mono" style="color:var(--text-muted);font-size:0.76rem;">(' + escapeHtml(s.type) + ')</span>' +
+                '<span class="mono" style="flex:1;font-size:0.78rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(s.url || s.command || '') + '</span>' +
+                '<button class="btn btn-sm" onclick="verifyMcpServer(' + i + ')">验证</button>' +
+                '<button class="btn btn-sm btn-danger" onclick="removeMcpServer(' + i + ')">删</button>' +
+                '</div><div id="mcp-verify-' + i + '" style="margin:2px 0 8px 8px;font-size:0.78rem;font-family:var(--font-mono);"></div>';
+    }
+    list.innerHTML = html;
+}
+
+function mcpTypeChanged() {
+    const t = document.getElementById('mcp-type').value;
+    document.getElementById('mcp-url').style.display = t === 'stdio' ? 'none' : '';
+    document.getElementById('mcp-command').style.display = t === 'stdio' ? '' : 'none';
+}
+
+function addMcpServer() {
+    const name = document.getElementById('mcp-name').value.trim();
+    const type = document.getElementById('mcp-type').value;
+    const url = document.getElementById('mcp-url').value.trim();
+    const command = document.getElementById('mcp-command').value.trim();
+    if (!name) { alert('名称不能为空'); return; }
+    if (type === 'stdio' && !command) { alert('stdio 类型需要 command 命令'); return; }
+    if (type !== 'stdio' && !url) { alert('URL 不能为空'); return; }
+    mcpServers.push({name: name, type: type, url: url, command: command, enabled: true});
+    document.getElementById('mcp-name').value = '';
+    document.getElementById('mcp-url').value = '';
+    document.getElementById('mcp-command').value = '';
+    mcpTypeChanged();
+    renderMcpServers();
+}
+
+function removeMcpServer(i) {
+    mcpServers.splice(i, 1);
+    renderMcpServers();
+}
+
+async function saveMcpConfig() {
+    const statusEl = document.getElementById('mcp-status');
+    statusEl.textContent = '保存中...';
+    statusEl.style.color = 'var(--text-muted)';
+    const resp = await fetch('/api/mcp/servers', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({enabled: document.getElementById('mcp-enabled').checked, servers: mcpServers})});
+    const data = await resp.json();
+    if (data.ok) { statusEl.textContent = '✓ ' + data.message; statusEl.style.color = 'var(--success)'; }
+    else { statusEl.textContent = '✗ ' + (data.error || '失败'); statusEl.style.color = 'var(--danger)'; }
+}
+
+async function verifyMcpServer(i) {
+    const s = mcpServers[i];
+    const el = document.getElementById('mcp-verify-' + i);
+    el.textContent = '验证中...';
+    el.style.color = 'var(--text-muted)';
+    const resp = await fetch('/api/mcp/verify', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(s)});
+    const data = await resp.json();
+    const detail = data.detail || {};
+    let msg = (data.ok ? '✓ ' : '✗ ') + data.message;
+    if (Array.isArray(detail.tools) && detail.tools.length) {
+        msg += ' · 工具: ' + detail.tools.join(', ');
+    }
+    el.textContent = msg;
+    el.style.color = data.ok ? 'var(--success)' : 'var(--danger)';
+}
+
+// ══════════ Skill 加载 ══════════
+let allSkills = [];
+let loadedSkills = [];
+
+async function loadSkillConfig() {
+    const resp = await fetch('/api/skills');
+    const data = await resp.json();
+    if (!data.ok) return;
+    allSkills = data.skills || [];
+    loadedSkills = data.loaded || [];
+    document.getElementById('skill-enabled').checked = !!data.enabled;
+    const cats = [...new Set(allSkills.map(s => s.category))];
+    document.getElementById('skill-category').innerHTML = '<option value="">全部分类</option>' +
+        cats.map(c => '<option value="' + escapeHtml(c) + '">' + escapeHtml(c) + '</option>').join('');
+    renderSkillList();
+}
+
+function renderSkillList() {
+    const q = document.getElementById('skill-search').value.trim().toLowerCase();
+    const cat = document.getElementById('skill-category').value;
+    let list = allSkills;
+    if (q) list = list.filter(s => s.name.toLowerCase().includes(q) || (s.description || '').toLowerCase().includes(q));
+    if (cat) list = list.filter(s => s.category === cat);
+    list = list.slice(0, 200);
+    const box = document.getElementById('skill-available');
+    if (!list.length) { box.innerHTML = '<span class="empty">无匹配 skill</span>'; renderLoadedList(); return; }
+    let html = '';
+    for (const s of list) {
+        const on = loadedSkills.includes(s.name) ? 'checked' : '';
+        html += '<div style="display:flex;gap:8px;align-items:center;padding:5px 2px;border-bottom:1px solid var(--border);">' +
+                '<span class="badge badge-event" style="white-space:nowrap;">' + escapeHtml(s.name) + '</span>' +
+                '<span class="mono" style="color:var(--text-muted);font-size:0.74rem;white-space:nowrap;">[' + escapeHtml(s.category) + ']</span>' +
+                '<span style="color:var(--text-muted);font-size:0.76rem;flex:1;">' + escapeHtml((s.description || '').slice(0, 120)) + '</span>' +
+                '<label class="switch" title="打开 = 全文加载到 system prompt；关闭 = 渐进式(索引+按需)" style="margin-left:auto;">' +
+                '<input type="checkbox" ' + on + ' onchange="toggleSkill(\'' + s.name + '\', this.checked)">' +
+                '<span class="switch-slider"></span>' +
+                '</label>' +
+                '</div>';
+    }
+    box.innerHTML = html;
+    if (allSkills.length > 200 && !q && !cat) {
+        const more = document.createElement('div');
+        more.style.cssText = 'padding:6px 2px;color:var(--text-muted);font-size:0.74rem;';
+        more.textContent = '仅显示前 200 条,搜索或选择分类可缩小范围(共 ' + allSkills.length + ' 个 skill)';
+        box.appendChild(more);
+    }
+    renderLoadedList();
+}
+
+function toggleSkill(name, checked) {
+    if (checked && !loadedSkills.includes(name)) loadedSkills.push(name);
+    if (!checked) loadedSkills = loadedSkills.filter(n => n !== name);
+    renderLoadedList();
+}
+
+function renderLoadedList() {
+    document.getElementById('skill-loaded-count').textContent = loadedSkills.length;
+    const el = document.getElementById('skill-loaded-list');
+    if (!loadedSkills.length) {
+        el.innerHTML = '<span style="color:var(--text-muted);">（无）</span>';
+        return;
+    }
+    el.innerHTML = loadedSkills.map(function(n) {
+        return '<span class="badge badge-event" style="font-size:0.74rem;">' + escapeHtml(n) + '</span>';
+    }).join('');
+}
+
+async function saveSkillConfig() {
+    const statusEl = document.getElementById('skill-status');
+    if (loadedSkills.length > 10) {
+        statusEl.textContent = '⚠ 全文加载上限 10 个,当前 ' + loadedSkills.length + ' 个,超出部分不会注入 system prompt(改用渐进式)';
+        statusEl.style.color = 'var(--danger)';
+        if (!confirm('已开 ' + loadedSkills.length + ' 个全文加载,超出 10 个的部分不会生效。继续保存?')) return;
+    }
+    statusEl.textContent = '保存中...';
+    statusEl.style.color = 'var(--text-muted)';
+    const resp = await fetch('/api/skills', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({enabled: document.getElementById('skill-enabled').checked,
+                              loaded: loadedSkills})});
+    const data = await resp.json();
+    if (data.ok) { statusEl.textContent = '✓ ' + data.message; statusEl.style.color = 'var(--success)'; }
+    else { statusEl.textContent = '✗ ' + (data.error || '失败'); statusEl.style.color = 'var(--danger)'; }
+}
+
+{% if tab == 'agent' %}
+loadSessions();
+{% endif %}
+{% if tab == 'config' %}
+loadAiConfig();
+{% endif %}
+</script>
 {% endblock %}

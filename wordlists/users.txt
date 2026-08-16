@@ -1,0 +1,11 @@
+root
+admin
+administrator
+test
+guest
+user
+oracle
+postgres
+mysql
+ftp
+tomcat

@@ -1,0 +1,64 @@
+name: feroxbuster_module
+description: Feroxbuster 目录扫描 — 快速路径发现(JS/备份/敏感目录),输出 URL 与 403_URL
+runtime:
+  max_concurrency: 2
+allowed_output_events:
+- URL
+- 403_URL
+io_contract:
+  input_events:
+  - URL
+  input_transform_code: |
+    import shlex
+    value = data["value"].strip()
+    if not value.startswith(("http://", "https://")):
+        value = "http://" + value
+    return [{"target": value, "target_q": shlex.quote(value)}]
+execution:
+  command: 'feroxbuster -u {{target_q}} -w wordlists/dirs.txt --smart -n --depth 1 --json --silent --threads 50 --status-codes 200,204,301,302,307,308,401,403,405,500 --timeout 8 --no-state --dont-extract-links -k 2>/dev/null'
+  output_parse_code: |
+    import json
+    from urllib.parse import urlparse
+
+    results = []
+    seen = set()
+    seen_403 = set()
+
+    def add(k, v):
+        v = str(v or "").strip()
+        if not v:
+            return
+        key = (k, v)
+        if key not in seen:
+            seen.add(key)
+            results.append({k: v})
+
+    for line in data["stdout"].splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            item = json.loads(line)
+        except:
+            continue
+        if not isinstance(item, dict):
+            continue
+
+        url = item.get("url") or item.get("target") or ""
+        if not url.startswith(("http://", "https://")):
+            continue
+
+        status = item.get("status")
+        if status is None:
+            continue
+
+        # URL:所有发现的路径(含 403 等状态,交给 httpx/katana 二次确认)
+        add("URL", url)
+
+        # 403_URL:专门标记 403 路径,供后续绕过/人工关注
+        if int(status) == 403:
+            if url not in seen_403:
+                seen_403.add(url)
+                add("403_URL", url)
+
+    return results

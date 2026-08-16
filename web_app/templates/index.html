@@ -1,76 +1,294 @@
 {% extends "base.html" %}
 {% block title %}仪表盘{% endblock %}
 {% block content %}
-<div class="dashboard">
+<div class="page-head">
     <h1>系统仪表盘</h1>
-
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-value {% if redis_ok %}green{% else %}red{% endif %}">
-                {{ "在线" if redis_ok else "离线" }}
-            </div>
-            <div class="stat-label">Redis 状态</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-value">{{ event_count }}</div>
-            <div class="stat-label">事件总数</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-value">{{ node_count }}</div>
-            <div class="stat-label">活跃节点</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-value">{{ tool_count }}</div>
-            <div class="stat-label">已注册工具</div>
-        </div>
-    </div>
-
-    {% if queue_stats %}
-    <div class="section">
-        <h2>事件队列状态</h2>
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>事件类型</th>
-                    <th>生产总数</th>
-                    <th>待处理数量</th>
-                    <th>消费者信息</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for q in queue_stats %}
-                <tr>
-                    <td>{{ q.type }}</td>
-                    <td>{{ q.total_produced }}</td>
-                    <td>{{ q.count }}</td>
-                    <td>
-                        {% if q.has_consumer %}
-                        {% for c in q.consumers %}
-                        <div style="margin-bottom:4px;">
-                            <span class="badge badge-tool">{{ c.tool }}</span>
-                            <span style="color:var(--text-muted);font-size:0.75rem;">待处理 {{ c.pending }}</span>
-                            {% if c.produces %}
-                            <span style="color:var(--text-muted);font-size:0.75rem;">→</span>
-                            {% for p in c.produces %}
-                            <span class="badge badge-event">{{ p }}</span>
-                            {% endfor %}
-                            {% endif %}
-                        </div>
-                        {% endfor %}
-                        {% else %}
-                        <span class="badge" style="background:rgba(248,81,73,0.15);color:var(--danger);">无消费者</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% else %}
-                <tr><td colspan="3" class="empty">无事件队列</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% endif %}
+    <p class="page-sub">事件驱动扫描编排中心 · 实时状态总览
+        <span class="help-text" style="margin-left:14px;font-family:var(--font-mono);">每 8 秒自动刷新 · 上次更新 <span id="last-refresh">-</span></span>
+    </p>
 </div>
+
+<div id="queue-alert" class="flash warning" style="display:none;margin-bottom:12px;"></div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value {% if redis_ok %}green{% else %}red{% endif %}">
+            {% if redis_ok %}<span class="dot-online"></span>在线{% else %}<span class="dot-offline"></span>离线{% endif %}
+        </div>
+        <div class="stat-label">Redis 状态</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="stat-event-count">{{ event_count }}</div>
+        <div class="stat-label">事件总数</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="stat-node-count">{{ node_count }}</div>
+        <div class="stat-label">活跃节点</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="stat-tool-count">{{ tool_count }}</div>
+        <div class="stat-label">已注册工具</div>
+    </div>
+</div>
+
+{% if redis_ok %}
+<div class="dash-charts">
+    <div class="card chart-card">
+        <h3>24h 事件趋势
+            <span class="help-text" style="float:right;font-family:var(--font-mono);">按小时聚合 · 自动刷新</span>
+        </h3>
+        <div class="trend-wrap">
+            <svg id="trend-svg" viewBox="0 0 720 150" preserveAspectRatio="none"></svg>
+            <div id="trend-labels" class="trend-labels"></div>
+        </div>
+    </div>
+    <div class="card chart-card">
+        <h3>事件类型分布
+            <span class="help-text" style="float:right;font-family:var(--font-mono);">Top 8</span>
+        </h3>
+        <div id="type-dist" class="type-dist">
+            <div class="chart-skeleton"></div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if queue_stats %}
+<div class="card">
+    <h3>事件队列状态</h3>
+    <table class="table">
+        <thead>
+            <tr>
+                <th style="width:180px;">事件类型</th>
+                <th style="width:90px;">生产总数</th>
+                <th style="width:90px;">待处理</th>
+                <th>消费者信息</th>
+            </tr>
+        </thead>
+        <tbody id="queue-tbody">
+            {% for q in queue_stats %}
+            <tr>
+                <td><span class="badge badge-event">{{ q.type }}</span></td>
+                <td><span class="mono">{{ q.total_produced }}</span></td>
+                <td><span class="mono {% if q.count > 0 %}pending-num{% endif %}">{{ q.count }}</span></td>
+                <td>
+                    {% if q.has_consumer %}
+                    {% for c in q.consumers %}
+                    <div class="consumer-row">
+                        <span class="badge badge-tool">{{ c.tool }}</span>
+                        <span class="consumer-meta">待处理 <b class="mono">{{ c.pending }}</b></span>
+                        {% if c.produces %}
+                        <span class="consumer-meta">→</span>
+                        {% for p in c.produces %}
+                        <span class="badge badge-event">{{ p }}</span>
+                        {% endfor %}
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <span class="badge badge-danger">无消费者</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="empty">无事件队列</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card">
+    <div class="eq-empty">
+        <div class="eq-empty-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+                <path d="M4 6h16M4 12h16M4 18h10"/>
+            </svg>
+        </div>
+        <h2>Redis 不可达</h2>
+        <p>检查 Redis 连接与 worker 节点状态,连接恢复后本页每 8 秒自动重试刷新。</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── 仪表盘自动刷新:每 8 秒轮询 /api/stats,更新统计卡 + 队列表 + 积压告警 ──
+function escHtml(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ── M-2 数字滚动:0→N 缓动动画 ──
+function animateNumber(el, target) {
+    if (!el) return;
+    var cur = parseInt(el.textContent.replace(/[^0-9]/g, ''), 10) || 0;
+    if (cur === target) return;
+    var t0 = null, dur = 600;
+    function step(ts) {
+        if (!t0) t0 = ts;
+        var p = Math.min(1, (ts - t0) / dur);
+        var eased = 1 - Math.pow(1 - p, 3);   // easeOutCubic
+        el.textContent = Math.round(cur + (target - cur) * eased);
+        if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+}
+
+// ── M-3 标签页积压提示:有积压时标题加 ⚠ 前缀 ──
+var _baseTitle = document.title;
+function updateTitle(pendingTotal) {
+    document.title = pendingTotal > 0 ? ('⚠ ' + pendingTotal + ' 积压 · ' + _baseTitle) : _baseTitle;
+}
+
+// ── M-1 24h 趋势图(SVG 折线 + 渐变面积,零依赖) ──
+function renderTrend(data) {
+    var svg = document.getElementById('trend-svg');
+    var labelBox = document.getElementById('trend-labels');
+    if (!svg || !data || !data.counts) return;
+    var counts = data.counts, labels = data.hours || [];
+    var W = 720, H = 150, padB = 18, padT = 8;
+    var max = Math.max.apply(null, counts.concat([1]));
+    var plotH = H - padB - padT;
+    function pt(i, c) {
+        var x = counts.length <= 1 ? W / 2 : (i * (W / (counts.length - 1)));
+        var y = padT + plotH * (1 - c / max);
+        return [x.toFixed(1), y.toFixed(1)];
+    }
+    var pts = counts.map(function(c, i) { return pt(i, c); });
+    var line = pts.map(function(p) { return p.join(','); }).join(' ');
+    // 渐变面积 path
+    var area = 'M' + pts[0][0] + ',' + (H - padB);
+    pts.forEach(function(p) { area += ' L' + p[0] + ',' + p[1]; });
+    area += ' L' + pts[pts.length - 1][0] + ',' + (H - padB) + ' Z';
+    // 水平网格线(3 条)
+    var grid = '';
+    for (var g = 1; g <= 3; g++) {
+        var gy = (padT + plotH * (1 - g / 4)).toFixed(1);
+        grid += '<line x1="0" y1="' + gy + '" x2="' + W + '" y2="' + gy + '" class="trend-grid"/>';
+    }
+    svg.innerHTML =
+        '<defs><linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">' +
+        '<stop offset="0%" stop-color="rgba(34,211,238,0.35)"/>' +
+        '<stop offset="100%" stop-color="rgba(34,211,238,0.02)"/>' +
+        '</linearGradient></defs>' +
+        grid +
+        '<path d="' + area + '" fill="url(#trendGrad)"/>' +
+        '<polyline points="' + line + '" fill="none" class="trend-line"/>' +
+        '<circle cx="' + pts[pts.length - 1][0] + '" cy="' + pts[pts.length - 1][1] + '" r="3" class="trend-dot"/>';
+    // x 轴标签:每 6 小时一个
+    var step = Math.max(1, Math.ceil(counts.length / 6));
+    var html = '';
+    for (var i = 0; i < counts.length; i += step) {
+        html += '<span class="trend-label">' + escHtml(labels[i] || '') + '</span>';
+    }
+    html += '<span class="trend-label">' + escHtml(labels[counts.length - 1] || '') + '</span>';
+    labelBox.innerHTML = html;
+}
+
+// ── M-1 事件类型分布(CSS 条形图) ──
+function renderTypeDist(data) {
+    var box = document.getElementById('type-dist');
+    if (!box || !data || !data.distribution) return;
+    var dist = data.distribution;
+    if (!dist.length) {
+        box.innerHTML = '<div class="empty-state">暂无事件</div>';
+        return;
+    }
+    box.innerHTML = dist.map(function(d) {
+        return '<div class="dist-row">' +
+            '<span class="badge badge-event dist-type">' + escHtml(d.type) + '</span>' +
+            '<span class="dist-bar-wrap"><span class="dist-bar" style="width:' + Math.max(1.5, d.pct) + '%"></span></span>' +
+            '<span class="mono dist-count">' + d.count + '</span>' +
+            '<span class="dist-pct">' + d.pct + '%</span>' +
+            '</div>';
+    }).join('');
+}
+
+function refreshTrend() {
+    fetch('/api/stats/trend', {headers: {'Accept': 'application/json'}})
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data || !data.ok) return;
+            renderTrend(data);
+            renderTypeDist(data);
+        })
+        .catch(function() { /* 网络抖动静默跳过,下轮重试 */ });
+}
+
+function renderQueueRows(queueStats) {
+    var tbody = document.getElementById('queue-tbody');
+    if (!tbody) return;
+    if (!queueStats || queueStats.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty">无事件队列</td></tr>';
+        return;
+    }
+    tbody.innerHTML = queueStats.map(function(q) {
+        var hasPending = q.count > 0;
+        var rowStyle = hasPending ? ' style="background:rgba(251,191,36,0.05);"' : '';
+        var consumers = (q.consumers || []).map(function(c) {
+            var pendingCls = c.pending > 0 ? ' class="pending-num"' : '';
+            var html = '<div class="consumer-row">' +
+                '<span class="badge badge-tool">' + escHtml(c.tool) + '</span>' +
+                '<span class="consumer-meta">待处理 <b class="mono"' + pendingCls + '>' + c.pending + '</b></span>';
+            if (c.produces && c.produces.length) {
+                html += '<span class="consumer-meta">→</span>';
+                c.produces.forEach(function(p) { html += '<span class="badge badge-event">' + escHtml(p) + '</span>'; });
+            }
+            return html + '</div>';
+        }).join('');
+        var consumerCell = q.has_consumer ? consumers : '<span class="badge badge-danger">无消费者</span>';
+        return '<tr' + rowStyle + '>' +
+            '<td><span class="badge badge-event">' + escHtml(q.type) + '</span></td>' +
+            '<td><span class="mono">' + q.total_produced + '</span></td>' +
+            '<td><span class="mono' + (hasPending ? ' pending-num' : '') + '">' + q.count + '</span></td>' +
+            '<td>' + consumerCell + '</td>' +
+            '</tr>';
+    }).join('');
+}
+
+function refreshDashboard() {
+    fetch('/api/stats', {headers: {'Accept': 'application/json'}})
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var ok = !!data.redis_ok;
+            var statusEl = document.querySelector('.stat-card .stat-value');
+            if (statusEl) {
+                statusEl.className = 'stat-value ' + (ok ? 'green' : 'red');
+                statusEl.innerHTML = ok
+                    ? '<span class="dot-online"></span>在线'
+                    : '<span class="dot-offline"></span>离线';
+            }
+            var map = {'event_count': 'stat-event-count', 'node_count': 'stat-node-count', 'tool_count': 'stat-tool-count'};
+            Object.keys(map).forEach(function(key) {
+                var el = document.getElementById(map[key]);
+                if (el && data[key] !== undefined) animateNumber(el, data[key]);
+            });
+            renderQueueRows(data.queue_stats || []);
+            // 积压告警:任一队列待处理 > 0
+            var stalled = (data.queue_stats || []).filter(function(q) { return q.count > 0; });
+            var alertEl = document.getElementById('queue-alert');
+            var pendingTotal = stalled.reduce(function(a, b) { return a + b.count; }, 0);
+            if (stalled.length > 0) {
+                var types = stalled.slice(0, 3).map(function(q) { return q.type; }).join(' / ');
+                alertEl.innerHTML = '⚠ ' + stalled.length + ' 个事件队列存在积压（待处理共 ' + pendingTotal + ' 条）：' + escHtml(types) + (stalled.length > 3 ? ' 等' : '') + '。请关注 worker 消费情况。';
+                alertEl.style.display = 'flex';
+            } else {
+                alertEl.style.display = 'none';
+            }
+            updateTitle(pendingTotal);
+            document.getElementById('last-refresh').textContent = new Date().toLocaleTimeString('zh-CN', {hour12: false});
+        })
+        .catch(function() {
+            // 网络抖动静默跳过,下轮重试;不打扰页面
+        });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    refreshDashboard();
+    refreshTrend();
+    setInterval(refreshDashboard, 8000);
+    setInterval(refreshTrend, 30000);   // 趋势图 30s 刷新足够
+});
+</script>
 {% endblock %}

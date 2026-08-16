@@ -1,0 +1,28 @@
+name: ip_port_split_module
+description: HOST_TCP_PORT_OPEN(ip->[ports]) 拆分为单个 OPEN_TCP_PORT(ip:port),供 httpx 探活
+runtime:
+  max_concurrency: 8
+allowed_output_events:
+  - OPEN_TCP_PORT
+
+io_contract:
+  input_events:
+    - HOST_TCP_PORT_OPEN
+  input_transform_code: |
+    import shlex
+    return [{"value": shlex.quote(data["value"])}]
+
+execution:
+  command: python ./bin/ip_port_split.py {{value}}
+  output_parse_code: |
+    import json
+    temp_list = []
+    for line in data["stdout"].strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            temp_list.append(json.loads(line))
+        except:
+            continue
+    return temp_list

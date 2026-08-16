@@ -1,48 +1,51 @@
-# FlowScan3 主配置
 redis:
-  listen_host: 0.0.0.0
-  remote_host: 127.0.0.1
-  port: 6379
+  redis_host: redis
+  redis_port: 6379
   password: ""
   db: 0
-
 web_config:
   host: 0.0.0.0
   port: 8080
   username: FlowScan
   password: FlowScanPassWord123
   session_ttl: 3600
-  secret_key: 5329a77d233311276c3f0ac7951b165c0b43fdfe9b7e1226abaa603da135a22d
-
-
+  secret_key: flowscan-secret-change-me
 xray_listen_http_proxy: 0.0.0.0:7777
 xray_remote_http_proxy: http://127.0.0.1:7777
-
 worker:
   idle_sleep_seconds: 1.0
   scan_batch_size: 200
   max_local_pending: 40
-  
-bbot:
-  port_range: 1-65535
-  securitytrails_api_key: 
-  virustotal_api_key: 
-  github_workflows_api_key: 
-
+  heartbeat_interval_seconds: 10
+  lock_stale_seconds: 120
 fofa:
   api_key: YOUR_FOFA_API_KEY
   base_url: https://fofa.info
-
-
-
 ai_analysis:
-  base_url: https://api.openai.com/v1
-  api_key: YOUR_OPENAI_COMPATIBLE_API_KEY
-  model: gpt-4o-mini
+  base_url: https://api.deepseek.com/v1
+  api_key: YOUR_DEEPSEEK_API_KEY
+  model: deepseek-chat
   timeout_seconds: 120
   max_events: 200
-  # system_prompt 未设置时自动从 prompts/ai_analysis.txt 读取
-  # system_prompt: |
-  #   自定义提示词（覆盖 prompts/ai_analysis.txt）
-  log_api_key: d6de3f6386d67953484daea7d560e8c97227bfac55f31ec628c837b2939d3fc0
-  loop_interval_minutes: 0
+  log_api_key: ""
+  agent_max_iterations: 50
+  agent_scan_gap_seconds: 5
+  agent_plan_mode: false
+  agent_context_max_chars: 60000
+  agent_approval_mode: ai        # 危险操作审批模式: auto=自动放行 / ai=AI审批 / human=人工审批
+c2:
+  enabled: false
+  project_root: c2_server          # 相对路径=项目根下的 c2_server 目录
+  config_file: config.json
+mcp:
+  enabled: true
+  servers:
+    - name: yakit
+      type: sse
+      url: http://127.0.0.1:11432/sse
+      enabled: true
+skills:
+  enabled: false
+  dirs:
+    - skills                 # 默认读取项目内 skills/ 目录(不存在会自动创建)
+  loaded: []

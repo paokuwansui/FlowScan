@@ -1,18 +1,7 @@
 name: katana_module
 description: Katana 爬虫
-check:
-  command: katana -version
-  expect_keyword: Current Version
-  exclude_keyword: not found
-install:
-  steps:
-  - mkdir -p "$HOME/.local/bin" "$HOME/.cache/go-tmp"
-  - GOBIN="$HOME/.local/bin" GOCACHE="$HOME/.cache/go-tmp" go install -v github.com/projectdiscovery/katana/cmd/katana@latest
-  - katana -u https://example.com -hl
-  install_timeout_seconds: 1200
 runtime:
   max_concurrency: 3
-  exec_timeout_seconds: 1800
 allowed_output_events:
   - FINDING
 io_contract:
@@ -25,7 +14,7 @@ io_contract:
         value = "http://" + value
     return [{"target": value, "target_q": shlex.quote(value)}]
 execution:
-  command: katana -u {{target_q}} -proxy {{config.xray_remote_http_proxy}} -field-scope rdn -crawl-scope 1 -hl -jc -xhr -fsu -c 5 -rl 20 -silent -no-sandbox
+  command: katana -u {{target_q}} -proxy {{config.xray_remote_http_proxy}} -field-scope rdn -crawl-scope 1 -hl -aff -jc -xhr -fsu -c 5 -rl 20 -silent -no-sandbox
   output_parse_code: |
     from urllib.parse import urlparse, parse_qs, urlencode
 
@@ -41,6 +30,10 @@ execution:
     for line in data["stdout"].strip().splitlines():
         url = line.strip()
         if not url:
+            continue
+        # 非 URL 行直接跳过(如 rod/launcher 的 Chromium 下载进度日志,
+        # 环境日志不属于扫描发现;katana -silent 正常只输出带协议的 URL)
+        if not url.startswith(("http://", "https://")):
             continue
         # 静态资源后缀
         path = urlparse(url).path.lower()

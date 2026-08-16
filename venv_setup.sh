@@ -1,3 +1,4 @@
+# [DEPRECATED] 主机部署方式已由 Docker 取代(docker-compose.yml),此脚本仅作参考保留
 setup_flowscan_venv.sh
 #!/bin/bash
 
@@ -28,17 +29,8 @@ source "$VENV_PATH/bin/activate"
 pip install --upgrade pip
 
 echo "=== 5. 安装所需的 Python 依赖包 ==="
-pip install PyYAML redis flask tldextract bbot
-
-echo "=== 6. 创建 bbot 全局软链接 ==="
-# 使用绝对路径创建软链接，确保全局可访问
-# 如果软链接已存在，先删除旧的以防报错
-if [ -L "/usr/local/bin/bbot" ] || [ -f "/usr/local/bin/bbot" ]; then
-    echo "检测到已存在 /usr/local/bin/bbot，正在覆盖..."
-    sudo rm -f /usr/local/bin/bbot
-fi
-
-sudo ln -s "$VENV_PATH/bin/bbot" /usr/local/bin/bbot
+# 注意: 仅保留核心依赖(原 bbot 依赖已移除)
+pip install PyYAML redis flask tldextract requests
 
 echo "=== 部署完成！ ==="
 echo "提示：由于脚本在子 Shell 中运行，当前终端尚未激活环境。"

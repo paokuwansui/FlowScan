@@ -1,6 +1,21 @@
 {% extends "base.html" %}
 {% block title %}事件查询{% endblock %}
 {% block content %}
+<div class="page-head">
+    <h1>事件查询</h1>
+    <p class="page-sub">按事件类型浏览 · 按值搜索 · 追溯事件链路</p>
+</div>
+
+<div class="eq-search-bar">
+    <form method="GET" action="{{ url_for('event_query') }}" id="search-form">
+        <input type="text" name="search" placeholder="搜索事件值..." value="{{ search_term }}" class="eq-search-input" aria-label="搜索事件值">
+        <button type="submit" class="btn btn-sm btn-primary">搜索</button>
+        {% if search_term %}
+        <a href="{{ url_for('event_query') }}" class="btn btn-sm btn-secondary">清除</a>
+        {% endif %}
+    </form>
+</div>
+
 <div class="eq-layout">
     {# ====== 左侧：事件类别 ====== #}
     <div class="eq-sidebar">
@@ -8,75 +23,124 @@
         <ul class="eq-type-list">
             {% for et in event_types %}
             <li>
-                <a href="{{ url_for('event_query', type=et) }}"
-                   class="{% if et == selected_type and not search_term %}active{% endif %}">
-                    {{ et }}
+                <a href="{% if search_term %}{{ url_for('event_query', type=et, search=search_term) }}{% else %}{{ url_for('event_query', type=et) }}{% endif %}"
+                   class="{% if et == selected_type %}active{% endif %}">
+                    <span>{{ et }}</span>
+                    <span class="eq-count">{{ type_counts.get(et, 0) }}</span>
                 </a>
             </li>
             {% else %}
-            <li class="empty">暂无事件</li>
+            <li class="eq-sidebar-empty">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+                    <circle cx="12" cy="12" r="8"/>
+                    <path d="M4 4l16 16"/>
+                </svg>
+                暂无事件
+            </li>
             {% endfor %}
         </ul>
     </div>
 
     {# ====== 右侧主区域 ====== #}
     <div class="eq-main">
-        {# ── 右上角搜索框 ── #}
-        <div class="eq-search-bar">
-            <form method="GET" action="{{ url_for('event_query') }}" id="search-form">
-                <input type="text" name="search" placeholder="搜索事件值..."
-                       value="{{ search_term }}" class="eq-search-input">
-                <button type="submit" class="btn btn-sm btn-primary">搜索</button>
-                {% if search_term %}
-                <a href="{{ url_for('event_query') }}" class="btn btn-sm btn-secondary">清除</a>
-                {% endif %}
-            </form>
-        </div>
-
         {# ── 搜索结果显示 ── #}
         {% if search_term %}
         <div class="eq-section">
-            <h3>搜索: "{{ search_term }}" — 找到 {{ search_results|length }} 个结果</h3>
+            {% if selected_type %}
+            <h3>搜索: "{{ search_term }}" — 在 [{{ selected_type }}] 最近 {{ search_window }} 条内找到 {{ search_total }} 个结果</h3>
+            {% else %}
+            <h3>搜索: "{{ search_term }}" — 找到 {{ search_total }} 个结果（仅最近 {{ search_window }} 条内搜索）</h3>
+            {% endif %}
+            {% if search_results %}
             <div class="eq-value-grid">
                 {% for r in search_results %}
-                <div class="eq-value-item" data-fp="{{ r.fp }}"
-                     onclick="togglePath('{{ r.fp }}', this)">
+                <div class="eq-value-item" data-fp="{{ r.fp }}" onclick="togglePath('{{ r.fp }}', this)">
                     <span class="eq-value-type">{{ r.type }}</span>
                     <span class="eq-value-text">{{ r.value }}</span>
                     <span class="eq-value-source">{{ r.source or '?' }}</span>
                 </div>
                 <div class="eq-path-panel" id="path-{{ r.fp }}" style="display:none;"></div>
-                {% else %}
-                <div class="empty-state">未找到匹配的事件</div>
                 {% endfor %}
             </div>
+            {% if total_pages > 1 %}
+            <div class="eq-pager">
+                {% if page > 1 %}
+                <a class="btn btn-sm" href="?search={{ search_term|urlencode }}{% if selected_type %}&type={{ selected_type|urlencode }}{% endif %}&page={{ page - 1 }}">← 上一页</a>
+                {% endif %}
+                <span class="eq-pager-info">第 {{ page }} / {{ total_pages }} 页 · 每页 {{ per_page }} 条</span>
+                {% if page < total_pages %}
+                <a class="btn btn-sm" href="?search={{ search_term|urlencode }}{% if selected_type %}&type={{ selected_type|urlencode }}{% endif %}&page={{ page + 1 }}">下一页 →</a>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="eq-empty">
+                <div class="eq-empty-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+                        <circle cx="11" cy="11" r="7"/>
+                        <path d="M21 21l-4.3-4.3"/>
+                    </svg>
+                </div>
+                <h2>未找到匹配的事件</h2>
+                <p>{% if selected_type %}在 [{{ selected_type }}] 最近 {{ search_window }} 条内未匹配。尝试更换关键字。{% else %}仅搜索最近 {{ search_window }} 条事件。尝试更换关键字,或先选类型再搜(类型内窗口更大)。{% endif %}</p>
+                <a href="{{ url_for('event_query') }}" class="btn btn-sm btn-secondary">清除搜索</a>
+            </div>
+            {% endif %}
         </div>
         {% endif %}
 
         {# ── 分类浏览结果 ── #}
         {% if selected_type and not search_term %}
         <div class="eq-section">
-            <h3>{{ selected_type }} — {{ type_values|length }} 个值</h3>
+            <h3>{{ selected_type }} — 共 {{ total_values }} 个值{% if type_values|length < total_values %}（显示前 {{ type_values|length }} 个）{% endif %}</h3>
+            {% if type_values %}
             <div class="eq-value-grid">
                 {% for v in type_values %}
-                <div class="eq-value-item" data-fp="{{ v.fp }}"
-                     onclick="togglePath('{{ v.fp }}', this)">
+                <div class="eq-value-item" data-fp="{{ v.fp }}" onclick="togglePath('{{ v.fp }}', this)">
                     <span class="eq-value-text">{{ v.value }}</span>
                     <span class="eq-value-source">{{ v.source or '?' }}</span>
                 </div>
                 <div class="eq-path-panel" id="path-{{ v.fp }}" style="display:none;"></div>
-                {% else %}
-                <div class="empty-state">该类型暂无事件值</div>
                 {% endfor %}
             </div>
+            {% if total_pages > 1 %}
+            <div class="eq-pager">
+                {% if page > 1 %}
+                <a class="btn btn-sm" href="?type={{ selected_type }}&page={{ page - 1 }}">← 上一页</a>
+                {% endif %}
+                <span class="eq-pager-info">第 {{ page }} / {{ total_pages }} 页 · 每页 {{ per_page }} 条 · 共 {{ total_values }} 条</span>
+                {% if page < total_pages %}
+                <a class="btn btn-sm" href="?type={{ selected_type }}&page={{ page + 1 }}">下一页 →</a>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="eq-empty">
+                <div class="eq-empty-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+                        <path d="M4 6h16M4 12h16M4 18h10"/>
+                    </svg>
+                </div>
+                <h2>该类型暂无事件值</h2>
+                <p>「{{ selected_type }}」类型下还没有事件,可先到「事件管理」注入,或换一个事件类别。</p>
+            </div>
+            {% endif %}
         </div>
         {% endif %}
 
         {# ── 默认提示 ── #}
         {% if not selected_type and not search_term %}
-        <div class="empty-state" style="margin-top:80px;">
-            <h2>事件查询</h2>
-            <p>从左侧选择一个事件类别，或在右上角搜索事件值</p>
+        <div class="eq-empty">
+            <div class="eq-empty-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+                    <ellipse cx="12" cy="5" rx="8" ry="3"/>
+                    <path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/>
+                    <path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/>
+                </svg>
+            </div>
+            <h2>暂无事件数据</h2>
+            <p>扫描事件入队后,可在此按事件类型浏览、按值搜索、追溯事件链路。当前 Redis 中还没有事件,可先到「事件管理」注入扫描目标。</p>
+            <a href="{{ url_for('events') }}" class="btn btn-sm btn-primary">去注入事件</a>
         </div>
         {% endif %}
 
@@ -101,7 +165,7 @@
                         <div class="path-value">{{ node.value }}</div>
                         <div class="path-meta">
                             <span>指纹: {{ node.fingerprint[:20] }}...</span>
-                            <span>时间: {{ "%.2f"|format(node.timestamp|float) if node.timestamp else '-' }}</span>
+                            <span>时间: <span data-rel-ts="{{ node.timestamp }}">{{ node.timestamp|fmt_ts }}</span></span>
                         </div>
                     </div>
                 </div>
@@ -147,17 +211,21 @@ function togglePath(fp, el) {
             var html = '<div class="path-timeline" style="padding:8px 0 8px 24px;">';
             data.forEach(function(node, i) {
                 var cls = i === 0 ? 'root' : (i === data.length-1 ? 'current' : 'intermediate');
+                var ts = node.created_at || node.timestamp || 0;
                 html += '<div class="path-node" style="margin-bottom:8px;">';
-                html += '<div class="path-marker ' + cls + '" style="width:28px;height:28px;font-size:0.7rem;margin-left:-24px;">' + (i+1) + '</div>';
+                html += '<div class="path-marker ' + cls + '" style="width:28px;height:28px;font-size:0.7rem;margin-left:-18px;">' + (i+1) + '</div>';
                 html += '<div class="path-content" style="padding:8px 12px;">';
                 html += '<div class="path-event-type"><span class="badge badge-event">' + (node.event_type||'') + '</span>';
                 if (node.source_tool) html += ' <span class="badge badge-tool">' + node.source_tool + '</span>';
                 html += '</div>';
                 html += '<div class="path-value" style="font-size:0.8rem;">' + escapeHtml(node.value||'') + '</div>';
+                html += '<div class="path-meta"><span>时间: <span data-rel-ts="' + ts + '">' + (new Date(parseFloat(ts)*1000).toLocaleString('zh-CN', {hour12:false}) || '-') + '</span></span></div>';
                 html += '</div></div>';
             });
             html += '</div>';
             panel.innerHTML = html;
+            if (window.FS3BadgeTint) FS3BadgeTint(panel);
+            if (window.FS3RelTime) FS3RelTime(panel);
         } else {
             panel.innerHTML = '<div class="empty-state">加载失败</div>';
         }

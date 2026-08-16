@@ -1,0 +1,49 @@
+# ============================================================================
+# FlowScan 主节点编排(单容器:redis + web + xray 内嵌同一容器)
+# 用法:
+#   docker compose up -d                          # 单容器跑起主节点
+#
+# 启动流程(entrypoint.sh 内,无外部依赖顺序):
+#   1) 无条件随机化 config.yaml 密钥(每次启动都换新密码)
+#   2) 内嵌 redis-server(读新密码 requirepass,纯内存不落盘)
+#   3) 内嵌 xray 被动代理(后台,可用 FS3_ENABLE_XRAY=0 关闭)
+#   4) 前台 web 面板(8080)
+#
+# 注意: worker 节点不在此文件(见 docker-compose.worker.yml),
+#       主节点暴露 6379 供 worker 节点远程连接。
+# ============================================================================
+services:
+  main:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: flowscan:main
+    container_name: flowscan-main
+    restart: unless-stopped
+    command: ["web", "--host", "0.0.0.0", "--port", "8080"]
+    ports:
+      - "8082:8080"          # web 面板(宿主 8081 常被本机调试实例占用,走 8082;停掉后可改回 8081)
+      - "6380:6379"          # redis(宿主 6379 可能被本机临时 redis 占用;同机 worker 走容器内网直连不依赖此映射,跨机部署时改回 6379)
+      - "7777:7777"          # xray 被动代理
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/login"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    volumes:
+      - ./config.yaml:/app/config.yaml          # 随机化需可写,不加 :ro
+      - ./state_snapshots:/app/state_snapshots
+      - ./reports:/app/reports
+      - flowscan-data:/app/data
+    networks:
+      fs3net:
+        aliases:
+          - redis        # 供 worker 按 config.yaml 的 redis_host: redis 解析到本容器
+
+volumes:
+  flowscan-data:
+
+networks:
+  fs3net:
+    driver: bridge

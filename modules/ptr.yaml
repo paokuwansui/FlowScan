@@ -1,0 +1,28 @@
+name: ptr_module
+description: 反向 DNS(PTR)查询 — IP_ADDRESS 反查域名,产出 DNS_NAME
+runtime:
+  max_concurrency: 8
+allowed_output_events:
+  - DNS_NAME
+
+io_contract:
+  input_events:
+    - IP_ADDRESS
+  input_transform_code: |
+    import shlex
+    return [{"value": shlex.quote(data["value"])}]
+
+execution:
+  command: python ./bin/ptr.py {{value}}
+  output_parse_code: |
+    import json
+    temp_list = []
+    for line in data["stdout"].strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            temp_list.append(json.loads(line))
+        except:
+            continue
+    return temp_list

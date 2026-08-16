@@ -1,0 +1,28 @@
+name: screenshot_module
+description: 网页截图 — 对 URL 用 chromium headless 截图,产出 SCREENSHOT(附带截图地址+base64 图片编码)
+runtime:
+  max_concurrency: 2
+allowed_output_events:
+  - SCREENSHOT
+
+io_contract:
+  input_events:
+    - URL
+  input_transform_code: |
+    import shlex
+    return [{"value": shlex.quote(data["value"])}]
+
+execution:
+  command: python ./bin/screenshot.py {{value}}
+  output_parse_code: |
+    import json
+    temp_list = []
+    for line in data["stdout"].strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            temp_list.append(json.loads(line))
+        except:
+            continue
+    return temp_list

@@ -1,0 +1,40 @@
+# ============================================================================
+# FlowScan Worker 节点编排(仅 worker,不安装 redis)
+# 用法:
+#   docker compose -f docker-compose.worker.yml up -d
+#
+# redis 连接统一从挂载的 config.yaml 读取(redis.redis_host / redis_port / password),
+# 不再通过 CLI 参数传递。worker 启动时 main.py 每 10s 重读 config 重试连接,
+# 直到连上主节点 redis(密码被 randomize_secrets 更新后也能自动拿到)。
+# 跨机部署时把挂载的 config.yaml 里 redis_host 改为主节点地址即可。
+# ============================================================================
+services:
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    image: flowscan:worker
+    container_name: flowscan-worker
+    restart: unless-stopped
+    # ksubdomain 无状态发包需要 NET_RAW;nmap -O 需要 root(容器默认 root)
+    cap_add:
+      - NET_RAW
+    command: ["worker"]
+    environment:
+      - FS3_NODE_ID=${FS3_NODE_ID:-}
+      - FS3_REDIS_HOST=${FS3_REDIS_HOST:-main}
+      - FS3_REDIS_PORT=${FS3_REDIS_PORT:-6379}
+      - FS3_REDIS_PASSWORD=${FS3_REDIS_PASSWORD:-}
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./state_snapshots:/app/state_snapshots
+    networks:
+      - fs3net
+
+networks:
+  # 复用主节点 compose 创建的 fs3net 网络(同机部署时 worker 可直接用 redis 服务名)
+  # 跨机部署时该网络仅作默认,实际连接走 FS3_REDIS_HOST 主节点 IP
+  fs3net:
+    external: true
+    name: flowscan_fs3net
+

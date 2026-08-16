@@ -1,0 +1,31 @@
+name: amass_module
+description: Amass 主动子域名枚举 — 主动发现+爆破模式，输出 DNS_NAME 事件
+runtime:
+  max_concurrency: 2
+allowed_output_events:
+  - DNS_NAME
+
+io_contract:
+  input_events:
+    - DNS_NAME
+  input_transform_code: |
+    import shlex
+    # 清洗域名:去空格/末尾点号/统一小写
+    domain = data["value"].strip().strip(".").lower()
+    if not domain or "." not in domain:
+        return []
+    return [{"domain": domain, "domain_q": shlex.quote(domain)}]
+
+execution:
+  command: amass enum -active -brute -d {{domain_q}} 2>/dev/null
+  output_parse_code: |
+    results = []
+    seen = set()
+    for line in data["stdout"].splitlines():
+        # 清洗:去空格/小写/去末尾点号
+        host = line.strip().lower().strip(".")
+        if not host or "." not in host or host in seen:
+            continue
+        seen.add(host)
+        results.append({"DNS_NAME": host})
+    return results

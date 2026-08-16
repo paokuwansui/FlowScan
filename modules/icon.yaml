@@ -1,0 +1,28 @@
+name: icon_module
+description: 图标解析 — 下载 favicon(ICON_PATH)存 reports/icons,产出 ICON(附带图标地址+base64 编码)
+runtime:
+  max_concurrency: 8
+allowed_output_events:
+  - ICON
+
+io_contract:
+  input_events:
+    - ICON_PATH
+  input_transform_code: |
+    import shlex
+    return [{"value": shlex.quote(data["value"])}]
+
+execution:
+  command: python ./bin/icon.py {{value}}
+  output_parse_code: |
+    import json
+    temp_list = []
+    for line in data["stdout"].strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            temp_list.append(json.loads(line))
+        except:
+            continue
+    return temp_list

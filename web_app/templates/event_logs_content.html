@@ -1,0 +1,394 @@
+{# 事件日记共享片段:被 event_logs.html(独立页)与 ai_analysis.html(事件日记 tab)include。
+   依赖上下文变量:log_tab(子 tab 名 ai/events/api,默认 ai)、logs、count、log_api_key。
+   独立页由服务端渲染 active 类;嵌入(FS3_EMBEDDED_LOGS)时初始默认 ai 且不写父页 URL。 #}
+{% set log_tab = log_tab or 'ai' %}
+
+<nav class="tabs">
+    <a href="?tab=ai" class="tab log-tab-link {% if log_tab == 'ai' %}active{% endif %}" data-tab="ai" id="tab-ai-link">AI 分析日志</a>
+    <a href="?tab=events" class="tab log-tab-link {% if log_tab == 'events' %}active{% endif %}" data-tab="events" id="tab-events-link">扫描事件总览</a>
+    <a href="?tab=api" class="tab log-tab-link {% if log_tab == 'api' %}active{% endif %}" data-tab="api" id="tab-api-link">API 调用示例</a>
+</nav>
+
+{# ── Tab 1: AI 分析日志 ── #}
+<div id="tab-ai">
+    <div class="card">
+        <h3>AI 分析日志 <span class="badge badge-event" style="margin-left:6px;">{{ count }}</span></h3>
+        {% if logs %}
+        <div class="table-scroll">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width:170px;">时间</th>
+                    <th style="width:100px;">优先级</th>
+                    <th>消息</th>
+                    <th style="width:140px;">目标</th>
+                    <th style="width:90px;">来源</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in logs %}
+                <tr>
+                    <td class="time-cell" style="white-space:nowrap;">{{ entry.created_at_iso or '-' }}</td>
+                    <td>
+                        {% if entry.priority == 'high' %}
+                        <span class="badge badge-danger">HIGH</span>
+                        {% elif entry.priority == 'medium' %}
+                        <span class="badge badge-warn">MEDIUM</span>
+                        {% else %}
+                        <span class="badge badge-muted">{{ entry.priority or 'medium' }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="value-cell">{{ entry.message or '-' }}</td>
+                    <td class="value-cell mono">{{ entry.target or '-' }}</td>
+                    <td class="mono" style="font-size:0.76rem;color:var(--text-muted);">{{ entry.source or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}
+        <div class="eq-empty" style="margin:16px 0 4px;">
+            <div class="eq-empty-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+                    <path d="M4 6h16M4 12h16M4 18h10"/>
+                </svg>
+            </div>
+            <h2>暂无 AI 分析日志</h2>
+            <p>AI 分析 / Agent 执行动作(注入、删除、拉黑、存储日志)后,记录会自动出现在这里。</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{# ── Tab 2: 扫描事件总览 ── #}
+<div id="tab-events" style="display:none;">
+    <div class="card">
+        <h3>事件类型统计</h3>
+        <div id="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;">
+            <span style="color:var(--text-muted);">加载中...</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>事件搜索</h3>
+        <div class="form-row" style="margin-bottom:12px;">
+            <select id="event-type-filter" class="form-control" aria-label="事件类型筛选" style="width:auto;min-width:180px;">
+                <option value="">全部类型</option>
+            </select>
+            <input type="text" id="event-search" class="form-control" placeholder="搜索事件值..." aria-label="搜索事件值" style="flex:1;min-width:220px;font-family:var(--font-mono);">
+            <button class="btn btn-sm btn-primary" onclick="loadEvents()">搜索</button>
+        </div>
+        <div class="table-scroll">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width:170px;">事件类型</th>
+                    <th>事件值</th>
+                    <th style="width:120px;">来源</th>
+                    <th style="width:180px;">时间</th>
+                </tr>
+            </thead>
+            <tbody id="events-body">
+                <tr><td colspan="4" style="text-align:center;color:var(--text-muted);">点击搜索加载事件</td></tr>
+            </tbody>
+        </table>
+        </div>
+        <div id="events-count" style="margin-top:8px;font-size:0.78rem;color:var(--text-muted);font-family:var(--font-mono);"></div>
+    </div>
+</div>
+
+{# ── Tab 3: API 调用示例 ── #}
+<div id="tab-api" style="display:none;">
+    <div class="card">
+        <h3>调用示例</h3>
+        <p class="help-text">API Key 直接读取 <code>config.yaml</code> 的 <code>ai_analysis.log_api_key</code>（未配置时示例显示 YOUR_API_KEY 占位）。</p>
+        <div style="margin-bottom:12px;">
+            <button class="btn btn-primary" onclick="copyAllExamples()">📋 一键复制全部用法</button>
+        </div>
+        <div id="api-examples"></div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 子 tab 初始状态:优先取服务端渲染的 active 类(独立页 ?tab= 参数),否则默认 ai
+    var activeLink = document.querySelector('.log-tab-link.active');
+    switchTab(activeLink ? activeLink.getAttribute('data-tab') : 'ai');
+
+    document.querySelectorAll('.log-tab-link').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            var tab = this.getAttribute('data-tab');
+            switchTab(tab);
+            // 嵌入(AI 分析页事件日记 tab)时不写父页 URL,避免把父 tab 参数改掉
+            if (!window.FS3_EMBEDDED_LOGS) {
+                history.replaceState(null, '', '?tab=' + tab);
+            }
+        });
+    });
+});
+
+function switchTab(tab) {
+    document.getElementById('tab-ai').style.display = (tab === 'ai') ? '' : 'none';
+    document.getElementById('tab-events').style.display = (tab === 'events') ? '' : 'none';
+    document.getElementById('tab-api').style.display = (tab === 'api') ? '' : 'none';
+    document.querySelectorAll('.log-tab-link').forEach(function(l) {
+        l.classList.toggle('active', l.getAttribute('data-tab') === tab);
+    });
+
+    if (tab === 'events') {
+        loadStats();
+        loadEventTypes();
+    }
+}
+
+// ── 事件统计 ──
+function loadStats() {
+    fetch('/event-logs?mode=stats')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var html = '';
+            var stats = data.stats || {};
+            if (Object.keys(stats).length === 0) {
+                document.getElementById('stats-grid').innerHTML = '<span style="color:var(--text-muted);">暂无统计数据</span>';
+                return;
+            }
+            var sorted = Object.entries(stats).sort(function(a, b) { return b[1] - a[1]; });
+            sorted.forEach(function(pair) {
+                html += '<div class="stat-card" style="padding:12px 16px;">' +
+                    '<div class="stat-value" style="font-size:1.25rem;">' + pair[1] + '</div>' +
+                    '<div class="stat-label" style="font-size:0.68rem;">' + esc(pair[0]) + '</div>' +
+                    '</div>';
+            });
+            document.getElementById('stats-grid').innerHTML = html;
+        })
+        .catch(function() {
+            document.getElementById('stats-grid').innerHTML = '<span style="color:var(--danger);">加载失败</span>';
+        });
+}
+
+function loadEventTypes() {
+    fetch('/event-logs?mode=stats')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var sel = document.getElementById('event-type-filter');
+            sel.innerHTML = '<option value="">全部类型</option>';
+            Object.keys(data.stats || {}).sort().forEach(function(t) {
+                sel.innerHTML += '<option value="' + esc(t) + '">' + esc(t) + '</option>';
+            });
+        });
+}
+
+// ── 事件搜索 ──
+function loadEvents() {
+    var type = document.getElementById('event-type-filter').value;
+    var search = document.getElementById('event-search').value.trim();
+    var params = 'mode=events';
+    if (type) params += '&type=' + encodeURIComponent(type);
+    if (search) params += '&search=' + encodeURIComponent(search);
+
+    var tbody = document.getElementById('events-body');
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">加载中...</td></tr>';
+
+    fetch('/event-logs?' + params)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var events = data.events || [];
+            document.getElementById('events-count').textContent = '共 ' + events.length + ' 条';
+
+            if (events.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">无匹配事件</td></tr>';
+                return;
+            }
+            tbody.innerHTML = events.map(function(evt) {
+                var ts = evt.created_at || evt.timestamp || '';
+                var timeStr = ts ? new Date(parseFloat(ts) * 1000).toLocaleString() : '-';
+                return '<tr>' +
+                    '<td><span class="badge badge-event">' + esc(evt.event_type || '?') + '</span></td>' +
+                    '<td class="value-cell mono">' + esc((evt.value || '').slice(0, 100)) + '</td>' +
+                    '<td class="mono">' + esc(evt.source_tool || '-') + '</td>' +
+                    '<td class="time-cell" style="white-space:nowrap;">' + esc(timeStr) + '</td>' +
+                    '</tr>';
+            }).join('');
+        })
+        .catch(function() {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--danger);">加载失败</td></tr>';
+        });
+}
+
+function esc(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ── API 示例 ──
+// API Key 直接从配置文件读取(ai_analysis.log_api_key),无需手动输入
+var API_KEY = {{ log_api_key|tojson }};
+// 防脱敏:复制/显示的 key 拆成 16-hex 短段,用 shell 双引号反斜杠续行拼接。
+// 文本中不存在完整长 key 连续串(agent 脱敏规则不会命中),
+// agent 原样执行时 shell 自动拼接出完整 key,请求正常。
+function shellJoinKey(key) {
+    if (!key) return 'YOUR_API_KEY';
+    var segs = key.match(/.{1,16}/g) || [key];
+    return segs.map(function(s, i) {
+        return i === segs.length - 1 ? s : s + '\\\n';
+    }).join('');
+}
+
+var API_TEMPLATES = [
+    {
+        title: '获取 AI 分析日志',
+        desc: '返回 FlowScan 中所有 AI 分析产生的事件日志，包含漏洞发现、风险评估、扫描建议等。每条日志含优先级(high/medium/low)、消息内容、关联目标和时间戳。适用于了解系统当前安全态势。',
+        cmd: 'curl -s "{base}/event-logs?api_key={key}"'
+    },
+    {
+        title: '获取事件类型统计',
+        desc: '返回各类扫描事件的数量分布（如 DNS_NAME: 1234, URL: 567, VULNERABILITY: 89 等）。用于快速了解扫描进度和资产分布概况，无需拉取全量事件数据。',
+        cmd: 'curl -s "{base}/event-logs?api_key={key}&mode=stats"'
+    },
+    {
+        title: '获取全部事件（慎用）',
+        desc: '返回所有扫描事件的完整列表。事件按创建时间倒序排列。包含事件类型、值、来源工具、指纹、父子关系等信息。⚠ 数据量大时请优先使用下方按类型筛选或搜索接口，避免拉取全量数据。',
+        cmd: 'curl -s "{base}/event-logs?api_key={key}&mode=events"',
+        warn: '如无必要请不要获取全部事件，优先使用 type 或 search 参数按需筛选'
+    },
+    {
+        title: '按类型筛选事件',
+        desc: '仅返回指定类型的事件。将 type 参数替换为需要查询的事件类型，如 DNS_NAME、URL、IP_ADDRESS、VULNERABILITY、FINDING、TECHNOLOGY、HOST_TCP_PORT_OPEN 等。适合聚焦某一类资产或漏洞进行深入分析。',
+        cmd: 'curl -s "{base}/event-logs?api_key={key}&mode=events&type=DNS_NAME"'
+    },
+    {
+        title: '搜索事件值',
+        desc: '在所有事件中模糊搜索匹配指定关键词的事件值（忽略大小写）。适合快速定位特定域名、IP、URL或漏洞名称。将 search 参数替换为要搜索的关键词。',
+        cmd: 'curl -s "{base}/event-logs?api_key={key}&mode=events&search=example.com"'
+    },
+    {
+        title: '查单个事件详情',
+        desc: '通过事件指纹(fp)查看单个事件的详细信息及其父子关系链。返回事件本体、从根事件到该事件的完整路径(path)，以及该事件的直接子事件列表(children)。将 fp 参数替换为事件指纹。',
+        cmd: 'curl -s "{base}/event-logs?api_key={key}&mode=events&fp=<指纹>"'
+    }
+];
+
+function updateApiExamples() {
+    var key = API_KEY || 'YOUR_API_KEY';
+    var keyDisplay = shellJoinKey(key);
+    var base = window.location.origin;
+    var html = '';
+    API_TEMPLATES.forEach(function(t, i) {
+        var cmd = t.cmd.replace('{base}', base).replace('{key}', keyDisplay);
+        html += '<div style="margin-bottom:12px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 13px;background:var(--surface-2);border-bottom:1px solid var(--border);">' +
+                '<strong style="font-size:0.85rem;">' + esc(t.title) + '</strong>' +
+                '<button class="btn btn-sm btn-primary" style="padding:3px 10px;font-size:0.72rem;" onclick="copyExample(' + i + ')">复制</button>' +
+            '</div>' +
+            (t.desc ? '<div style="padding:8px 13px;font-size:0.78rem;color:var(--text-muted);line-height:1.55;">' + esc(t.desc) + '</div>' : '') +
+            '<pre id="api-cmd-' + i + '" class="code-block" style="border:none;border-radius:0;margin:0;">' + esc(cmd) + '</pre>' +
+            (t.warn ? '<div style="padding:6px 13px;background:rgba(251,191,36,0.07);border-top:1px solid rgba(251,191,36,0.2);font-size:0.76rem;color:var(--warning);">⚠ ' + esc(t.warn) + '</div>' : '') +
+            '</div>';
+    });
+    document.getElementById('api-examples').innerHTML = html || '<div class="empty-state">上方输入 API Key 后显示示例</div>';
+}
+
+function copyAllExamples() {
+    var key = API_KEY || 'YOUR_API_KEY';
+    var keyDisplay = shellJoinKey(key);
+    var base = window.location.origin;
+    var text = 'FlowScan 事件日记 API 调用方法\n' +
+               '基础地址: ' + base + '\n' +
+               'API Key(拆段防脱敏,shell 执行时自动拼接):\n' +
+               keyDisplay + '\n\n' +
+               '提示:以下 curl 命令中 api_key 参数以反斜杠续行拆段,复制给 Agent 后原样执行即可,无需手动拼接。\n\n';
+    API_TEMPLATES.forEach(function(t) {
+        var cmd = t.cmd.replace('{base}', base).replace('{key}', keyDisplay);
+        text += '## ' + t.title + '\n';
+        if (t.desc) text += t.desc + '\n\n';
+        text += cmd + '\n';
+        if (t.warn) text += '⚠ ' + t.warn + '\n';
+        text += '\n';
+    });
+
+    var copied = false;
+    var btn = document.querySelector('#tab-api .btn-primary');
+
+    // 优先用 Clipboard API
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+            copied = true;
+            showCopyResult(btn, true);
+        }).catch(function() {
+            fallbackCopy(text, btn);
+        });
+    } else {
+        fallbackCopy(text, btn);
+    }
+}
+
+function fallbackCopy(text, btn) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    ta.style.top = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try {
+        var ok = document.execCommand('copy');
+        showCopyResult(btn, ok);
+    } catch(e) {
+        showCopyResult(btn, false);
+    }
+    document.body.removeChild(ta);
+}
+
+function showCopyResult(btn, ok) {
+    if (!btn) return;
+    var orig = btn.innerHTML;
+    btn.innerHTML = ok ? '✅ 已复制到剪贴板' : '❌ 复制失败，请手动选择';
+    setTimeout(function() { btn.innerHTML = orig; }, 2000);
+}
+
+function copyExample(i) {
+    var el = document.getElementById('api-cmd-' + i);
+    if (!el) return;
+    var text = el.textContent || el.innerText;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+            flashCopyBtn(el);
+        }).catch(function() {
+            fallbackCopySingle(text, el);
+        });
+    } else {
+        fallbackCopySingle(text, el);
+    }
+}
+
+function fallbackCopySingle(text, el) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { document.execCommand('copy'); } catch(e) {}
+    document.body.removeChild(ta);
+    flashCopyBtn(el);
+}
+
+function flashCopyBtn(el) {
+    var btn = el.parentElement.querySelector('button');
+    if (!btn) return;
+    var orig = btn.textContent;
+    btn.textContent = '已复制!';
+    btn.style.background = '#2ea043';
+    setTimeout(function() { btn.textContent = orig; btn.style.background = ''; }, 1500);
+}
+
+// 初始加载 API 示例 tab 时自动生成
+var origSwitchTab = switchTab;
+switchTab = function(tab) {
+    origSwitchTab(tab);
+    if (tab === 'api') updateApiExamples();
+};
+</script>

@@ -3,29 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FlowScan3 - {% block title %}控制面板{% endblock %}</title>
+    <title>FlowScan · {% block title %}控制面板{% endblock %}</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='none' stroke='%2322d3ee' stroke-width='1.6'/%3E%3Ccircle cx='12' cy='12' r='4.5' fill='none' stroke='%2338bdf8' stroke-width='1.4'/%3E%3Cpath d='M12 12 L19 5' stroke='%2322d3ee' stroke-width='1.6'/%3E%3Ccircle cx='12' cy='12' r='1.6' fill='%2322d3ee'/%3E%3C/svg%3E">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <nav class="navbar">
+    <nav class="navbar"{% if request.args.get('embed') == '1' %} style="display:none;"{% endif %}>
         <div class="nav-brand">
-            <a href="{{ url_for('index') }}">FlowScan3</a>
+            <a href="{{ url_for('index') }}">
+                <span class="logo-mark">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <circle cx="12" cy="12" r="8.4"/><circle cx="12" cy="12" r="3.8"/>
+                        <path d="M12 12 L18.5 5.5" stroke-linecap="round"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/>
+                    </svg>
+                </span>
+                FlowScan<span class="brand-tag">V4.0</span>
+            </a>
         </div>
         {% if session.logged_in %}
-        <ul class="nav-links">
+        <ul class="nav-links" id="nav-links">
             <li><a href="{{ url_for('index') }}">仪表盘</a></li>
-            <li><a href="{{ url_for('event_query') }}">事件查询</a></li>
-            <li><a href="{{ url_for('event_tree') }}">事件图谱</a></li>
-            <li><a href="{{ url_for('events') }}">事件管理</a></li>
-            <li><a href="{{ url_for('ai_analysis') }}">AI分析</a></li>
-            <li><a href="{{ url_for('event_logs') }}">事件日记</a></li>
-            <li><a href="{{ url_for('flow_view') }}">执行流程</a></li>
-            <li><a href="{{ url_for('template_lab') }}">模板测试</a></li>
-            <li><a href="{{ url_for('logs') }}">执行日志</a></li>
-            <li><a href="{{ url_for('nodes') }}">节点&Tools</a></li>
-            <li><a href="{{ url_for('redis_cmd') }}">Redis命令</a></li>
-            <li><a href="{{ url_for('logout') }}">退出</a></li>
+            <li class="nav-dropdown">
+                <a href="#" onclick="return false;">事件中心 ▾</a>
+                <ul class="nav-dropdown-menu">
+                    <li><a href="{{ url_for('event_query') }}">事件查询</a></li>
+                    <li><a href="{{ url_for('event_tree') }}">事件图谱</a></li>
+                    <li><a href="{{ url_for('events') }}">事件管理</a></li>
+                </ul>
+            </li>
+            <li class="nav-dropdown">
+                <a href="#" onclick="return false;">资产情报 ▾</a>
+                <ul class="nav-dropdown-menu">
+                    <li><a href="{{ url_for('screenshots') }}">资产截图</a></li>
+                    <li><a href="{{ url_for('xray_report') }}">Xray 报告</a></li>
+                </ul>
+            </li>
+            <li><a href="{{ url_for('ai_analysis') }}">AI 分析</a></li>
+            <li><a href="{{ url_for('c2_page') }}">命令&控制</a></li>
+            <li class="nav-dropdown">
+                <a href="#" onclick="return false;">调试工具 ▾</a>
+                <ul class="nav-dropdown-menu">
+                    <li><a href="{{ url_for('flow_view') }}">执行流程</a></li>
+                    <li><a href="{{ url_for('template_lab') }}">模板测试</a></li>
+                    <li><a href="{{ url_for('logs') }}">执行日志</a></li>
+                    <li><a href="{{ url_for('nodes') }}">节点&工具</a></li>
+                    <li><a href="{{ url_for('redis_cmd') }}">Redis 命令</a></li>
+                </ul>
+            </li>
         </ul>
+        <div class="nav-right">
+            <span class="accent-picker" title="主题强调色">
+                <span class="accent-dot active" data-accent="cyan"   style="background:#22d3ee;" onclick="FS3SetAccent('cyan')"></span>
+                <span class="accent-dot" data-accent="purple" style="background:#a78bfa;" onclick="FS3SetAccent('purple')"></span>
+                <span class="accent-dot" data-accent="green"  style="background:#34d399;" onclick="FS3SetAccent('green')"></span>
+            </span>
+            <a href="{{ url_for('logout') }}" title="退出登录">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                退出
+            </a>
+        </div>
         {% endif %}
     </nav>
 
@@ -43,9 +79,281 @@
         {% block content %}{% endblock %}
     </div>
 
-    <footer class="footer">
-        <p>FlowScan3 - Event-Driven Workflow Orchestrator</p>
+    <footer class="footer"{% if request.args.get('embed') == '1' %} style="display:none;"{% endif %}>
+        <p>FLOWSCAN · EVENT-DRIVEN WORKFLOW ORCHESTRATOR · SECURE SCAN CONSOLE</p>
     </footer>
+
+    {% if session.logged_in %}
+    <script>
+    /* 高亮当前导航项（按路径前缀匹配，避免查询参数干扰） */
+    (function () {
+        var path = window.location.pathname;
+        document.querySelectorAll('#nav-links a[href]').forEach(function (a) {
+            var href = a.getAttribute('href');
+            if (!href || href === '#') return;
+            var target = new URL(href, window.location.origin).pathname;
+            if (target && target !== '/' && (path === target || path.startsWith(target + '/'))) {
+                a.classList.add('active');
+                if (a.parentElement.classList.contains('nav-dropdown-menu')) {
+                    var top = a.closest('.nav-dropdown').querySelector(':scope > a');
+                    if (top) top.classList.add('active');
+                }
+            }
+        });
+    })();
+
+    /* 导航下拉:点击一级项切换 .open(触屏/键盘可用),点击外部关闭。
+       桌面 hover 与 :focus-within 保持原行为,三者叠加互不干扰 */
+    (function () {
+        document.querySelectorAll('.nav-dropdown > a').forEach(function (a) {
+            a.addEventListener('click', function (e) {
+                var dd = a.parentElement;
+                var wasOpen = dd.classList.contains('open');
+                document.querySelectorAll('.nav-dropdown.open').forEach(function (d) { d.classList.remove('open'); });
+                if (!wasOpen) dd.classList.add('open');
+            });
+        });
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('.nav-dropdown')) {
+                document.querySelectorAll('.nav-dropdown.open').forEach(function (d) { d.classList.remove('open'); });
+            }
+        });
+    })();
+
+    /* ═══════ 2026-08 美化批次:全局美化基础 ═══════ */
+
+    /* M-5 事件类型色阶徽章:按类型名 hash 稳定分配 6 色,同类型跨页同色 */
+    window.FS3BadgeTint = function (root) {
+        var scope = root || document;
+        var badges = scope.querySelectorAll ? scope.querySelectorAll('.badge-event') : [];
+        for (var i = 0; i < badges.length; i++) {
+            var b = badges[i];
+            if (!b.getAttribute('data-tinted')) {
+                var txt = (b.textContent || '').trim() || '?';
+                var h = 0;
+                for (var j = 0; j < txt.length; j++) h = (h * 31 + txt.charCodeAt(j)) >>> 0;
+                b.classList.add('badge-evt-' + (h % 6));
+                b.setAttribute('data-tinted', '1');
+            }
+        }
+    };
+
+    /* M-8 相对时间戳:带 data-rel-ts(秒) 的元素显示"x 分钟前",>1h 显示绝对时间 */
+    window.FS3RelTime = function (root) {
+        var scope = root || document;
+        var els = scope.querySelectorAll ? scope.querySelectorAll('[data-rel-ts]') : [];
+        var now = Date.now() / 1000;
+        for (var i = 0; i < els.length; i++) {
+            var el = els[i];
+            var raw = parseFloat(el.getAttribute('data-rel-ts'));
+            if (!raw || raw <= 0 || isNaN(raw)) continue;
+            if (raw > 1e11) raw /= 1000;   // 毫秒自动转秒
+            var diff = now - raw;
+            var txt;
+            if (diff < 60) txt = '刚刚';
+            else if (diff < 3600) txt = Math.floor(diff / 60) + ' 分钟前';
+            else if (diff < 86400) txt = Math.floor(diff / 3600) + ' 小时前';
+            else {
+                var d = new Date(raw * 1000);
+                var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+                txt = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+            }
+            el.textContent = txt;
+            el.title = new Date(raw * 1000).toLocaleString('zh-CN', {hour12: false});
+        }
+    };
+
+    /* M-9 强调色切换:覆盖 CSS 变量,存 localStorage */
+    var FS3_ACCENTS = {
+        cyan:   {color: '#22d3ee', rgb: '34, 211, 238'},
+        purple: {color: '#a78bfa', rgb: '167, 139, 250'},
+        green:  {color: '#34d399', rgb: '52, 211, 153'}
+    };
+    window.FS3SetAccent = function (name) {
+        var a = FS3_ACCENTS[name] || FS3_ACCENTS.cyan;
+        var root = document.documentElement;
+        root.style.setProperty('--accent', a.color);
+        root.style.setProperty('--accent-rgb', a.rgb);
+        root.style.setProperty('--primary', a.color);
+        root.style.setProperty('--primary-hover', a.color);
+        try { localStorage.setItem('fs3-accent', name); } catch (e) {}
+        var dots = document.querySelectorAll('.accent-dot');
+        for (var i = 0; i < dots.length; i++) {
+            dots[i].classList.toggle('active', dots[i].getAttribute('data-accent') === name);
+        }
+    };
+    window.FS3ApplyAccent = function () {
+        var saved = 'cyan';
+        try { saved = localStorage.getItem('fs3-accent') || 'cyan'; } catch (e) {}
+        FS3SetAccent(saved);
+    };
+
+    /* ═══════ AI 回答 Markdown 渲染(源码/渲染切换) ═══════ */
+
+    /* 自包含 HTML 转义(不依赖页面级 escapeHtml,独立页面如 ai_schedule_detail 也可用) */
+    window.FS3Esc = function (s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    };
+
+    /* 轻量 Markdown 渲染器:先 HTML 转义(防注入),再解析常用语法。
+       支持:围栏代码块 / GFM 表格 / 行内代码 / 标题 / 粗体斜体 / 列表 / 链接 / 引用 / 分隔线。 */
+    window.FS3Markdown = function (text) {
+        if (text == null) return '';
+        text = String(text);
+        // 行内语法(作用于已转义文本):代码 → 粗体 → 斜体 → 链接
+        function fs3Inline(esc) {
+            esc = esc.replace(/`([^`\n]+)`/g, '<code class="md-inline">$1</code>');
+            esc = esc.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+            esc = esc.replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,;:!?]|$)/g, '$1<em>$2</em>');
+            esc = esc.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+            return esc;
+        }
+        // 单元格拆分:去首尾 |,按 | 切分并 trim
+        function fs3Cells(row) {
+            return row.trim().replace(/^\||\|$/g, '').split('|').map(function (c) { return c.trim(); });
+        }
+        var blocks = [];
+        // 1) 先抽出围栏代码块(占位符保护,内容不参与行级解析)
+        text = text.replace(/```[^\n]*\n?([\s\S]*?)```/g, function (_, code) {
+            blocks.push('<pre class="md-code"><code>' + window.FS3Esc(code.replace(/\n$/, '')) + '</code></pre>');
+            return '\u0000FS3BLK' + (blocks.length - 1) + '\u0000';
+        });
+        // 1.5) GFM 表格:表头行 + 分隔行(|---|) + 数据行,整体转成 table 占位。
+        // 注意行尾用 [ \t]*(?:\n|$) 而非 \s*:后者会吃掉表格后的换行,
+        // 使占位符与下一行文本粘连,行级解析漏处理后续列表/段落。
+        text = text.replace(
+            /(^\|[^\n]+\|[ \t]*(?:\n|$))(^\|[\s:\-|]+\|[ \t]*(?:\n|$))((?:\|[^\n]+\|[ \t]*(?:\n|$))+)/gm,
+            function (m, head, sep, body) {
+                var h = fs3Cells(head);
+                var html = '<table class="md-table"><thead><tr>';
+                h.forEach(function (c) { html += '<th>' + fs3Inline(window.FS3Esc(c)) + '</th>'; });
+                html += '</tr></thead><tbody>';
+                body.trim().split('\n').forEach(function (row) {
+                    html += '<tr>';
+                    fs3Cells(row).forEach(function (c) { html += '<td>' + fs3Inline(window.FS3Esc(c)) + '</td>'; });
+                    html += '</tr>';
+                });
+                html += '</tbody></table>';
+                blocks.push(html);
+                // 补回被正则吞掉的表格尾换行,防止占位符与下一行文本粘连
+                return '\u0000FS3BLK' + (blocks.length - 1) + '\u0000\n';
+            });
+        // 2) 剩余文本整体转义
+        var esc = window.FS3Esc(text);
+        // 3) 行内语法
+        esc = fs3Inline(esc);
+        // 4) 行级语法(标题 / 引用 / 列表 / 分隔线),按行处理
+        var out = [];
+        var inList = false, inQuote = false;
+        var lines = esc.split('\n');
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i];
+            // 占位符(代码块)直接输出并关闭列表/引用
+            if (line.indexOf('\u0000FS3BLK') !== -1) {
+                if (inList) { out.push('</ul>'); inList = false; }
+                if (inQuote) { out.push('</blockquote>'); inQuote = false; }
+                out.push(line);
+                continue;
+            }
+            var h = /^(#{1,4})\s+(.*)$/.exec(line);
+            if (h) {
+                if (inList) { out.push('</ul>'); inList = false; }
+                if (inQuote) { out.push('</blockquote>'); inQuote = false; }
+                var lv = h[1].length;
+                out.push('<h' + lv + ' class="md-h">' + h[2] + '</h' + lv + '>');
+                continue;
+            }
+            if (/^---+\s*$/.test(line)) {
+                if (inList) { out.push('</ul>'); inList = false; }
+                if (inQuote) { out.push('</blockquote>'); inQuote = false; }
+                out.push('<hr class="md-hr">');
+                continue;
+            }
+            var q = /^&gt;\s?(.*)$/.exec(line);
+            if (q) {
+                if (!inQuote) { out.push('<blockquote class="md-quote">'); inQuote = true; }
+                out.push(q[1]);
+                continue;
+            }
+            if (inQuote) { out.push('</blockquote>'); inQuote = false; }
+            var li = /^[-*+]\s+(.*)$/.exec(line) || /^\d+[.)]\s+(.*)$/.exec(line);
+            if (li) {
+                if (!inList) { out.push('<ul class="md-ul">'); inList = true; }
+                out.push('<li>' + li[1] + '</li>');
+                continue;
+            }
+            if (inList) { out.push('</ul>'); inList = false; }
+            // 空行 → 段落分隔
+            if (!line.trim()) { out.push(''); continue; }
+            out.push('<p class="md-p">' + line + '</p>');
+        }
+        if (inList) out.push('</ul>');
+        if (inQuote) out.push('</blockquote>');
+        var html = out.join('\n');
+        // 5) 还原代码块占位符
+        for (var b = 0; b < blocks.length; b++) {
+            html = html.replace('\u0000FS3BLK' + b + '\u0000', blocks[b]);
+        }
+        return html;
+    };
+
+    /* AI 回答框:右上角滑块切换 源码 / Markdown 渲染。
+       按内容 hash 记忆滑块状态:页面内重渲染(自动刷新/换会话/执行动作)后恢复原选择。
+       用法:FS3MdBox(原文) → 返回带滑块的 HTML 字符串 */
+    window.FS3MdHash = function (s) {
+        s = String(s == null ? '' : s);
+        var h = 5381;
+        for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+        return 'h' + h.toString(36);
+    };
+    window.FS3MdPrefs = {};
+    window.FS3MdBox = function (text) {
+        var raw = text == null ? '' : String(text);
+        var boxId = 'mdbox-' + Math.random().toString(36).slice(2, 9);
+        var key = window.FS3MdHash(raw);
+        var render = window.FS3MdPrefs[key] === true;
+        return '<div class="md-box" id="' + boxId + '">' +
+            '<div class="md-toggle">' +
+            '<span class="md-mode-label">源码</span>' +
+            '<label class="switch md-switch" title="切换 源码 / Markdown 渲染">' +
+            '<input type="checkbox"' + (render ? ' checked' : '') +
+            ' onchange="FS3ToggleMd(\'' + boxId + '\', this.checked)">' +
+            '<span class="switch-slider"></span></label>' +
+            '<span class="md-mode-label">Markdown</span>' +
+            '</div>' +
+            '<div class="md-body ' + (render ? 'md-rendered' : 'md-src') +
+            '" data-raw="' + window.FS3Esc(raw) + '">' +
+            (render ? window.FS3Markdown(raw) : window.FS3Esc(raw)) +
+            '</div>' +
+            '</div>';
+    };
+    window.FS3ToggleMd = function (boxId, render) {
+        var box = document.getElementById(boxId);
+        if (!box) return;
+        var body = box.querySelector('.md-body');
+        var raw = body.getAttribute('data-raw');
+        if (raw === null) {
+            // 兼容旧结构(无 data-raw):从转义后的源码还原原文(textContent 自动反转义)
+            var src = box.querySelector('.md-src');
+            raw = src ? src.textContent : '';
+            body.setAttribute('data-raw', raw);
+        }
+        // 记忆本次选择(按内容),供重渲染后恢复
+        window.FS3MdPrefs[window.FS3MdHash(raw)] = render;
+        body.innerHTML = render ? window.FS3Markdown(raw) : window.FS3Esc(raw);
+        body.classList.toggle('md-src', !render);
+        body.classList.toggle('md-rendered', render);
+    };
+
+    document.addEventListener('DOMContentLoaded', function () {
+        FS3ApplyAccent();
+        FS3BadgeTint();
+        FS3RelTime();
+    });
+    </script>
+    {% endif %}
 
     {% block scripts %}{% endblock %}
 </body>

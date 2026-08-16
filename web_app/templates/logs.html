@@ -1,42 +1,47 @@
 {% extends "base.html" %}
 {% block title %}执行日志{% endblock %}
 {% block content %}
-<div class="section">
+<div class="page-head">
     <h1>执行日志</h1>
-    <p class="help-text">所有 Worker 节点的执行记录，最新的在最上方</p>
+    <p class="page-sub">所有 Worker 节点的执行记录 · 最新在最上方</p>
+</div>
 
-    <div class="card">
-        <div class="log-controls">
-            <form method="GET" action="{{ url_for('logs') }}">
-                <label>显示条数:</label>
+<div class="card">
+    <div class="log-controls">
+        <form method="GET" action="{{ url_for('logs') }}" class="form-row">
+            <label style="display:flex;align-items:center;gap:8px;color:var(--text-muted);font-size:0.84rem;">
+                显示条数
                 <select name="limit" onchange="this.form.submit()">
-                    <option value="50" {% if limit == 50 %}selected{% endif %}>50</option>
-                    <option value="100" {% if limit == 100 %}selected{% endif %}>100</option>
-                    <option value="200" {% if limit == 200 %}selected{% endif %}>200</option>
-                    <option value="500" {% if limit == 500 %}selected{% endif %}>500</option>
-                    <option value="1000" {% if limit == 1000 %}selected{% endif %}>1000</option>
-                    <option value="2000" {% if limit == 2000 %}selected{% endif %}>2000</option>
-                    <option value="5000" {% if limit == 5000 %}selected{% endif %}>5000</option>
-                    <option value="10000" {% if limit == 10000 %}selected{% endif %}>10000</option>
+                    {% for opt in [50, 100, 200, 500, 1000, 2000, 5000, 10000] %}
+                    <option value="{{ opt }}" {% if limit == opt %}selected{% endif %}>{{ opt }}</option>
+                    {% endfor %}
                     <option value="all" {% if limit == 'all' %}selected{% endif %}>全部</option>
                 </select>
-            </form>
-            <div>
-                <a href="{{ url_for('logs_download', limit=limit) }}" class="btn btn-sm btn-primary">下载</a>
-                <button class="btn btn-sm btn-secondary" onclick="location.reload()">刷新</button>
-            </div>
+            </label>
+        </form>
+        <div class="action-buttons">
+            <a href="{{ url_for('logs_download', limit=limit) }}" class="btn btn-sm btn-primary">下载</a>
+            <button class="btn btn-sm btn-secondary" onclick="location.reload()">刷新</button>
         </div>
+    </div>
 
-        <div class="log-container">
-            {% for log in logs %}
-            <div class="log-entry">
-                <span class="log-time">{{ "%.2f"|format(log.ts) }}</span>
-                <span class="log-msg">{{ log.msg }}</span>
-            </div>
-            {% else %}
-            <div class="empty-state">暂无日志</div>
-            {% endfor %}
+    <div class="log-container">
+        {% for log in logs %}
+        <div class="log-entry">
+            <span class="log-time">{{ log.ts or '?' }}</span>
+            <span class="log-msg {{ log.level_class }}">{{ log.msg }}</span>
         </div>
+        {% else %}
+        <div class="eq-empty" style="margin:24px 0;">
+            <div class="eq-empty-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+                    <path d="M4 6h16M4 12h16M4 18h10"/>
+                </svg>
+            </div>
+            <h2>暂无日志</h2>
+            <p>Worker 执行日志写入 Redis（fs3:logs），有事件流转后这里会自动出现记录。可在「仪表盘」注入事件触发。</p>
+        </div>
+        {% endfor %}
     </div>
 </div>
 {% endblock %}

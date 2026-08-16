@@ -1,67 +1,69 @@
 {% extends "base.html" %}
 {% block title %}事件管理{% endblock %}
 {% block content %}
-<div class="section">
+<div class="page-head">
     <h1>事件管理</h1>
+    <p class="page-sub">事件注入 / 移除 / 状态快照 · 黑白名单规则管理</p>
+</div>
 
-    {# ── Tab 切换 ── #}
-    <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border);">
-        <a href="?tab=events" class="blacklist-tab-link" data-tab="events"
-           style="padding:8px 20px;text-decoration:none;color:var(--text);border-bottom:2px solid transparent;margin-bottom:-2px;font-weight:500;{% if tab != 'blacklist' %}border-bottom-color:var(--accent)!important;color:var(--accent)!important;{% endif %}">事件列表</a>
-        <a href="?tab=blacklist" class="blacklist-tab-link" data-tab="blacklist"
-           style="padding:8px 20px;text-decoration:none;color:var(--text);border-bottom:2px solid transparent;margin-bottom:-2px;font-weight:500;{% if tab == 'blacklist' %}border-bottom-color:var(--accent)!important;color:var(--accent)!important;{% endif %}">黑名单管理</a>
-    </div>
+{# ── Tab 切换 ── #}
+<nav class="tabs">
+    <a href="?tab=events" class="tab blacklist-tab-link {% if tab != 'blacklist' and tab != 'whitelist' %}active{% endif %}" data-tab="events">事件列表</a>
+    <a href="?tab=blacklist" class="tab blacklist-tab-link {% if tab == 'blacklist' %}active{% endif %}" data-tab="blacklist">黑名单管理</a>
+    <a href="?tab=whitelist" class="tab blacklist-tab-link {% if tab == 'whitelist' %}active{% endif %}" data-tab="whitelist">白名单管理</a>
+</nav>
 
-    {# ── 事件列表 Tab ── #}
-    <div id="tab-events" {% if tab == 'blacklist' %}style="display:none"{% endif %}>
-    <div class="stats-grid" style="grid-template-columns:1fr 1fr;">
-        <div class="stat-card">
-            <div class="stat-value">{{ events|length }}</div>
-            <div class="stat-label">当前显示</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value">{{ event_types|length }}</div>
-            <div class="stat-label">事件类型数</div>
-        </div>
-    </div>
-
-    {# ── 状态操作 ── #}
-    <div class="card">
-        <h3>事件状态管理</h3>
-        <p class="help-text">
-            <strong>保存</strong>：导出 Redis 中所有 <code>fs3:*</code> 键（含事件、队列、工具、统计、日志等）为 JSON 文件。<br>
-            <strong>恢复</strong>：上传 JSON 文件，<em>先清空</em> Redis 中所有 <code>fs3:*</code> 键，再全量恢复。
-            仅支持全量导出格式（含 <code>"keys"</code> 字段的 JSON）。<br>
-            <strong>一键清空</strong>：删除 Redis 中所有事件相关状态。
-        </p>
-        <div class="form-row" style="align-items:center;gap:10px;flex-wrap:wrap;">
-            <form method="POST" action="{{ url_for('events_save_state') }}" style="display:inline;margin:0;">
-                <button type="submit" class="btn btn-primary">保存当前状态</button>
-            </form>
-            <form method="POST" action="{{ url_for('events_restore_state') }}" enctype="multipart/form-data" style="display:inline;margin:0;">
-                <input type="file" name="state_file" accept=".json" required
-                       style="padding:6px 8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:0.85rem;max-width:220px;">
-                <button type="submit" class="btn btn-warning" onclick="return confirm('确认恢复状态？\n\n该操作会先清空 Redis 中所有 fs3:* 数据，再用上传文件全量恢复。')"
-                        style="background:rgba(210,153,34,0.18);color:#d29922;border:1px solid rgba(210,153,34,0.35);">从文件恢复状态</button>
-            </form>
-            <form method="POST" action="{{ url_for('events_clear') }}" style="display:inline;margin:0;">
-                <button type="submit" class="btn btn-danger" onclick="return confirm('确认清空所有事件？')">一键清空所有事件</button>
-            </form>
-        </div>
-    </div>
-
-    {# ── 批量注入 ── #}
-    <div class="card">
-        <h3>批量添加事件</h3>
-        <p class="help-text">每行一个事件，格式：<code>[事件类型]事件值</code> 或直接输入值（默认 INPUT 类型）</p>
-        <form method="POST" action="{{ url_for('events_inject') }}">
-            <div class="form-group">
-                <textarea name="events_batch" rows="12"
-                    placeholder="example.com（自动识别为 INPUT）&#10;[INPUT]任意文本&#10;[DNS_NAME]example.com&#10;[URL]https://example.com&#10;[URL_UNVERIFIED]https://example.com&#10;[IP_ADDRESS]1.1.1.1&#10;[IP_RANGE]10.0.0.0/24&#10;[OPEN_TCP_PORT]1.1.1.1:443&#10;[OPEN_UDP_PORT]1.1.1.1:53&#10;[DNS_NAME_UNRESOLVED]nx.example.com"
-                    style="width:100%;font-family:monospace;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:10px;resize:vertical;tab-size:2;"></textarea>
+{# ── 事件列表 Tab ── #}
+<div id="tab-events" {% if tab == 'blacklist' or tab == 'whitelist' %}style="display:none"{% endif %}>
+    <div class="grid-2">
+        {# ── 状态操作 ── #}
+        <div class="card" style="display:flex;flex-direction:column;">
+            <h3>事件状态管理</h3>
+            <div class="mini-stats">
+                <div class="mini-stat">
+                    <span class="ms-value">{{ total_events }}</span>
+                    <span class="ms-label">事件总数</span>
+                </div>
+                <div class="mini-stat">
+                    <span class="ms-value">{{ event_types|length }}</span>
+                    <span class="ms-label">事件类型数</span>
+                </div>
             </div>
-            <button type="submit" class="btn btn-primary">批量注入</button>
-        </form>
+            <p class="help-text">
+                <strong>保存</strong>：导出 Redis 中所有 <code>fs3:*</code> 键为 JSON 快照。<br>
+                <strong>恢复</strong>：先清空 <code>fs3:*</code> 再全量恢复（仅支持含 <code>"keys"</code> 字段的全量导出）。<br>
+                <strong>一键清空</strong>：删除 Redis 中所有事件相关状态。
+            </p>
+            <div class="form-row" style="gap:10px;">
+                <form method="POST" action="{{ url_for('events_save_state') }}" style="display:inline;margin:0;">
+                    <button type="submit" class="btn btn-primary">保存当前状态</button>
+                </form>
+                <form method="POST" action="{{ url_for('events_clear') }}" style="display:inline;margin:0;">
+                    <button type="submit" class="btn btn-danger" onclick="return confirm('确认清空所有事件？')">一键清空所有事件</button>
+                </form>
+            </div>
+            <hr>
+            <div style="margin-top:auto;">
+                <p class="help-text" style="margin:0 0 8px;"><strong>从文件恢复状态：</strong></p>
+                <form method="POST" action="{{ url_for('events_restore_state') }}" enctype="multipart/form-data" class="form-row" style="align-items:center;gap:10px;">
+                    <input type="file" name="state_file" accept=".json" required class="form-control" aria-label="选择状态快照文件" style="flex:1;min-width:200px;max-width:300px;padding:7px 10px;font-size:0.82rem;">
+                    <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('确认恢复状态？\n\n该操作会先清空 Redis 中所有 fs3:* 数据，再用上传文件全量恢复。')">上传并恢复</button>
+                </form>
+            </div>
+        </div>
+
+        {# ── 批量注入 ── #}
+        <div class="card">
+            <h3>批量添加事件</h3>
+            <p class="help-text">每行一个事件，格式：<code>[事件类型]事件值</code> 或直接输入值（默认 INPUT 类型）</p>
+            <form method="POST" action="{{ url_for('events_inject') }}">
+                <div class="form-group">
+                    <textarea name="events_batch" rows="10" class="form-control" aria-label="批量注入的事件(每行一个)"
+                        placeholder="example.com（自动识别为 INPUT）&#10;[INPUT]任意文本&#10;[DNS_NAME]example.com&#10;[URL]https://example.com&#10;[URL_UNVERIFIED]https://example.com&#10;[IP_ADDRESS]1.1.1.1&#10;[IP_RANGE]10.0.0.0/24&#10;[OPEN_TCP_PORT]1.1.1.1:443&#10;[OPEN_UDP_PORT]1.1.1.1:53&#10;[DNS_NAME_UNRESOLVED]nx.example.com"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">批量注入</button>
+            </form>
+        </div>
     </div>
 
     {# ── 批量移除 ── #}
@@ -69,10 +71,9 @@
         <h3>批量移除事件</h3>
 
         <div style="margin-bottom:12px;">
-            <form method="GET" action="{{ url_for('events') }}" style="display:flex;gap:8px;align-items:center;">
-                <input type="text" name="search_val" placeholder="按事件值搜索…"
-                       value="{{ search_val or '' }}"
-                       style="flex:1;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:0.9rem;font-family:monospace;">
+            <form method="GET" action="{{ url_for('events') }}" class="form-row">
+                <input type="text" name="search_val" placeholder="按事件值搜索…" value="{{ search_val or '' }}"
+                       class="form-control" aria-label="按事件值搜索" style="flex:1;max-width:420px;font-family:var(--font-mono);">
                 <button type="submit" class="btn btn-sm btn-primary">搜索</button>
                 {% if search_val %}
                 <a href="{{ url_for('events') }}" class="btn btn-sm btn-secondary">清除</a>
@@ -82,35 +83,42 @@
 
         {% if search_val %}
         <div style="margin-bottom:12px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
-            <div style="padding:6px 10px;background:var(--surface);font-size:0.8rem;color:var(--text-muted);border-bottom:1px solid var(--border);">
-                搜索 &quot;{{ search_val }}&quot; — {{ events|length }} 个结果
+            <div style="padding:7px 12px;background:var(--surface-2);font-size:0.78rem;color:var(--text-muted);border-bottom:1px solid var(--border);font-family:var(--font-mono);">
+                搜索 "{{ search_val }}" — {{ events|length }} 个结果（仅最近 {{ search_window }} 条内搜索，大库请到事件查询页先选类型再搜）
             </div>
             {% for evt in events %}
-            <div style="display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--surface);border-bottom:1px solid var(--border);font-size:0.82rem;">
-                <span class="badge badge-event" style="min-width:80px;">{{ evt.event_type }}</span>
-                <span style="flex:1;font-family:monospace;font-size:0.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ evt.value[:80] }}</span>
+            <div style="display:flex;align-items:center;gap:10px;padding:6px 12px;background:var(--surface);border-bottom:1px solid var(--border);font-size:0.82rem;">
+                <span class="badge badge-event" style="min-width:84px;">{{ evt.event_type }}</span>
+                <span class="mono" style="flex:1;font-size:0.76rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ evt.value[:80] }}</span>
                 <span class="fp-cell">{{ evt.fingerprint[:12] }}..</span>
-                <a href="{{ url_for('event_query', path=evt.fingerprint) }}" class="btn btn-sm btn-secondary" style="padding:3px 8px;font-size:0.75rem;">路径</a>
+                <a href="{{ url_for('event_query', path=evt.fingerprint) }}" class="btn btn-sm btn-secondary">路径</a>
                 <form method="POST" action="{{ url_for('events_remove') }}" style="display:inline;margin:0;">
                     <input type="hidden" name="fingerprints" value="[{{ evt.event_type }}]{{ evt.value }}">
-                    <button type="submit" class="btn btn-sm btn-danger" style="padding:3px 8px;font-size:0.75rem;"
-                            onclick="return confirm('移除 [{{ evt.event_type }}]{{ evt.value[:24] }}..？')">删除</button>
+                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('移除 [{{ evt.event_type }}]{{ evt.value[:24] }}..？')">删除</button>
                 </form>
             </div>
             {% else %}
-            <div class="empty-state" style="padding:20px;">未找到匹配事件</div>
+            <div class="eq-empty" style="padding:36px 20px;">
+                <div class="eq-empty-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+                        <circle cx="11" cy="11" r="7"/>
+                        <path d="M21 21l-4.3-4.3"/>
+                    </svg>
+                </div>
+                <h2>未找到匹配事件</h2>
+                <p>尝试更换关键字,或切换到「批量移除」直接粘贴指纹/事件行移除。</p>
+            </div>
             {% endfor %}
         </div>
         {% endif %}
 
         <form method="POST" action="{{ url_for('events_remove') }}">
             <div class="form-group">
-                <textarea name="fingerprints" rows="3"
-                    placeholder="[事件类型]事件值，每行一个&#10;也支持直接粘贴 SHA256 指纹"
-                    style="width:100%;font-family:monospace;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:10px;resize:vertical;"></textarea>
+                <textarea name="fingerprints" rows="3" class="form-control" aria-label="批量移除的事件(每行一个或指纹)"
+                    placeholder="[事件类型]事件值，每行一个&#10;也支持直接粘贴 SHA256 指纹"></textarea>
             </div>
             <div class="form-row" style="align-items:center;">
-                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-muted);font-size:0.85rem;">
+                <label style="display:flex;align-items:center;gap:7px;cursor:pointer;color:var(--text-muted);font-size:0.85rem;">
                     <input type="checkbox" name="cascade" value="1" checked>
                     同时移除子事件（默认勾选）
                 </label>
@@ -118,146 +126,143 @@
             </div>
         </form>
     </div>
+</div>
 
-    {% if not search_val %}
+{# ── 黑名单管理 Tab ── #}
+<div id="tab-blacklist" {% if tab != 'blacklist' %}style="display:none"{% endif %}>
     <div class="card">
-        <h3>事件列表</h3>
-        <div class="filter-bar">
-            <form method="GET" action="{{ url_for('events') }}">
-                <select name="type" onchange="this.form.submit()">
-                    <option value="">全部类型</option>
-                    {% for et in event_types %}
-                    <option value="{{ et }}" {% if et == current_type %}selected{% endif %}>{{ et }}</option>
-                    {% endfor %}
-                </select>
-                <span class="count-info">显示 {{ events|length }} 个</span>
-            </form>
+        <div class="card-title">
+            <h3 style="margin:0;">Redis 动态规则</h3>
+            <div class="action-buttons">
+                <button class="btn btn-sm btn-primary" onclick="showAddModal()">+ 新增规则</button>
+                <button class="btn btn-sm btn-secondary" onclick="reloadFileRules()">重载文件规则</button>
+            </div>
         </div>
+        <p class="help-text" style="margin-top:10px;">动态规则存储在 Redis 中，可随时增删，立即生效。匹配规则：<em>任一命中即拦截</em>，忽略大小写。</p>
 
-        <table class="table">
+        <table class="table" id="redis-rules-table">
             <thead>
                 <tr>
-                    <th>事件类型</th>
-                    <th>事件值</th>
-                    <th>来源</th>
-                    <th>指纹</th>
-                    <th>操作</th>
+                    <th style="width:120px;">事件类型</th>
+                    <th style="width:96px;">匹配模式</th>
+                    <th>匹配值</th>
+                    <th style="width:110px;">备注</th>
+                    <th style="width:80px;">操作</th>
                 </tr>
             </thead>
-            <tbody>
-                {% for evt in events %}
-                <tr>
-                    <td><span class="badge badge-event">{{ evt.event_type }}</span></td>
-                    <td class="value-cell">{{ evt.value[:80] }}{% if evt.value|length > 80 %}...{% endif %}</td>
-                    <td>{{ evt.source_tool or '-' }}</td>
-                    <td class="fp-cell">{{ evt.fingerprint[:16] }}...</td>
-                    <td>
-                        <a href="{{ url_for('event_query', path=evt.fingerprint) }}" class="btn btn-sm btn-secondary">路径</a>
-                        <form method="POST" action="{{ url_for('events_remove') }}" style="display:inline;">
-                            <input type="hidden" name="fingerprints"
-                                   value="[{{ evt.event_type }}]{{ evt.value }}">
-                            <button type="submit" class="btn btn-sm btn-danger"
-                                    onclick="return confirm('移除事件 [{{ evt.event_type }}]{{ evt.value[:30] }}...？')">删除</button>
-                        </form>
-                    </td>
-                </tr>
-                {% else %}
-                <tr><td colspan="5" class="empty">暂无事件</td></tr>
-                {% endfor %}
+            <tbody id="redis-rules-body">
+                <tr><td colspan="5" style="text-align:center;color:var(--text-muted);">加载中...</td></tr>
             </tbody>
         </table>
-    </div>
-    {% endif %}
+        <div style="margin-top:8px;font-size:0.78rem;color:var(--text-muted);font-family:var(--font-mono);" id="redis-rules-count"></div>
     </div>
 
-    {# ── 黑名单管理 Tab ── #}
-    <div id="tab-blacklist" {% if tab != 'blacklist' %}style="display:none"{% endif %}>
-        {# Redis 动态规则 #}
-        <div class="card">
-            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-                <h3 style="margin:0;">Redis 动态规则</h3>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                    <button class="btn btn-sm btn-primary" onclick="showAddModal()">+ 新增规则</button>
-                    <button class="btn btn-sm btn-secondary" onclick="reloadFileRules()">重载文件规则</button>
-                </div>
-            </div>
-            <p class="help-text">动态规则存储在 Redis 中，可随时增删，立即生效。匹配规则：<em>任一命中即拦截</em>，忽略大小写。</p>
-
-            <table class="table" id="redis-rules-table">
+    <div class="card">
+        <h3>文件默认规则（只读）</h3>
+        <p class="help-text"><code>black_list.cfg</code> — 系统默认黑名单，需手动编辑文件后点"重载文件规则"生效。</p>
+        <div style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);">
+            <table class="table" style="margin:0;">
                 <thead>
                     <tr>
                         <th style="width:120px;">事件类型</th>
-                        <th style="width:90px;">匹配模式</th>
+                        <th style="width:96px;">匹配模式</th>
                         <th>匹配值</th>
-                        <th style="width:100px;">备注</th>
-                        <th style="width:80px;">操作</th>
                     </tr>
                 </thead>
-                <tbody id="redis-rules-body">
-                    <tr><td colspan="5" style="text-align:center;color:var(--text-muted);">加载中...</td></tr>
+                <tbody id="file-rules-body">
+                    <tr><td colspan="3" style="text-align:center;color:var(--text-muted);">加载中...</td></tr>
                 </tbody>
             </table>
-            <div style="margin-top:8px;font-size:0.8rem;color:var(--text-muted);" id="redis-rules-count"></div>
         </div>
+        <div style="margin-top:8px;font-size:0.78rem;color:var(--text-muted);font-family:var(--font-mono);" id="file-rules-count"></div>
+    </div>
 
-        {# 文件默认规则（只读） #}
-        <div class="card">
-            <h3>文件默认规则（只读）</h3>
-            <p class="help-text"><code>black_list.cfg</code> — 系统默认黑名单，需手动编辑文件后点"重载文件规则"生效。</p>
-            <div style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);">
-                <table class="table" style="margin:0;">
-                    <thead>
-                        <tr>
-                            <th style="width:120px;">事件类型</th>
-                            <th style="width:90px;">匹配模式</th>
-                            <th>匹配值</th>
-                        </tr>
-                    </thead>
-                    <tbody id="file-rules-body">
-                        <tr><td colspan="3" style="text-align:center;color:var(--text-muted);">加载中...</td></tr>
-                    </tbody>
-                </table>
+    <div class="card">
+        <h3>实时测试</h3>
+        <p class="help-text">输入事件类型和值，测试是否会被黑名单拦截。</p>
+        <div class="form-row" style="align-items:flex-end;">
+            <div class="form-group" style="margin:0;">
+                <label for="test-event-type">事件类型</label>
+                <select id="test-event-type" class="form-control" style="width:auto;min-width:180px;">
+                    <option value="DNS_NAME">DNS_NAME</option>
+                    <option value="URL">URL</option>
+                    <option value="IP_ADDRESS">IP_ADDRESS</option>
+                    <option value="IP_RANGE">IP_RANGE</option>
+                    <option value="URL_UNVERIFIED">URL_UNVERIFIED</option>
+                    <option value="OPEN_TCP_PORT">OPEN_TCP_PORT</option>
+                    <option value="HOST_TCP_PORT_OPEN">HOST_TCP_PORT_OPEN</option>
+                    <option value="*">* (全部)</option>
+                </select>
             </div>
-            <div style="margin-top:8px;font-size:0.8rem;color:var(--text-muted);" id="file-rules-count"></div>
+            <div class="form-group" style="margin:0;flex:1;min-width:220px;">
+                <label for="test-value">测试值</label>
+                <input type="text" id="test-value" class="form-control" placeholder="例如: api.cloudflare.com" style="font-family:var(--font-mono);">
+            </div>
+            <button class="btn btn-sm btn-primary" onclick="testBlacklist()">测试</button>
         </div>
+        <div id="test-result" style="margin-top:12px;display:none;"></div>
+    </div>
+</div>
 
-        {# 实时测试 #}
-        <div class="card">
-            <h3>实时测试</h3>
-            <p class="help-text">输入事件类型和值，测试是否会被黑名单拦截。</p>
-            <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
-                <div class="form-group" style="margin:0;">
-                    <label style="font-size:0.8rem;color:var(--text-muted);">事件类型</label>
-                    <select id="test-event-type" style="padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);">
-                        <option value="DNS_NAME">DNS_NAME</option>
-                        <option value="URL">URL</option>
-                        <option value="IP_ADDRESS">IP_ADDRESS</option>
-                        <option value="IP_RANGE">IP_RANGE</option>
-                        <option value="URL_UNVERIFIED">URL_UNVERIFIED</option>
-                        <option value="OPEN_TCP_PORT">OPEN_TCP_PORT</option>
-                        <option value="HOST_TCP_PORT_OPEN">HOST_TCP_PORT_OPEN</option>
-                        <option value="*">* (全部)</option>
-                    </select>
-                </div>
-                <div class="form-group" style="margin:0;flex:1;min-width:200px;">
-                    <label style="font-size:0.8rem;color:var(--text-muted);">测试值</label>
-                    <input type="text" id="test-value" placeholder="例如: api.cloudflare.com"
-                           style="width:100%;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:monospace;">
-                </div>
-                <button class="btn btn-sm btn-primary" onclick="testBlacklist()">测试</button>
-            </div>
-            <div id="test-result" style="margin-top:12px;display:none;"></div>
+{# ── 白名单管理 Tab ── #}
+<div id="tab-whitelist" {% if tab != 'whitelist' %}style="display:none"{% endif %}>
+    <div class="card">
+        <div class="card-title">
+            <h3 style="margin:0;">Redis 白名单规则</h3>
+            <button class="btn btn-sm btn-primary" onclick="showAddModal('whitelist')">+ 新增白名单规则</button>
         </div>
+        <p class="help-text" style="margin-top:10px;">白名单为空时<strong>放行所有事件</strong>；一旦设置规则，则<strong>只有命中规则的事件才允许入队</strong>，其余全部丢弃。匹配规则：<em>任一命中即放行</em>，忽略大小写。</p>
+        <table class="table" id="whitelist-rules-table">
+            <thead>
+                <tr>
+                    <th style="width:120px;">事件类型</th>
+                    <th style="width:96px;">匹配模式</th>
+                    <th>匹配值</th>
+                    <th style="width:110px;">备注</th>
+                    <th style="width:80px;">操作</th>
+                </tr>
+            </thead>
+            <tbody id="whitelist-rules-body">
+                <tr><td colspan="5" style="text-align:center;color:var(--text-muted);">加载中...</td></tr>
+            </tbody>
+        </table>
+        <div style="margin-top:8px;font-size:0.78rem;color:var(--text-muted);font-family:var(--font-mono);" id="whitelist-rules-count"></div>
+    </div>
+
+    <div class="card">
+        <h3>实时测试</h3>
+        <p class="help-text">输入事件类型和值，测试是否会被白名单放行或拦截。</p>
+        <div class="form-row" style="align-items:flex-end;">
+            <div class="form-group" style="margin:0;">
+                <label for="whitelist-test-event-type">事件类型</label>
+                <select id="whitelist-test-event-type" class="form-control" style="width:auto;min-width:180px;">
+                    <option value="DNS_NAME">DNS_NAME</option>
+                    <option value="URL">URL</option>
+                    <option value="IP_ADDRESS">IP_ADDRESS</option>
+                    <option value="IP_RANGE">IP_RANGE</option>
+                    <option value="URL_UNVERIFIED">URL_UNVERIFIED</option>
+                    <option value="OPEN_TCP_PORT">OPEN_TCP_PORT</option>
+                    <option value="HOST_TCP_PORT_OPEN">HOST_TCP_PORT_OPEN</option>
+                    <option value="*">* (全部)</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin:0;flex:1;min-width:220px;">
+                <label for="whitelist-test-value">测试值</label>
+                <input type="text" id="whitelist-test-value" class="form-control" placeholder="例如: api.example.com" style="font-family:var(--font-mono);">
+            </div>
+            <button class="btn btn-sm btn-primary" onclick="testWhitelist()">测试</button>
+        </div>
+        <div id="whitelist-test-result" style="margin-top:12px;display:none;"></div>
     </div>
 </div>
 
 {# ── 新增规则模态框 ── #}
-<div id="add-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center;">
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:24px;width:90%;max-width:460px;">
-        <h3 style="margin-top:0;">新增 Redis 规则</h3>
+<div id="add-modal" class="modal-backdrop" style="display:none;">
+    <div class="modal">
+        <h3 id="add-modal-title">新增 Redis 规则</h3>
         <div class="form-group">
-            <label>事件类型</label>
-            <select id="add-event-type" style="width:100%;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);">
+            <label for="add-event-type">事件类型</label>
+            <select id="add-event-type" class="form-control">
                 <option value="DNS_NAME">DNS_NAME</option>
                 <option value="URL">URL</option>
                 <option value="IP_ADDRESS">IP_ADDRESS</option>
@@ -267,11 +272,11 @@
                 <option value="HOST_TCP_PORT_OPEN">HOST_TCP_PORT_OPEN</option>
                 <option value="*">* (全部)</option>
             </select>
-            <p class="help-text"><code>*</code> 表示匹配所有事件类型</p>
+            <p class="help-text" style="margin-top:6px;"><code>*</code> 表示匹配所有事件类型</p>
         </div>
         <div class="form-group">
-            <label>匹配模式</label>
-            <select id="add-match-mode" style="width:100%;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);" onchange="updatePreview()">
+            <label for="add-match-mode">匹配模式</label>
+            <select id="add-match-mode" class="form-control" onchange="updatePreview()">
                 <option value="suffix">suffix — 后缀匹配</option>
                 <option value="prefix">prefix — 前缀匹配</option>
                 <option value="contains">contains — 正则包含</option>
@@ -279,16 +284,14 @@
             </select>
         </div>
         <div class="form-group">
-            <label>匹配值</label>
-            <input type="text" id="add-value" placeholder="例如: cloudflare.com"
-                   style="width:100%;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:monospace;" oninput="updatePreview()">
+            <label for="add-value">匹配值</label>
+            <input type="text" id="add-value" class="form-control" placeholder="例如: cloudflare.com" style="font-family:var(--font-mono);" oninput="updatePreview()">
         </div>
         <div class="form-group">
-            <label>备注（可选）</label>
-            <input type="text" id="add-comment" placeholder="例如: 临时屏蔽 CDN"
-                   style="width:100%;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);">
+            <label for="add-comment">备注（可选）</label>
+            <input type="text" id="add-comment" class="form-control" placeholder="例如: 临时屏蔽 CDN">
         </div>
-        <div id="add-preview" style="padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);font-size:0.82rem;color:var(--text-muted);margin-bottom:12px;min-height:20px;"></div>
+        <div id="add-preview" style="padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:0.8rem;color:var(--text-muted);margin-bottom:14px;min-height:20px;"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end;">
             <button class="btn btn-secondary" onclick="closeAddModal()">取消</button>
             <button class="btn btn-primary" onclick="addRule()">确定</button>
@@ -304,23 +307,28 @@ document.addEventListener('DOMContentLoaded', function() {
         loadRedisRules();
         loadFileRules();
     }
+    if (tab === 'whitelist' || window.location.search.indexOf('tab=whitelist') >= 0) {
+        loadWhitelistRules();
+    }
     // Tab 点击切换（不刷新页面）
     document.querySelectorAll('.blacklist-tab-link').forEach(function(link) {
         link.addEventListener('click', function(e) {
             var targetTab = this.getAttribute('data-tab');
-            if (targetTab === 'blacklist') {
+            if (targetTab !== 'events') {
                 e.preventDefault();
                 document.getElementById('tab-events').style.display = 'none';
-                document.getElementById('tab-blacklist').style.display = '';
-                document.querySelectorAll('.blacklist-tab-link').forEach(function(l) {
-                    l.style.borderBottomColor = 'transparent';
-                    l.style.color = '';
-                });
-                this.style.borderBottomColor = 'var(--accent)';
-                this.style.color = 'var(--accent)';
-                history.replaceState(null, '', '?tab=blacklist');
-                loadRedisRules();
-                loadFileRules();
+                document.getElementById('tab-blacklist').style.display = (targetTab === 'blacklist') ? '' : 'none';
+                document.getElementById('tab-whitelist').style.display = (targetTab === 'whitelist') ? '' : 'none';
+                document.querySelectorAll('.blacklist-tab-link').forEach(function(l) { l.classList.remove('active'); });
+                this.classList.add('active');
+                history.replaceState(null, '', '?tab=' + targetTab);
+                if (targetTab === 'blacklist') {
+                    loadRedisRules();
+                    loadFileRules();
+                }
+                if (targetTab === 'whitelist') {
+                    loadWhitelistRules();
+                }
             }
         });
     });
@@ -341,10 +349,10 @@ function loadRedisRules() {
             tbody.innerHTML = rules.map(function(r) {
                 return '<tr>' +
                     '<td><span class="badge badge-event">' + esc(r.event_type) + '</span></td>' +
-                    '<td><span class="badge" style="background:rgba(var(--accent-rgb,0,180,180),0.15);color:var(--accent);">' + esc(r.match_mode) + '</span></td>' +
-                    '<td><code style="font-size:0.82rem;">' + esc(r.value) + '</code></td>' +
-                    '<td style="font-size:0.78rem;color:var(--text-muted);">' + esc(r.comment || '-') + '</td>' +
-                    '<td><button class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:0.72rem;" onclick="deleteRule(\'' + r.fp + '\')">删除</button></td>' +
+                    '<td><span class="badge badge-muted">' + esc(r.match_mode) + '</span></td>' +
+                    '<td><code style="font-size:0.8rem;">' + esc(r.value) + '</code></td>' +
+                    '<td style="font-size:0.76rem;color:var(--text-muted);">' + esc(r.comment || '-') + '</td>' +
+                    '<td><button class="btn btn-sm btn-danger" onclick="deleteRule(\'' + r.fp + '\')">删除</button></td>' +
                     '</tr>';
             }).join('');
             countEl.textContent = '共 ' + rules.length + ' 条';
@@ -371,6 +379,51 @@ function deleteRule(fp) {
     });
 }
 
+// ========== 白名单规则 ==========
+function loadWhitelistRules() {
+    fetch('/api/whitelist/redis-rules')
+        .then(function(r) { return r.json(); })
+        .then(function(rules) {
+            var tbody = document.getElementById('whitelist-rules-body');
+            var countEl = document.getElementById('whitelist-rules-count');
+            if (!rules || rules.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">暂无白名单规则(未设置时放行所有事件)</td></tr>';
+                countEl.textContent = '共 0 条(白名单未启用)';
+                return;
+            }
+            tbody.innerHTML = rules.map(function(r) {
+                return '<tr>' +
+                    '<td><span class="badge badge-event">' + esc(r.event_type) + '</span></td>' +
+                    '<td><span class="badge badge-muted">' + esc(r.match_mode) + '</span></td>' +
+                    '<td><code style="font-size:0.8rem;">' + esc(r.value) + '</code></td>' +
+                    '<td style="font-size:0.76rem;color:var(--text-muted);">' + esc(r.comment || '-') + '</td>' +
+                    '<td><button class="btn btn-sm btn-danger" onclick="deleteWhitelistRule(\'' + r.fp + '\')">删除</button></td>' +
+                    '</tr>';
+            }).join('');
+            countEl.textContent = '共 ' + rules.length + ' 条(白名单已启用)';
+        })
+        .catch(function(err) {
+            document.getElementById('whitelist-rules-body').innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--danger);">加载失败: ' + esc(String(err)) + '</td></tr>';
+        });
+}
+
+function deleteWhitelistRule(fp) {
+    if (!confirm('确认删除此白名单规则？')) return;
+    fetch('/api/whitelist/delete', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({fp: fp})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) {
+            loadWhitelistRules();
+        } else {
+            alert('删除失败: ' + (data.error || '未知错误'));
+        }
+    });
+}
+
 // ========== 文件规则 ==========
 function loadFileRules() {
     fetch('/api/blacklist/file-rules')
@@ -388,8 +441,8 @@ function loadFileRules() {
             tbody.innerHTML = shown.map(function(r) {
                 return '<tr>' +
                     '<td><span class="badge badge-event">' + esc(r.event_type) + '</span></td>' +
-                    '<td><span class="badge" style="background:rgba(100,100,100,0.15);color:var(--text-muted);">' + esc(r.match_mode) + '</span></td>' +
-                    '<td><code style="font-size:0.82rem;">' + esc(r.value) + '</code></td>' +
+                    '<td><span class="badge badge-muted">' + esc(r.match_mode) + '</span></td>' +
+                    '<td><code style="font-size:0.8rem;">' + esc(r.value) + '</code></td>' +
                     '</tr>';
             }).join('');
             var msg = '共 ' + rules.length + ' 条';
@@ -408,7 +461,12 @@ function reloadFileRules() {
 }
 
 // ========== 新增规则模态框 ==========
-function showAddModal() {
+var currentRuleList = 'blacklist';
+
+function showAddModal(list) {
+    currentRuleList = list || 'blacklist';
+    document.getElementById('add-modal-title').textContent =
+        currentRuleList === 'whitelist' ? '新增白名单规则' : '新增 Redis 规则';
     document.getElementById('add-modal').style.display = 'flex';
     document.getElementById('add-value').value = '';
     document.getElementById('add-comment').value = '';
@@ -432,8 +490,8 @@ function updatePreview() {
     var examples = generateExamples(et, mm, val);
     preview.innerHTML =
         '<div style="margin-bottom:4px;">' + esc(et) + ' · ' + esc(mm) + ' · <code>' + esc(val) + '</code></div>' +
-        '<div style="color:#2ea043;">✓ 命中: ' + examples.hit.map(function(s){return '<code>'+esc(s)+'</code>';}).join(', ') + '</div>' +
-        '<div style="color:#f85149;">✗ 不命中: ' + examples.miss.map(function(s){return '<code>'+esc(s)+'</code>';}).join(', ') + '</div>';
+        '<div style="color:var(--success);">✓ 命中: ' + examples.hit.map(function(s){return '<code>'+esc(s)+'</code>';}).join(', ') + '</div>' +
+        '<div style="color:var(--danger);">✗ 不命中: ' + examples.miss.map(function(s){return '<code>'+esc(s)+'</code>';}).join(', ') + '</div>';
 }
 
 function generateExamples(et, mode, val) {
@@ -467,7 +525,8 @@ function addRule() {
     var val = document.getElementById('add-value').value.trim();
     var comment = document.getElementById('add-comment').value.trim();
     if (!val) { alert('匹配值不能为空'); return; }
-    fetch('/api/blacklist/add', {
+    var api = currentRuleList === 'whitelist' ? '/api/whitelist/add' : '/api/blacklist/add';
+    fetch(api, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({event_type: et, match_mode: mm, value: val, comment: comment})
@@ -476,7 +535,11 @@ function addRule() {
     .then(function(data) {
         if (data.ok) {
             closeAddModal();
-            loadRedisRules();
+            if (currentRuleList === 'whitelist') {
+                loadWhitelistRules();
+            } else {
+                loadRedisRules();
+            }
         } else {
             alert('添加失败: ' + (data.error || '未知错误'));
         }
@@ -499,27 +562,65 @@ function testBlacklist() {
     .then(function(r) { return r.json(); })
     .then(function(data) {
         if (!data.ok) {
-            resultDiv.innerHTML = '<div style="color:#f85149;">错误: ' + esc(data.error) + '</div>';
+            resultDiv.innerHTML = '<div style="color:var(--danger);">错误: ' + esc(data.error) + '</div>';
             return;
         }
         var html = '';
         if (data.blocked) {
-            html += '<div style="color:#f85149;font-weight:600;margin-bottom:8px;">⛔ 拦截！共命中 ' + data.total + ' 条规则</div>';
+            html += '<div style="color:var(--danger);font-weight:600;margin-bottom:8px;">⛔ 拦截！共命中 ' + data.total + ' 条规则</div>';
         } else {
-            html += '<div style="color:#2ea043;font-weight:600;margin-bottom:8px;">✓ 放行，未被任何规则命中</div>';
+            html += '<div style="color:var(--success);font-weight:600;margin-bottom:8px;">✓ 放行，未被任何规则命中</div>';
         }
         if (data.file_matches.length > 0) {
-            html += '<div style="font-size:0.82rem;margin-bottom:4px;">文件规则命中 (' + data.file_matches.length + '):</div>';
+            html += '<div style="font-size:0.8rem;margin-bottom:4px;">文件规则命中 (' + data.file_matches.length + '):</div>';
             data.file_matches.forEach(function(m) {
-                html += '<div style="font-size:0.78rem;padding:2px 8px;margin-bottom:2px;background:rgba(248,81,73,0.08);border-radius:3px;">' +
+                html += '<div style="font-size:0.76rem;padding:2px 8px;margin-bottom:2px;background:rgba(251,113,133,0.07);border-radius:4px;">' +
                     esc(m.event_type) + ':' + esc(m.match_mode) + ':' + esc(m.value) + ' <span style="color:var(--text-muted);">[文件]</span></div>';
             });
         }
         if (data.redis_matches.length > 0) {
-            html += '<div style="font-size:0.82rem;margin-bottom:4px;margin-top:8px;">Redis 规则命中 (' + data.redis_matches.length + '):</div>';
+            html += '<div style="font-size:0.8rem;margin-bottom:4px;margin-top:8px;">Redis 规则命中 (' + data.redis_matches.length + '):</div>';
             data.redis_matches.forEach(function(m) {
-                html += '<div style="font-size:0.78rem;padding:2px 8px;margin-bottom:2px;background:rgba(248,81,73,0.08);border-radius:3px;">' +
+                html += '<div style="font-size:0.76rem;padding:2px 8px;margin-bottom:2px;background:rgba(251,113,133,0.07);border-radius:4px;">' +
                     esc(m.event_type) + ':' + esc(m.match_mode) + ':' + esc(m.value) + ' <span style="color:var(--text-muted);">[Redis]</span></div>';
+            });
+        }
+        resultDiv.innerHTML = html;
+    });
+}
+
+// ========== 白名单实时测试 ==========
+function testWhitelist() {
+    var et = document.getElementById('whitelist-test-event-type').value;
+    var val = document.getElementById('whitelist-test-value').value.trim();
+    if (!val) { alert('请输入测试值'); return; }
+    var resultDiv = document.getElementById('whitelist-test-result');
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = '<span style="color:var(--text-muted);">检测中...</span>';
+    fetch('/api/whitelist/test', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({event_type: et, value: val})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.ok) {
+            resultDiv.innerHTML = '<div style="color:var(--danger);">错误: ' + esc(data.error) + '</div>';
+            return;
+        }
+        var html = '';
+        if (!data.has_rules) {
+            html += '<div style="color:var(--text-muted);font-weight:600;margin-bottom:8px;">白名单未设置，放行所有事件</div>';
+        } else if (data.allowed) {
+            html += '<div style="color:var(--success);font-weight:600;margin-bottom:8px;">✓ 放行！命中白名单规则</div>';
+        } else {
+            html += '<div style="color:var(--danger);font-weight:600;margin-bottom:8px;">⛔ 拦截！未命中任何白名单规则</div>';
+        }
+        if (data.matches.length > 0) {
+            html += '<div style="font-size:0.8rem;margin-bottom:4px;">命中的白名单规则 (' + data.matches.length + '):</div>';
+            data.matches.forEach(function(m) {
+                html += '<div style="font-size:0.76rem;padding:2px 8px;margin-bottom:2px;background:rgba(52,211,153,0.07);border-radius:4px;">' +
+                    esc(m.event_type) + ':' + esc(m.match_mode) + ':' + esc(m.value) + ' <span style="color:var(--text-muted);">[白名单]</span></div>';
             });
         }
         resultDiv.innerHTML = html;

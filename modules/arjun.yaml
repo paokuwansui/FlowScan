@@ -1,0 +1,43 @@
+name: arjun_module
+description: Arjun HTTP 参数发现 — 对存活 URL 爆破隐藏参数(反射型),产出 FINDING
+runtime:
+  max_concurrency: 2
+allowed_output_events:
+- FINDING
+io_contract:
+  input_events:
+  - URL
+  input_transform_code: |
+    import shlex
+    value = data["value"].strip()
+    if not value.startswith(("http://", "https://")):
+        value = "http://" + value
+    return [{"target": value, "target_q": shlex.quote(value)}]
+execution:
+  # -oJ 写 JSON 到临时文件(arjun 的 JSON 只落盘不直出 stdout),mktemp+trap+cat 模式同 whatweb
+  # -q 静默 banner/进度;默认 large.txt(2.5 万参数),-t 10 并发加速,-T 10 HTTP 超时
+  command: 'f=$(mktemp /tmp/arjun.XXXXXX.json); trap "rm -f $f" EXIT; arjun -u {{target_q}} -oJ "$f" -t 10 -T 10 -q 2>/dev/null; cat "$f" 2>/dev/null'
+  output_parse_code: |
+    import json
+    raw = (data["stdout"] or "").strip()
+    if not raw:
+        return []
+    try:
+        obj = json.loads(raw)
+    except:
+        return []
+    if not isinstance(obj, dict):
+        return []
+    results = []
+    seen = set()
+    for url, info in obj.items():
+        if not isinstance(info, dict):
+            continue
+        method = str(info.get("method") or "GET")
+        for p in (info.get("params") or []):
+            key = (url, str(p))
+            if key in seen:
+                continue
+            seen.add(key)
+            results.append({"FINDING": f"arjun hidden param: {p} ({method}) @ {url}"})
+    return results

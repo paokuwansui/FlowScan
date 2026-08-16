@@ -1,0 +1,52 @@
+redis:
+  redis_host: redis
+  redis_port: 6379
+  password: ""
+  db: 0
+web_config:
+  host: 0.0.0.0
+  port: 8080
+  username: FlowScan
+  password: FlowScanPassWord123
+  session_ttl: 3600
+  secret_key: flowscan3-secret-change-me
+xray_listen_http_proxy: 0.0.0.0:7777
+xray_remote_http_proxy: http://127.0.0.1:7777
+worker:
+  idle_sleep_seconds: 1.0
+  scan_batch_size: 200
+  max_local_pending: 40
+  heartbeat_interval_seconds: 10
+  lock_stale_seconds: 120
+fofa:
+  api_key: YOUR_FOFA_API_KEY
+  base_url: https://fofa.info
+ai_analysis:
+  base_url: https://api.deepseek.com/v1
+  api_key: YOUR_DEEPSEEK_API_KEY
+  model: deepseek-chat
+  timeout_seconds: 120
+  max_events: 200
+  log_api_key: ""
+  agent_max_iterations: 50
+  agent_scan_gap_seconds: 5
+  agent_plan_mode: false
+  agent_context_max_chars: 60000
+  agent_approval_mode: ai        # 危险操作审批模式: auto=自动放行 / ai=AI审批 / human=人工审批
+c2:
+  enabled: false
+  project_root: c2_server          # 相对路径=项目根下的 c2_server 目录
+  config_file: config.json
+mcp:
+  enabled: false
+  servers:
+    - name: yakit
+      type: sse
+      url: http://127.0.0.1:11432/sse
+      enabled: true
+skills:
+  enabled: false
+  dirs:
+    - skills                 # 默认读取项目内 skills/ 目录(不存在会自动创建)
+  loaded: []
+  force_load: false   # true=把已加载技能全文注入提示词; false=渐进式加载(仅注入索引, Agent 按需 load_skill)

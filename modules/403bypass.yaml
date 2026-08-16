@@ -1,0 +1,28 @@
+name: forbidden_bypass_module
+description: 403 绕过 — 对 feroxbuster 产出的 403_URL 尝试路径/方法/Header 绕过,发现可访问路径产出 URL/FINDING
+runtime:
+  max_concurrency: 4
+allowed_output_events:
+  - URL
+  - FINDING
+io_contract:
+  input_events:
+  - 403_URL
+  input_transform_code: |
+    import shlex
+    value = data["value"].strip()
+    return [{"target": value, "target_q": shlex.quote(value)}]
+execution:
+  command: python3 ./bin/403bypass.py --url {{target_q}}
+  output_parse_code: |
+    import json
+    temp_list = []
+    for line in data["stdout"].strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            temp_list.append(json.loads(line))
+        except:
+            continue
+    return temp_list

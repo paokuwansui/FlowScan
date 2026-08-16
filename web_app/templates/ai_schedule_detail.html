@@ -1,78 +1,107 @@
 {% extends "base.html" %}
 {% block title %}AI 定时任务详情{% endblock %}
 {% block content %}
-<div class="section">
+<div class="page-head">
     <h1>AI 定时任务详情</h1>
+    <p class="page-sub">定时分析任务配置快照与历史运行记录</p>
+</div>
 
-    <div class="card">
-        <h3>任务配置</h3>
-        <table class="table">
-            <tbody>
-                <tr><th>ID</th><td class="fp-cell">{{ schedule.schedule_id }}</td></tr>
-                <tr><th>创建时间</th><td>{{ schedule.created_at_iso or '-' }}</td></tr>
-                <tr><th>间隔</th><td>{{ schedule.interval_minutes }} 分钟</td></tr>
-                <tr><th>模型</th><td>{{ schedule.model or '-' }}</td></tr>
-                <tr><th>事件类型</th><td class="value-cell">{{ schedule.selected_types|join(', ') }}</td></tr>
-                <tr><th>最多事件数</th><td>{{ schedule.max_events }}</td></tr>
-                <tr>
-                    <th>自动动作</th>
-                    <td>
-                        增加事件={{ '开' if schedule.toggles.add else '关' }}；
-                        删除事件={{ '开' if schedule.toggles.del else '关' }}；
-                        删除子事件={{ '开' if schedule.toggles.del_children else '关' }}；
-                        增加黑名单={{ '开' if schedule.toggles.blacklist_add else '关' }}；
-                        删除黑名单={{ '开' if schedule.toggles.blacklist_del else '关' }}；
-                        存储日志={{ '开' if schedule.toggles.log else '关' }}
-                    </td>
-                </tr>
-                <tr><th>上次执行</th><td>{{ schedule.last_run_iso or '-' }}</td></tr>
-                <tr><th>下次执行</th><td>{{ schedule.next_run_iso or '-' }}</td></tr>
-                <tr><th>运行次数</th><td>{{ schedule.run_count }}</td></tr>
-                <tr><th>最后状态</th><td>{{ schedule.last_status }}{% if schedule.last_error %}<br><span style="color:var(--danger);">{{ schedule.last_error }}</span>{% endif %}</td></tr>
-                <tr><th>用户问题</th><td><pre style="white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px;">{{ schedule.question }}</pre></td></tr>
-                <tr><th>系统提示词快照</th><td><pre style="white-space:pre-wrap;word-break:break-word;max-height:360px;overflow:auto;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px;">{{ schedule.system_prompt }}</pre></td></tr>
-            </tbody>
-        </table>
-        <div class="form-row" style="gap:10px;">
-            <a href="{{ url_for('ai_analysis') }}" class="btn">返回 AI 分析</a>
-            <form method="POST" action="{{ url_for('ai_schedule_delete', schedule_id=schedule.schedule_id) }}" onsubmit="return confirm('确认删除这个定时 AI 分析任务？');">
-                <button type="submit" class="btn btn-danger">删除定时任务</button>
-            </form>
-        </div>
+<div class="card">
+    <h3>任务配置</h3>
+    <table class="table" style="max-width:900px;">
+        <tbody>
+            <tr><th style="width:160px;">ID</th><td class="fp-cell">{{ schedule.schedule_id }}</td></tr>
+            <tr><th>创建时间</th><td class="mono">{{ schedule.created_at_iso or '-' }}</td></tr>
+            <tr><th>间隔</th><td><b class="mono">{{ schedule.interval_minutes }}</b> 分钟</td></tr>
+            <tr><th>运行状态</th><td>
+                {% if schedule.enabled %}
+                <span class="badge badge-tool">启用中</span>
+                {% else %}
+                <span class="badge badge-muted">已暂停</span>
+                {% endif %}
+            </td></tr>
+            <tr><th>模型</th><td class="mono">{{ schedule.model or '-' }}</td></tr>
+            <tr><th>事件类型</th><td class="value-cell">
+                {% for t in schedule.selected_types %}<span class="badge badge-event">{{ t }}</span> {% endfor %}
+            </td></tr>
+            <tr><th>最多事件数</th><td class="mono">{{ schedule.max_events }}</td></tr>
+            <tr>
+                <th>自动执行</th>
+                <td>
+                    <span class="badge {% if schedule.toggles.add %}badge-tool{% else %}badge-muted{% endif %}">增加事件 {{ '开' if schedule.toggles.add else '关' }}</span>
+                    <span class="badge {% if schedule.toggles.del %}badge-danger{% else %}badge-muted{% endif %}">删除事件 {{ '开' if schedule.toggles.del else '关' }}</span>
+                    <span class="badge {% if schedule.toggles.del_children %}badge-danger{% else %}badge-muted{% endif %}">删除子事件 {{ '开' if schedule.toggles.del_children else '关' }}</span>
+                    <span class="badge {% if schedule.toggles.blacklist_add %}badge-purple{% else %}badge-muted{% endif %}">增加黑名单 {{ '开' if schedule.toggles.blacklist_add else '关' }}</span>
+                    <span class="badge {% if schedule.toggles.blacklist_del %}badge-warn{% else %}badge-muted{% endif %}">删除黑名单 {{ '开' if schedule.toggles.blacklist_del else '关' }}</span>
+                    <span class="badge {% if schedule.toggles.log %}badge-node{% else %}badge-muted{% endif %}">存储日志 {{ '开' if schedule.toggles.log else '关' }}</span>
+                </td>
+            </tr>
+            <tr><th>上次执行</th><td class="mono">{{ schedule.last_run_iso or '-' }}</td></tr>
+            <tr><th>下次执行</th><td class="mono">{{ schedule.next_run_iso or '-' }}</td></tr>
+            <tr><th>运行次数</th><td class="mono">{{ schedule.run_count }}</td></tr>
+            <tr><th>最后状态</th><td>
+                <span class="badge {% if schedule.last_status == 'ok' %}badge-tool{% elif schedule.last_status == 'error' %}badge-danger{% else %}badge-muted{% endif %}">{{ schedule.last_status }}</span>
+                {% if schedule.last_error %}<br><span style="color:var(--danger);font-size:0.82rem;">{{ schedule.last_error }}</span>{% endif %}
+            </td></tr>
+            <tr><th>用户问题</th><td><pre class="code-block">{{ schedule.question }}</pre></td></tr>
+            <tr><th>系统提示词快照</th><td><pre class="code-block" style="max-height:340px;">{{ schedule.system_prompt }}</pre></td></tr>
+        </tbody>
+    </table>
+    <div class="form-row" style="gap:10px;margin-top:16px;">
+        <a href="{{ url_for('ai_analysis') }}" class="btn btn-secondary">返回 AI 分析</a>
+        <form method="POST" action="{{ url_for('ai_schedule_toggle', schedule_id=schedule.schedule_id) }}"
+              onsubmit="return confirm('{{ '确认暂停' if schedule.enabled else '确认启用' }}该定时任务？');">
+            <button type="submit" class="btn {% if schedule.enabled %}btn-warning{% else %}btn-success{% endif %}">
+                {{ '暂停定时任务' if schedule.enabled else '启用定时任务' }}
+            </button>
+        </form>
+        <form method="POST" action="{{ url_for('ai_schedule_delete', schedule_id=schedule.schedule_id) }}" onsubmit="return confirm('确认删除这个定时 AI 分析任务？');">
+            <button type="submit" class="btn btn-danger">删除定时任务</button>
+        </form>
     </div>
+</div>
 
-    <div class="card">
-        <h3>回答记录</h3>
-        {% if runs %}
-        {% for run in runs %}
-        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:12px;background:var(--bg);">
-            <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
-                <strong>{{ run.created_at_iso }}</strong>
-                <span>
-                    状态: {{ '成功' if run.ok else '失败' }}；
-                    上下文事件: {{ run.event_count or 0 }}；
-                    解析动作: {{ run.parsed_actions|length if run.parsed_actions else 0 }}；
-                    执行动作: {{ run.action_results|length if run.action_results else 0 }}
-                </span>
-            </div>
-            {% if run.error %}<div class="flash error">{{ run.error }}</div>{% endif %}
-            {% if run.answer %}
-            <details open>
-                <summary>AI 回答</summary>
-                <pre style="white-space:pre-wrap;word-break:break-word;max-height:500px;overflow:auto;">{{ run.answer }}</pre>
-            </details>
-            {% endif %}
-            {% if run.action_results %}
-            <details>
-                <summary>动作执行结果</summary>
-                <pre style="white-space:pre-wrap;word-break:break-word;">{{ run.action_results | tojson(indent=2) }}</pre>
-            </details>
-            {% endif %}
+<div class="card">
+    <h3>回答记录</h3>
+    {% if runs %}
+    {% for run in runs %}
+    <div style="border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:12px;background:rgba(3,7,15,0.45);">
+        <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+            <strong class="mono">{{ run.created_at_iso }}</strong>
+            <span class="mono" style="color:var(--text-muted);font-size:0.78rem;">
+                状态: <b style="color:{{ 'var(--success)' if run.ok else 'var(--danger)' }};">{{ '成功' if run.ok else '失败' }}</b> ·
+                上下文事件: {{ run.event_count or 0 }} ·
+                解析动作: {{ run.parsed_actions|length if run.parsed_actions else 0 }} ·
+                执行动作: {{ run.action_results|length if run.action_results else 0 }}
+            </span>
         </div>
-        {% endfor %}
-        {% else %}
-        <div class="empty-state">暂无执行记录。后台线程会在下次到期后自动执行。</div>
+        {% if run.error %}<div class="flash error">{{ run.error }}</div>{% endif %}
+        {% if run.answer %}
+        <details open>
+            <summary>AI 回答</summary>
+            <div class="md-box" id="mdbox-sched-{{ loop.index0 }}">
+                <div class="md-toggle">
+                    <span class="md-mode-label">源码</span>
+                    <label class="switch md-switch" title="切换 源码 / Markdown 渲染">
+                        <input type="checkbox" onchange="FS3ToggleMd('mdbox-sched-{{ loop.index0 }}', this.checked)">
+                        <span class="switch-slider"></span>
+                    </label>
+                    <span class="md-mode-label">Markdown</span>
+                </div>
+                <div class="md-body md-src">{{ run.answer }}</div>
+            </div>
+        </details>
+        {% endif %}
+        {% if run.action_results %}
+        <details>
+            <summary>动作执行结果</summary>
+            <pre class="code-block">{{ run.action_results | tojson(indent=2) }}</pre>
+        </details>
         {% endif %}
     </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state">暂无执行记录。后台线程会在下次到期后自动执行。</div>
+    {% endif %}
 </div>
 {% endblock %}

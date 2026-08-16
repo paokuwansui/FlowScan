@@ -1,3 +1,4 @@
+# [DEPRECATED] 主机部署方式已由 Docker 取代(docker-compose.yml),此脚本仅作参考保留
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -6,7 +7,7 @@ CONFIG_PATH="${PROJECT_DIR}/config.yaml"
 VENV_PYTHON="${PROJECT_DIR}/flowscan_venv/bin/python3"
 
 echo "============================================"
-echo " FlowScan3 Main Node Setup"
+echo " FlowScan Main Node Setup"
 echo "============================================"
 
 # ── Step 1: Randomize secrets ──
@@ -68,7 +69,7 @@ if [ -z "$REDIS_CONF" ]; then
 fi
 
 # Backup original
-sudo cp "$REDIS_CONF" "${REDIS_CONF}.flowscan3.bak"
+sudo cp "$REDIS_CONF" "${REDIS_CONF}.flowscan.bak"
 
 # Apply config via Python (handles quoting, escaping, edge cases cleanly)
 TMP_CONF="$(mktemp)"

@@ -1,20 +1,26 @@
 {% extends "base.html" %}
 {% block title %}事件图谱{% endblock %}
 {% block content %}
+<div class="page-head" style="margin-bottom:14px;">
+    <h1>事件图谱</h1>
+    <p class="page-sub">事件父子关系可视化 · 搜索链路 · 递归查询子事件</p>
+</div>
+
 <div class="eq-layout-tree">
     <div class="eq-sidebar graph-left-panel">
         <h3>搜索</h3>
-        <div style="margin-bottom:12px;">
-            <input type="text" id="graph-search-input" placeholder="输入事件值模糊搜索…"
-                   style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:0.85rem;">
+        <div style="margin-bottom:10px;">
+            <input type="text" id="graph-search-input" class="form-control" placeholder="输入事件值模糊搜索…" aria-label="搜索事件值" style="font-family:var(--font-mono);font-size:0.82rem;">
         </div>
         <button class="btn btn-sm btn-primary" onclick="searchGraph()" style="width:100%;">搜索链路</button>
         <button class="btn btn-sm btn-danger" onclick="deleteSelectedRenderedSubtree()" style="width:100%;margin-top:8px;">删除选中渲染</button>
         <button class="btn btn-sm btn-secondary" onclick="resetGraph()" style="width:100%;margin-top:8px;">清空图谱</button>
+        <button class="btn btn-sm btn-primary" onclick="queryRecursiveChildren()" style="width:100%;margin-top:8px;">查询递归子事件 JSON</button>
+        <div id="recursive-result" style="display:none;margin-top:8px;"></div>
         <div id="search-results" style="margin-top:10px;"></div>
-        <hr style="border-color:var(--border);margin:12px 0;">
-        <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6;">
-            <p><strong>操作说明</strong></p>
+        <hr>
+        <div style="font-size:0.76rem;color:var(--text-muted);line-height:1.7;">
+            <p><strong style="color:var(--text);">操作说明</strong></p>
             <p>• 默认右侧显示所有根事件</p>
             <p>• 点击右侧事件：渲染到图谱并展开其直接子事件</p>
             <p>• 点击图中事件：右侧同步显示直接子事件</p>
@@ -24,7 +30,7 @@
     </div>
 
     <div class="eq-main">
-        <div id="graph-container" style="width:100%;height:calc(100vh - 120px);background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);"></div>
+        <div id="graph-container" style="width:100%;height:calc(100vh - 170px);background:rgba(3,7,15,0.6);border:1px solid var(--border);border-radius:var(--radius);"></div>
     </div>
 
     <div class="eq-detail" id="detail-panel">
@@ -44,21 +50,6 @@
 <style>
 #graph-container canvas { display: block; }
 .vis-network:focus { outline: none; }
-.graph-result-item,
-.graph-list-item {
-    padding: 7px 8px;
-    margin-bottom: 5px;
-    background: var(--bg);
-    border: 1px solid transparent;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.78rem;
-}
-.graph-result-item:hover,
-.graph-list-item:hover { border-color: rgba(88,166,255,0.35); background: rgba(88,166,255,0.06); }
-.graph-list-item.selected { border-color: var(--primary); background: rgba(88,166,255,0.12); }
-.graph-item-value { display:block; font-family:monospace; word-break:break-all; white-space:normal; color:var(--text); }
-.graph-item-meta { display:block; margin-top:3px; color:var(--text-muted); font-size:0.68rem; }
 </style>
 <script>
 var nodes = new vis.DataSet([]);
@@ -78,15 +69,15 @@ var container = document.getElementById('graph-container');
 var options = {
     nodes: {
         shape: 'box',
-        color: { background: '#161b22', border: '#30363d', highlight: { background: '#1c2333', border: '#58a6ff' } },
-        font: { color: '#e6edf3', size: 13, face: 'monospace' },
+        color: { background: '#0c1322', border: '#2c4270', highlight: { background: '#12203a', border: '#22d3ee' } },
+        font: { color: '#d9e4f7', size: 13, face: 'monospace' },
         borderWidth: 1.5,
         borderWidthSelected: 2.5,
         margin: { top: 7, bottom: 7, left: 10, right: 10 },
     },
     edges: {
-        color: { color: '#30363d', highlight: '#58a6ff', hover: '#58a6ff' },
-        font: { color: '#8b949e', size: 11, face: 'sans-serif', align: 'middle', strokeWidth: 0 },
+        color: { color: '#2c4270', highlight: '#22d3ee', hover: '#22d3ee' },
+        font: { color: '#7d8fb5', size: 11, face: 'sans-serif', align: 'middle', strokeWidth: 0 },
         width: 1.5,
         arrows: { to: { enabled: true, scaleFactor: 0.65 } },
         smooth: { type: 'cubicBezier', forceDirection: 'horizontal', roundness: 0.3 },
@@ -168,7 +159,35 @@ function eventTitle(evt) {
         '<br>fp: ' + escapeHtml((evt.fingerprint || '').slice(0, 16)) + '...</small>';
 }
 
-function renderEventNode(evt) {
+/* M-6 事件类型分色:资产发现青 / 端口服务绿 / 指纹技术紫 / 漏洞风险红,其余灰蓝 */
+var FS3_EVT_COLORS = {
+    'INPUT':          ['#0e2a3a', '#22d3ee'],
+    'DNS_NAME':       ['#0e2a3a', '#22d3ee'],
+    'IP_ADDRESS':     ['#0e2a3a', '#22d3ee'],
+    'IP_RANGE':       ['#0e2a3a', '#22d3ee'],
+    'URL':            ['#0e2a3a', '#22d3ee'],
+    'URL_UNVERIFIED': ['#0e2a3a', '#22d3ee'],
+    'ICON_PATH':      ['#0e2a3a', '#22d3ee'],
+    'HOST_TCP_PORT_OPEN': ['#0e3328', '#34d399'],
+    'OPEN_TCP_PORT':  ['#0e3328', '#34d399'],
+    'TECHNOLOGY':     ['#241b3a', '#a78bfa'],
+    'WAF':            ['#241b3a', '#a78bfa'],
+    'SERVICE':        ['#241b3a', '#a78bfa'],
+    'FINDING':        ['#3a1622', '#fb7185'],
+    'VULNERABILITY':  ['#3a1622', '#fb7185'],
+    'SCREENSHOT':     ['#1d2a3a', '#7dd3fc'],
+    'ICON':           ['#1d2a3a', '#7dd3fc'],
+    '403_URL':        ['#3a2b16', '#fbbf24']
+};
+function evtNodeColors(evt) {
+    var t = evt.event_type || '';
+    var c = FS3_EVT_COLORS[t];
+    if (c) return { background: c[0], border: c[1] };
+    var isRoot = !evt.parent_fp || evt.root_fp === evt.fingerprint;
+    return { background: isRoot ? '#10233a' : '#13233c', border: isRoot ? '#22d3ee' : '#2c4270' };
+}
+
+function renderEventNode(evt, parentFp) {
     evt = cacheEvent(evt);
     var fp = evt.fingerprint;
     if (!fp) return null;
@@ -179,12 +198,31 @@ function renderEventNode(evt) {
         id: id,
         label: eventLabel(evt),
         title: eventTitle(evt),
-        color: { background: isRoot ? '#16212e' : '#1a2332', border: '#30363d' },
+        color: { background: evtNodeColors(evt).background, border: evtNodeColors(evt).border },
         shape: 'box'
     });
     fpNodeMap[fp] = id;
     nodeFpMap[id] = fp;
+    // 子事件默认落在父事件下方一定距离(首子正下方,后续左右扇开),并固定位置
+    if (parentFp && fpNodeMap[parentFp]) {
+        placeChildBelow(id, fpNodeMap[parentFp]);
+    }
     return id;
+}
+
+function placeChildBelow(childId, parentId) {
+    var pos = network.getPositions([parentId])[parentId];
+    if (!pos) return;
+    var k = 0;
+    edges.forEach(function(e) { if (e.from === parentId) k++; });
+    // 第 0 个子事件:正下方 130px;第 1 个:左 130;第 2 个:右 130;依次向外扇开
+    var xOffset = 0;
+    if (k > 0) {
+        var half = Math.ceil(k / 2);
+        xOffset = (k % 2 === 1) ? -half * 130 : half * 130;
+    }
+    nodes.update({ id: childId, x: pos.x + xOffset, y: pos.y + 130,
+                   fixed: { x: true, y: true } });
 }
 
 function renderEdge(parentFp, childEvt) {
@@ -217,7 +255,7 @@ function eventListHtml(evt, parentFp, isRoot) {
     var source = escapeHtml(evt.source_tool || evt.tool || evt.source || '?');
     var click = isRoot ? "selectEvent('" + jsEscape(fp) + "', {render:true, expand:false, focus:true})" : "selectEvent('" + jsEscape(fp) + "', {render:true, parentFp:'" + jsEscape(parentFp) + "', expand:false, focus:true})";
     return '<div class="graph-list-item" data-fp="' + escapeHtml(fp) + '" onclick="' + click + '">' +
-        '<span class="badge badge-event" style="font-size:0.65rem;">' + type + '</span>' +
+        '<span class="badge badge-event" style="font-size:0.64rem;">' + type + '</span>' +
         '<span class="graph-item-value">' + val + '</span>' +
         '<span class="graph-item-meta">' + (isRoot ? 'root' : ('by ' + source)) + ' · fp ' + escapeHtml(fp.slice(0, 12)) + '</span>' +
         '</div>';
@@ -230,7 +268,7 @@ function selectEvent(fp, opts) {
     var evt = eventCache[fp];
     if (opts.render) {
         if (!evt && opts.event) evt = cacheEvent(opts.event);
-        if (evt) renderEventNode(evt);
+        if (evt) renderEventNode(evt, opts.parentFp);
         if (opts.parentFp && evt) renderEdge(opts.parentFp, evt);
     }
     if (fpNodeMap[fp]) {
@@ -295,7 +333,7 @@ function renderImmediateChildren(parentFp, done) {
                         source_tool: raw.tool || raw.source,
                         parent_fp: parentFp
                     }));
-                    renderEventNode(evt);
+                    renderEventNode(evt, parentFp);
                     renderEdge(parentFp, evt);
                 });
             });
@@ -378,21 +416,21 @@ function searchGraph() {
         .then(function(resp) { return resp.json(); })
         .then(function(items) {
             if (!items || !items.length) {
-                box.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;">未找到</div>';
+                box.innerHTML = '<div style="color:var(--text-muted);font-size:0.78rem;">未找到</div>';
                 return;
             }
-            var html = '<div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px;">' + items.length + ' 个结果</div>';
+            var html = '<div style="font-size:0.76rem;color:var(--text-muted);margin-bottom:6px;">' + items.length + ' 个结果（仅最近 1000 条内搜索）</div>';
             items.forEach(function(item) {
                 cacheEvent(normalizeEvent(item));
                 html += '<div class="graph-result-item" onclick="renderPath(\'' + jsEscape(item.fp) + '\')">' +
-                    '<span class="badge badge-event" style="font-size:0.65rem;">' + escapeHtml(item.event_type || '?') + '</span>' +
+                    '<span class="badge badge-event" style="font-size:0.64rem;">' + escapeHtml(item.event_type || '?') + '</span>' +
                     '<span class="graph-item-value">' + escapeHtml(item.value || '') + '</span>' +
                     '<span class="graph-item-meta">by ' + escapeHtml(item.source_tool || item.tool_name || '?') + ' · fp ' + escapeHtml((item.fp || '').slice(0, 12)) + '</span>' +
                     '</div>';
             });
             box.innerHTML = html;
         })
-        .catch(function() { box.innerHTML = '<div style="color:var(--danger);font-size:0.8rem;">搜索失败</div>'; });
+        .catch(function() { box.innerHTML = '<div style="color:var(--danger);font-size:0.78rem;">搜索失败</div>'; });
 }
 
 function renderPath(fp) {
@@ -403,7 +441,7 @@ function renderPath(fp) {
             var prevFp = '';
             path.forEach(function(raw, idx) {
                 var evt = cacheEvent(normalizeEvent(raw));
-                renderEventNode(evt);
+                renderEventNode(evt, prevFp || '');
                 if (idx > 0) renderEdge(prevFp, evt);
                 prevFp = evt.fingerprint;
             });
@@ -416,6 +454,33 @@ function renderPath(fp) {
                 network.setOptions({ physics: false });
                 network.fit({ animation: true });
             }, 400);
+        });
+}
+
+function queryRecursiveChildren() {
+    if (!selectedFp) { alert('请先选中一个事件'); return; }
+    var box = document.getElementById('recursive-result');
+    // toggle: 已展开则收起
+    if (box.style.display !== 'none') {
+        box.style.display = 'none';
+        return;
+    }
+    box.style.display = 'block';
+    box.innerHTML = '<div class="loading">查询递归子事件...</div>';
+    fetch('/api/events/recursive-children?fp=' + encodeURIComponent(selectedFp))
+        .then(function(resp) { return resp.json(); })
+        .then(function(data) {
+            if (!data.ok) {
+                box.innerHTML = '<div style="color:var(--danger);font-size:0.76rem;">' + escapeHtml(data.error || '查询失败') + '</div>';
+                return;
+            }
+            var html = '<div style="font-size:0.76rem;margin-bottom:6px;">递归子事件 · 后代总数 <strong style="color:var(--accent);">' + data.total_descendants + '</strong></div>';
+            html += '<pre class="code-block" style="max-height:420px;font-size:0.7rem;">' +
+                escapeHtml(JSON.stringify(data.tree, null, 2)) + '</pre>';
+            box.innerHTML = html;
+        })
+        .catch(function() {
+            box.innerHTML = '<div style="color:var(--danger);font-size:0.76rem;">查询失败</div>';
         });
 }
 

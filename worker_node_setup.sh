@@ -1,3 +1,4 @@
+# [DEPRECATED] 主机部署方式已由 Docker 取代(docker-compose.yml),此脚本仅作参考保留
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -53,11 +54,7 @@ done
 export PATH="$HOME/.local/bin:$HOME/go/bin:$PATH"
 export GOTMPDIR="$HOME/go/tmp"
 
-# Pre-install bbot system dependencies from venv (massdns, subfinder, etc.)
-echo "[WORKER_SETUP] Installing bbot dependencies..."
-"$PROJECT_DIR/flowscan_venv/bin/bbot" --install-all-deps 2>&1 || echo "[WORKER_SETUP] [WARN] bbot --install-all-deps had issues; continuing"
 GOBIN="$HOME/.local/bin" GOCACHE="$HOME/.cache/go-tmp" go install -v github.com/projectdiscovery/cdncheck/cmd/cdncheck@latest
-python3 main.py init
 
 # ── Clean Go build residuals ──
 echo ""

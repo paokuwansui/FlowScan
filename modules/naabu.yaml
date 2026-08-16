@@ -1,0 +1,47 @@
+name: naabu_module
+description: Naabu 全端口扫描 — 对 IP/CIDR 执行 1-65535 快速端口发现(非 root 自动降级 connect 扫描),输出 HOST_TCP_PORT_OPEN 供 ip_port_split/nmap 消费
+runtime:
+  max_concurrency: 4
+allowed_output_events:
+- HOST_TCP_PORT_OPEN
+io_contract:
+  input_events:
+  - IP_ADDRESS
+  - IP_RANGE
+  input_transform_code: |
+    import shlex
+    value = data["value"].strip()
+    if not value:
+        return []
+    return [{"target": value, "target_q": shlex.quote(value)}]
+execution:
+  command: 'naabu -host {{target_q}} -p - -json -silent -rate 2000 -timeout 3000 -retries 2 2>/dev/null'
+  output_parse_code: |
+    import json
+    hosts = {}
+    for line in data["stdout"].splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            obj = json.loads(line)
+        except:
+            continue
+        host = obj.get("host") or obj.get("ip") or ""
+        port = obj.get("port")
+        if not host or not port:
+            continue
+        try:
+            port = int(port)
+        except:
+            continue
+        hosts.setdefault(host, set()).add(port)
+    results = []
+    for host, ports in hosts.items():
+        ports = sorted(ports)
+        # 防止误把全端口/泛响应结果推入后续扫描链路
+        if len(ports) >= 65535:
+            continue
+        value = "%s -> [%s]" % (host, ",".join(str(p) for p in ports))
+        results.append({"HOST_TCP_PORT_OPEN": value})
+    return results

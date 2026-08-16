@@ -1,0 +1,28 @@
+name: medusa_module
+description: Medusa 弱口令爆破 — 对开放端口(OPEN_TCP_PORT)按端口映射服务模块做暴力破解,产出弱口令 FINDING
+runtime:
+  max_concurrency: 2
+allowed_output_events:
+  - FINDING
+
+io_contract:
+  input_events:
+    - OPEN_TCP_PORT
+  input_transform_code: |
+    import shlex
+    return [{"value": shlex.quote(data["value"])}]
+
+execution:
+  command: python ./bin/medusa.py {{value}}
+  output_parse_code: |
+    import json
+    temp_list = []
+    for line in data["stdout"].strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            temp_list.append(json.loads(line))
+        except:
+            continue
+    return temp_list
