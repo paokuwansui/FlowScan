@@ -76,7 +76,8 @@ def main() -> int:
     args = parser.parse_args()
     url = args.url.strip()
     if not url.startswith(("http://", "https://")):
-        return 0
+        print(f"[403bypass] invalid URL: {url!r}", file=sys.stderr)
+        return 1
 
     parsed = urlparse(url)
     path = parsed.path or "/"

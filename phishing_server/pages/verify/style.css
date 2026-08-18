@@ -1,0 +1,35 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: radial-gradient(ellipse at top, #101a35 0%, #0a0e1d 70%);
+  color: #e6edf3;
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+}
+.ph-wrap { width: 100%; max-width: 460px; padding: 1rem; }
+.ph-card {
+  background: rgba(15, 22, 42, 0.94);
+  border: 1px solid #26355a;
+  border-radius: 14px;
+  padding: 2.4rem 2.2rem;
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+.ph-shield { font-size: 2.4rem; margin-bottom: 0.6rem; }
+h1 { font-size: 1.3rem; font-weight: 600; }
+.ph-sub { color: #8b98b4; font-size: 0.82rem; margin: 0.5rem 0 1.6rem; }
+.ph-check { text-align: left; margin-bottom: 1.4rem; }
+.ph-check-item {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.65rem 0.8rem; margin-bottom: 0.5rem;
+  background: rgba(10, 16, 34, 0.6);
+  border: 1px solid #223052;
+  border-radius: 8px;
+  font-size: 0.82rem;
+}
+.ph-check-ico { color: #22c55e; }
+.ph-check-state { margin-left: auto; color: #8b98b4; font-size: 0.75rem; }
+.ph-check-item.done .ph-check-ico { color: #22c55e; }
+.ph-check-item.done .ph-check-state { color: #22c55e; }
+.ph-tip { color: #5d6b8a; font-size: 0.74rem; }
+.ph-foot { text-align: center; color: #46536e; font-size: 0.7rem; margin-top: 1.2rem; }

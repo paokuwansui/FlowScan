@@ -1,0 +1,36 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: #0d1117;
+  color: #e6edf3;
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+}
+.ph-wrap { width: 100%; max-width: 420px; padding: 1rem; }
+.ph-card {
+  background: #161b27;
+  border: 1px solid #242d3f;
+  border-radius: 14px;
+  padding: 2.6rem 2.2rem;
+  text-align: center;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+.ph-code {
+  font-size: 3.6rem; font-weight: 800;
+  background: linear-gradient(135deg, #f87171, #f59e0b);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+  line-height: 1.1;
+}
+h1 { font-size: 1.2rem; font-weight: 600; margin-top: 0.3rem; }
+.ph-sub { color: #8b98b4; font-size: 0.82rem; margin: 0.6rem 0 1.6rem; }
+.ph-links { margin-bottom: 1.2rem; }
+.ph-btn {
+  display: inline-block; padding: 0.6rem 1.8rem;
+  background: #242d3f; color: #e6edf3;
+  border: 1px solid #33405c; border-radius: 8px;
+  font-size: 0.85rem; text-decoration: none;
+  transition: background 0.2s;
+}
+.ph-btn:hover { background: #2c3a55; }
+.ph-tip { color: #56617a; font-size: 0.72rem; }

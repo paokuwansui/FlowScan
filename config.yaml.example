@@ -1,17 +1,18 @@
 redis:
-  redis_host: redis
-  redis_port: 6379
+  redis_host: 127.0.0.1        # 主节点:web 与 redis 同容器,127.0.0.1 直达(单容器架构)
+                                # worker 节点:用单独的 config.worker.yaml,redis_host 填主节点 IP(全部走宿主端口暴露,无内网互联)
+  redis_port: 65001             # 端口排布(65000-65535 段整体映射):redis=65001
   password: ""
   db: 0
 web_config:
   host: 0.0.0.0
-  port: 8080
+  port: 65000                   # 端口排布:web=65000
   username: FlowScan
   password: FlowScanPassWord123
   session_ttl: 3600
-  secret_key: flowscan3-secret-change-me
-xray_listen_http_proxy: 0.0.0.0:7777
-xray_remote_http_proxy: http://127.0.0.1:7777
+  secret_key: flowscan-secret-change-me
+xray_listen_http_proxy: 0.0.0.0:65002    # 端口排布:xray=65002
+xray_remote_http_proxy: http://127.0.0.1:65002
 worker:
   idle_sleep_seconds: 1.0
   scan_batch_size: 200
@@ -34,9 +35,16 @@ ai_analysis:
   agent_context_max_chars: 60000
   agent_approval_mode: ai        # 危险操作审批模式: auto=自动放行 / ai=AI审批 / human=人工审批
 c2:
-  enabled: false
+  enabled: true                # C2 服务默认启动(面板 C2 工作台首次访问即内嵌启动,懒加载)
   project_root: c2_server          # 相对路径=项目根下的 c2_server 目录
   config_file: config.json
+  server_port: 65003           # implant 监听端口(合并自 c2_server/config.json,改这里优先覆盖,免重建镜像)
+  client_port: 65004           # client 监听端口(合并自 c2_server/config.json,改这里优先覆盖,免重建镜像)
+phishing:
+  enabled: true                # 钓鱼页面默认启动(XSS 管理 + 静态页面,懒加载)
+  project_root: phishing_server    # 相对路径=项目根下的 phishing_server 目录
+  config_file: config.json
+  port: 65005                  # 反连服务器端口(合并自 phishing_server/config.json,改这里优先覆盖,免重建镜像)
 mcp:
   enabled: false
   servers:
@@ -45,8 +53,8 @@ mcp:
       url: http://127.0.0.1:11432/sse
       enabled: true
 skills:
-  enabled: false
+  enabled: true                # Skill 加载默认开启(Agent 的 load_skill/search_skills 可用)
   dirs:
-    - skills                 # 默认读取项目内 skills/ 目录(不存在会自动创建)
+    - skills
   loaded: []
   force_load: false   # true=把已加载技能全文注入提示词; false=渐进式加载(仅注入索引, Agent 按需 load_skill)

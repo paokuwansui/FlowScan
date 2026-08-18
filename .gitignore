@@ -1,0 +1,32 @@
+# ── Python ──
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# ── 虚拟环境 ──
+.venv/
+venv/
+flowscan_venv/
+
+# ── 运行时生成 ──
+.env
+*.log
+nohup.out
+reports/
+state_snapshots/
+c2_server/events.jsonl
+c2_server/server.log
+phishing_server/server.log
+
+# ── 敏感配置(含密码/密钥,部署时从 *.example 复制)──
+config.yaml
+config.worker.yaml
+c2_server/config.json
+
+# ── CA 私钥(部署时重新生成,勿公开)──
+bin/xray/ca.key
+bin/rad/rad_ca.key
+
+# ── 本机辅助 ──
+.hermes/

@@ -1,0 +1,56 @@
+# FlowScan Worker 节点专用配置模板
+# 部署前: cp config.worker.yaml.example config.worker.yaml,并把 redis_host 改为主节点地址:
+#   同机部署   → 主节点 ECS 内网 IP(如 172.18.31.207),走宿主端口映射
+#   跨机部署   → 主节点公网 IP(如 101.37.202.33),需安全组/防火墙放行 6379
+# redis 连接全部经宿主端口映射访问主节点(无 docker 内网互联机制)。
+redis:
+  redis_host: 127.0.0.1        # ← 改成主节点 IP(worker 容器内 127.0.0.1 是自己,连不上)
+  redis_port: 65001             # 主节点 redis 端口(65000-65535 段排布)
+  password: ""                # 与主节点 config.yaml 的 redis.password 一致(entrypoint 每次启动随机化,以主节点容器内 /app/config.yaml 为准)
+  db: 0
+web_config:
+  host: 0.0.0.0
+  port: 65000
+  username: FlowScan
+  password: FlowScanPassWord123
+  session_ttl: 3600
+  secret_key: flowscan-secret-change-me
+xray_listen_http_proxy: 0.0.0.0:7777
+xray_remote_http_proxy: http://127.0.0.1:7777
+worker:
+  idle_sleep_seconds: 1.0
+  scan_batch_size: 200
+  max_local_pending: 40
+  heartbeat_interval_seconds: 10
+  lock_stale_seconds: 120
+fofa:
+  api_key: YOUR_FOFA_API_KEY
+  base_url: https://fofa.info
+ai_analysis:
+  base_url: https://api.deepseek.com/v1
+  api_key: YOUR_DEEPSEEK_API_KEY
+  model: deepseek-chat
+  timeout_seconds: 120
+  max_events: 200
+  log_api_key: ""
+  agent_max_iterations: 50
+  agent_scan_gap_seconds: 5
+  agent_plan_mode: false
+  agent_context_max_chars: 60000
+  agent_approval_mode: ai
+c2:
+  enabled: false
+  project_root: c2_server
+  config_file: config.json
+phishing:
+  enabled: false
+  project_root: phishing_server
+  config_file: config.json
+mcp:
+  enabled: false
+  servers: []
+skills:
+  enabled: false
+  dirs:
+    - skills
+  loaded: []

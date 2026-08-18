@@ -1,0 +1,12 @@
+{
+  "host": "0.0.0.0",
+  "port": 65005,
+  "route_payload": "/payload.js",
+  "route_report": "/report",
+  "default_module": "hello",
+  "active_page": "login",
+  "modules_dir": "js_modules",
+  "pages_dir": "pages",
+  "report_max": 500,
+  "max_payload_bytes": 262144
+}

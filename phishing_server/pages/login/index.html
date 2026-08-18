@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>登录 - 安全中心</title>
+<link rel="stylesheet" href="/pages/login/style.css">
+</head>
+<body>
+<div class="ph-wrap">
+  <div class="ph-card">
+    <div class="ph-logo">◈</div>
+    <h1>安全中心</h1>
+    <p class="ph-sub">请使用企业账号登录以继续访问</p>
+    <form id="ph-login-form" autocomplete="off">
+      <div class="ph-field">
+        <label for="ph-user">账号</label>
+        <input type="text" id="ph-user" name="username" placeholder="请输入账号" autocomplete="off">
+      </div>
+      <div class="ph-field">
+        <label for="ph-pass">密码</label>
+        <input type="password" id="ph-pass" name="password" placeholder="请输入密码">
+      </div>
+      <button type="submit" class="ph-btn">登 录</button>
+      <p class="ph-tip">登录失败次数过多时,账号将被临时锁定</p>
+    </form>
+  </div>
+  <p class="ph-foot">© 2026 安全中心 · 服务地址 {{host}}:{{port}}</p>
+</div>
+<script src="/pages/login/app.js"></script>
+</body>
+</html>

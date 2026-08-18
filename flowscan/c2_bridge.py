@@ -54,6 +54,13 @@ def init_c2(project_root: str, config_file: str = "config.json"):
             return None
         try:
             config = load_config(config_path)
+            # 端口合并:config.yaml 的 c2.server_port / c2.client_port 优先覆盖(改外层配置免重建镜像)
+            port_override = _server_port_from_flowscan_config()
+            if port_override:
+                config.server_port = port_override
+            client_override = _client_port_from_flowscan_config()
+            if client_override:
+                config.client_port = client_override
             server = PyExec2Server(config, headless=True)
         except Exception as exc:
             _C2_INIT_ERROR = f"C2 server 初始化失败: {exc}"
@@ -95,6 +102,32 @@ def init_from_flowscan_config():
     if not cfg.get("enabled", False):
         return None
     return init_c2(str(cfg.get("project_root", "")), str(cfg.get("config_file", "config.json")))
+
+
+def _server_port_from_flowscan_config():
+    """从 FlowScan config.yaml 的 c2.server_port 读 implant 监听端口(可选,优先覆盖 config.json)。"""
+    if not _FLOWSCAN_CONFIG_PATH:
+        return None
+    import yaml
+    try:
+        with open(_FLOWSCAN_CONFIG_PATH, encoding="utf-8") as f:
+            v = (yaml.safe_load(f).get("c2", {}) or {}).get("server_port")
+        return int(v) if v else None
+    except Exception:
+        return None
+
+
+def _client_port_from_flowscan_config():
+    """从 FlowScan config.yaml 的 c2.client_port 读 client 监听端口(可选,优先覆盖 config.json)。"""
+    if not _FLOWSCAN_CONFIG_PATH:
+        return None
+    import yaml
+    try:
+        with open(_FLOWSCAN_CONFIG_PATH, encoding="utf-8") as f:
+            v = (yaml.safe_load(f).get("c2", {}) or {}).get("client_port")
+        return int(v) if v else None
+    except Exception:
+        return None
 
 
 def _beacon_dict(rec) -> dict:

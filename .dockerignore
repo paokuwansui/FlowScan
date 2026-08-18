@@ -1,0 +1,21 @@
+# ── 运行时数据/敏感配置:不进镜像,由 docker-compose 挂载提供 ──
+config.yaml
+reports/
+state_snapshots/
+*.log
+
+# ── C2 运行时产物(代码保留) ──
+c2_server/events.jsonl
+c2_server/s_modules/output/
+
+# ── 宿主调试用大二进制(镜像内由 install/*.sh 安装,仓库副本仅宿主用) ──
+bin/afrog
+bin/cdncheck
+bin/dnsx
+bin/ksubdomain
+
+# ── 缓存与版本控制 ──
+__pycache__/
+*.pyc
+.git/
+.env

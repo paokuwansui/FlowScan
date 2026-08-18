@@ -1,0 +1,24 @@
+/* 仿 Chrome 崩溃页(Aw, Snap!)— 浅色 Chrome 原版风格 */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  background: #fff;
+  color: #202124;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.chrome-snap { max-width: 560px; width: 92%; text-align: center; padding: 40px 0; }
+.snap-illustration { margin-bottom: 20px; }
+.snap-face { width: 110px; height: 110px; }
+.snap-title { font-size: 22px; font-weight: 400; margin-bottom: 10px; color: #202124; }
+.snap-desc { font-size: 14px; color: #5f6368; margin-bottom: 22px; }
+.snap-actions { display: flex; gap: 12px; justify-content: center; margin-bottom: 20px; }
+.snap-btn {
+  background: #1a73e8; color: #fff; border: none; border-radius: 4px;
+  padding: 8px 24px; font-size: 14px; cursor: pointer;
+}
+.snap-btn:hover { background: #1765cc; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+.snap-code { font-size: 12px; color: #5f6368; margin-bottom: 12px; font-family: "Google Sans", Roboto, Arial, sans-serif; }
+.snap-tips { font-size: 13px; color: #5f6368; }

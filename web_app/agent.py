@@ -14,6 +14,7 @@ from flask import jsonify, redirect, request, url_for
 
 from flowscan import c2_bridge
 from flowscan import webshell as ws
+from flowscan import phishing_bridge
 from flowscan.agent_tools import exec_http, exec_python, exec_shell
 from flowscan.config import load_yaml
 from flowscan.filter import add_redis_rule
@@ -122,11 +123,17 @@ AGENT_TOOLS = [
     {"type": "function", "function": {"name": "xray_report", "description": "读取 xray 被动扫描 JSON 报告(reports/xray_out.json),返回漏洞发现列表(严重等级/插件/URL/payload),可搜索、限量。", "parameters": {"type": "object", "properties": {
         "limit": {"type": "integer", "description": "返回条数上限,默认 20"},
         "search": {"type": "string", "description": "按插件名/漏洞类别/URL/payload 模糊搜索关键字,可选"}}}}},
+    {"type": "function", "function": {"name": "phishing_build", "description": "构建钓鱼页面 JS 反连 payload(选模块+参数 → JS 代码;xss_payload 模块额外返回 <script src> 注入代码)。用于 XSS 钓鱼/XSS 验证场景。", "parameters": {"type": "object", "properties": {
+        "name": {"type": "string", "description": "JS 模块名(hello/cookie_stealer/keylogger/screen/xss_payload/custom)"},
+        "args": {"type": "object", "description": "模块参数(如 {\"interval\": \"5000\"})"},
+        "host": {"type": "string", "description": "反连地址,可选"}}, "required": ["name"]}}},
+    {"type": "function", "function": {"name": "phishing_reports", "description": "读取钓鱼页面受害浏览器回传记录(类型/IP/URL/数据)。", "parameters": {"type": "object", "properties": {
+        "limit": {"type": "integer", "description": "返回条数,默认 20"}}}}},
 ]
 
 _AGENT_DANGEROUS = ("remove_event", "blacklist_add", "http_request", "run_python", "run_shell", "c2_exec",
                     "c2_raw", "c2_module_add", "c2_module_delete", "c2_auto_commands_set",
-                    "webshell_exec", "webshell_fileop", "mcp_call",
+                    "webshell_exec", "webshell_fileop", "mcp_call", "phishing_build",
                     "web_browse", "browser_navigate", "browser_click", "browser_type")
 
 # ── 工具集按需裁剪 ──
@@ -143,6 +150,7 @@ _TOOL_GROUP_NAMES = {
     "exec": ["http_request", "run_python", "run_shell"],
     "web": ["web_search", "web_browse", "browser_navigate", "browser_state",
             "browser_click", "browser_type", "browser_screenshot"],
+    "phishing": ["phishing_build", "phishing_reports"],
 }
 
 # 任务关键词 → 工具组(命中任一即注入该组)
@@ -151,6 +159,7 @@ _TOOL_GROUP_KEYWORDS = {
     "webshell": ["webshell", "shell", "后门", "蚁剑", "冰蝎", "菜刀", "马"],
     "mcp": ["mcp", "yakit", "dnslog", "外部工具", "被动扫描工具"],
     "exec": ["python", "脚本", "代码", "命令", "执行", "bash", "写文件", "跑一下", "curl", "http 请求"],
+    "phishing": ["钓鱼", "xss", "反连", "钓鱼页面", "script src", "受害", "浏览器回传"],
 }
 _DEFAULT_EXTRA_GROUPS = ("web",)   # 搜索/浏览默认开(情报收集基础能力)
 
@@ -683,6 +692,33 @@ def _dispatch_agent_tool(name: str, args: Dict[str, Any], redis: FlowScanRedis,
                     "create_time_iso": f.get("create_time_iso", "")} for f in findings[:limit]]
             result = json.dumps({"ok": True, "total": total, "returned": len(out),
                                  "findings": out}, ensure_ascii=False)
+    elif name == "phishing_build":
+        srv = phishing_bridge.init_from_flowscan_config()
+        if not srv:
+            result = json.dumps({"ok": False, "error": "钓鱼页面未启用或启动失败: " + phishing_bridge.init_error()}, ensure_ascii=False)
+        else:
+            mod_args = args.get("args") or {}
+            if not isinstance(mod_args, dict):
+                mod_args = {}
+            mod_name = str(args.get("name") or "").strip()
+            host = str(args.get("host") or "").strip()
+            res = phishing_bridge.build_payload(mod_name, mod_args, host=host)
+            if res.get("ok"):
+                out = {"ok": True, "module": res.get("module", ""), "code": res["code"]}
+                if res.get("module") == "xss_payload":
+                    tag = phishing_bridge.build_script_tag(res.get("module", ""), mod_args, host=host)
+                    out["script_tag"] = tag.get("tag", "") if tag.get("ok") else ""
+                result = json.dumps(out, ensure_ascii=False)
+            else:
+                result = json.dumps({"ok": False, "error": res.get("error", "构建失败")}, ensure_ascii=False)
+    elif name == "phishing_reports":
+        srv = phishing_bridge.init_from_flowscan_config()
+        if not srv:
+            result = json.dumps({"ok": False, "error": "钓鱼页面未启用或启动失败: " + phishing_bridge.init_error()}, ensure_ascii=False)
+        else:
+            limit = min(int(args.get("limit") or 20), 100)
+            reports = phishing_bridge.list_reports(limit)
+            result = json.dumps({"ok": True, "count": len(reports), "reports": reports}, ensure_ascii=False)
     else:
         result = json.dumps({"ok": False, "error": f"未知工具: {name}"}, ensure_ascii=False)
     duration = time.time() - t0

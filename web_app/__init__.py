@@ -11,6 +11,7 @@ import threading
 from flask import Flask
 
 from flowscan import c2_bridge
+from flowscan import phishing_bridge
 from flowscan.config import load_yaml
 from flowscan.redis_store import FlowScanRedis
 from flowscan.utils import project_root
@@ -91,6 +92,7 @@ def create_app(config_path: str = "config.yaml", modules_dir: str = "modules") -
 
     app.config["get_redis"] = get_redis
     c2_bridge.set_flowscan_config(config_path)
+    phishing_bridge.set_flowscan_config(config_path)
 
     # 公共模板 filter:Unix 时间戳 → 人读时间(模板里 `{{ ts|fmt_ts }}`)
     app.jinja_env.filters["fmt_ts"] = fmt_ts

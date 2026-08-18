@@ -26,6 +26,19 @@ except Exception:
     fi
 }
 
+# 从 config.yaml 读取 redis 端口(配置驱动:配置文件写哪个端口就监听哪个)
+redis_port() {
+    if [ -f "${CONFIG_PATH}" ] && command -v "${PYTHON}" >/dev/null 2>&1; then
+        "${PYTHON}" -c 'import sys
+try:
+    import yaml
+    cfg = yaml.safe_load(open(sys.argv[1])) or {}
+    print((cfg.get("redis") or {}).get("redis_port") or 6379, end="")
+except Exception:
+    print(6379, end="")' "${CONFIG_PATH}" 2>/dev/null
+    fi
+}
+
 # ── 0. 配置兜底：镜像内无 config.yaml（docker run 未挂载）时用 example 生成 ──
 if [ ! -f "${CONFIG_PATH}" ]; then
     if [ -f "${PROJECT_DIR}/config.yaml.example" ]; then
@@ -36,18 +49,16 @@ if [ ! -f "${CONFIG_PATH}" ]; then
     fi
 fi
 
-# ── 1. web 主节点:无条件随机化密钥 + 启动内嵌 redis + xray ──
+# ── 1. web 主节点:启动内嵌 redis + xray ──
+# (密钥随机化已挪至 docker/up.sh 执行,容器启动/重启不再变密码,以宿主 config.yaml 为准)
 if [ "${MODE}" = "web" ]; then
-    echo "[ENTRYPOINT] randomizing secrets (unconditional)..."
-    "${PYTHON}" "${PROJECT_DIR}/tools/randomize_secrets.py" "${CONFIG_PATH}" \
-        || echo "[ENTRYPOINT] [WARN] randomize_secrets failed, continuing"
-
     REDIS_PASS="$(redis_password)"
-    echo "[ENTRYPOINT] starting embedded redis (no persistence)..."
+    REDIS_PORT="$(redis_port)"
+    echo "[ENTRYPOINT] starting embedded redis (no persistence) on port ${REDIS_PORT}..."
     if [ -n "${REDIS_PASS}" ]; then
-        redis-server --requirepass "${REDIS_PASS}" --save "" --appendonly no --daemonize yes
+        redis-server --requirepass "${REDIS_PASS}" --port "${REDIS_PORT}" --save "" --appendonly no --daemonize yes
     else
-        redis-server --save "" --appendonly no --daemonize yes
+        redis-server --port "${REDIS_PORT}" --save "" --appendonly no --daemonize yes
     fi
 
     if [ "${FS3_ENABLE_XRAY:-1}" = "1" ]; then
@@ -73,8 +84,9 @@ if [ "${NEEDS_REDIS}" = "1" ]; then
     REDIS_PASS="${FS3_REDIS_PASSWORD:-}"
 
     if [ "${MODE}" = "web" ]; then
-        # web 主节点连本机内嵌 redis
+        # web 主节点连本机内嵌 redis(端口/密码都从 config.yaml 读,配置驱动)
         REDIS_HOST="127.0.0.1"
+        REDIS_PORT="$(redis_port)"
         REDIS_PASS="$(redis_password)"
     elif [ -z "${REDIS_PASS}" ] && [ -f "${CONFIG_PATH}" ]; then
         # worker 未显式传密码时,回退读挂载的 config.yaml

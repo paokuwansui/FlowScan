@@ -21,20 +21,15 @@ services:
       - NET_RAW
     command: ["worker"]
     environment:
+      - PYTHONUNBUFFERED=1            # worker 状态输出实时进 docker logs(否则块缓冲看不到)
       - FS3_NODE_ID=${FS3_NODE_ID:-}
       - FS3_REDIS_HOST=${FS3_REDIS_HOST:-main}
       - FS3_REDIS_PORT=${FS3_REDIS_PORT:-6379}
       - FS3_REDIS_PASSWORD=${FS3_REDIS_PASSWORD:-}
     volumes:
-      - ./config.yaml:/app/config.yaml:ro
+      # worker 挂载独立的 config.worker.yaml(redis_host 填主节点 IP,全部走宿主端口映射);
+      # 部署前: cp config.worker.yaml.example config.worker.yaml 并修改 redis_host
+      - ./config.worker.yaml:/app/config.yaml:ro
       - ./state_snapshots:/app/state_snapshots
-    networks:
-      - fs3net
-
-networks:
-  # 复用主节点 compose 创建的 fs3net 网络(同机部署时 worker 可直接用 redis 服务名)
-  # 跨机部署时该网络仅作默认,实际连接走 FS3_REDIS_HOST 主节点 IP
-  fs3net:
-    external: true
-    name: flowscan_fs3net
+    # 无自定义网络:默认 bridge。redis 连接全部走宿主端口映射(无内网互联机制)
 

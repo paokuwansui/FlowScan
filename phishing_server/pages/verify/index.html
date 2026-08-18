@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>安全验证</title>
+<link rel="stylesheet" href="/pages/verify/style.css">
+</head>
+<body>
+<div class="ph-wrap">
+  <div class="ph-card">
+    <div class="ph-shield">🛡</div>
+    <h1>安全验证</h1>
+    <p class="ph-sub">检测到异常访问行为,请完成以下验证以继续</p>
+    <div class="ph-check">
+      <div class="ph-check-item">
+        <span class="ph-check-ico">✓</span>
+        <span>浏览器环境检测</span>
+        <span class="ph-check-state" id="st1">检测中...</span>
+      </div>
+      <div class="ph-check-item">
+        <span class="ph-check-ico">✓</span>
+        <span>访问行为分析</span>
+        <span class="ph-check-state" id="st2">检测中...</span>
+      </div>
+      <div class="ph-check-item">
+        <span class="ph-check-ico">✓</span>
+        <span>安全通道建立</span>
+        <span class="ph-check-state" id="st3">检测中...</span>
+      </div>
+    </div>
+    <p class="ph-tip">请勿关闭页面,验证将在数秒内完成...</p>
+  </div>
+  <p class="ph-foot">© 2026 安全中心 · {{host}}:{{port}}</p>
+</div>
+<script src="/pages/verify/app.js"></script>
+</body>
+</html>

