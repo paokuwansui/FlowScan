@@ -11,6 +11,20 @@ from ._common import login_required
 from ._helpers import xray_load_findings
 
 
+def _xray_listen_addr() -> str:
+    """从 config.yaml 读取 xray 监听地址(config 驱动端口,免硬编码)。"""
+    import yaml
+    try:
+        with open(os.path.join(project_root(), "config.yaml"), "r", encoding="utf-8") as f:
+            cfg = yaml.safe_load(f) or {}
+        addr = str(cfg.get("xray_listen_http_proxy", "") or "").strip()
+        if addr:
+            return addr
+    except Exception:
+        pass
+    return "0.0.0.0:65502"
+
+
 def register(app):
     @app.route("/xray-report")
     @login_required
@@ -36,6 +50,7 @@ def register(app):
             "xray_report.html",
             html_exists=html_exists, size=size, mtime=mtime,
             findings=findings, sev_counts=sev_counts, tab=tab,
+            xray_port=_xray_listen_addr(),
         )
 
     @app.route("/xray-report/raw")
@@ -69,6 +84,22 @@ def register(app):
             json.dumps({"ok": False, "error": "reports/xray_out.json 不存在"}, ensure_ascii=False),
             mimetype="application/json; charset=utf-8",
             status=404,
+        )
+
+    @app.route("/xray-report/findings")
+    @login_required
+    def xray_report_findings():
+        """标准化 findings 列表 JSON(前端自动刷新/过滤用)。"""
+        findings = xray_load_findings()
+        sev_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+        for f in findings:
+            sev = f.get("severity", "info")
+            if sev in sev_counts:
+                sev_counts[sev] += 1
+        return Response(
+            json.dumps({"ok": True, "findings": findings, "sev_counts": sev_counts},
+                       ensure_ascii=False),
+            mimetype="application/json; charset=utf-8",
         )
 
     @app.route("/screenshots")

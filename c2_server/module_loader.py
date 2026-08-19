@@ -13,11 +13,32 @@ JSON 序列模块: steps 串联 python 模块；加载后统一校验引用存�
 嵌套 JSON 引用直接拒绝。
 """
 
+import io
 import json
 import logging
 import os
+import tokenize
 from dataclasses import dataclass, field
 from typing import Optional
+
+# 下发载荷的 Python 注释剥离器(tokenize 安全,保留字符串字面量与 docstring):
+# 仅移除 # 注释,不影响代码语义、MODULE dict、docstring 与普通字符串。
+def strip_py_comments(source: str) -> str:
+    """移除源码中全部 # 注释,保留 docstring,返回紧凑代码(保持可编译)。"""
+    if not source.strip():
+        return source
+    lines = source.split("\n")
+    # tokenize 精确删除 COMMENT token(仅挖掉注释文本,不删整行,行尾注释安全)
+    try:
+        tokens = list(tokenize.generate_tokens(io.StringIO(source).readline))
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        return source
+    cuts = [(t.start[0], t.start[1], t.end[1])
+            for t in tokens if t.type == tokenize.COMMENT]
+    for lineno, c0, c1 in sorted(cuts, reverse=True):
+        ln = lines[lineno - 1]
+        lines[lineno - 1] = ln[:c0] + ln[c1:]
+    return "\n".join(lines).rstrip() + "\n"
 
 from server.core.log import get_logger
 from . import module_meta
@@ -208,7 +229,7 @@ class ModuleLoader:
                 else f"result = {func_name}()")
         code = (
             f"# --- module: {mod.name} ({func_name}) ---\n"
-            f"{mod.code}\n\n"
+            f"{strip_py_comments(mod.code)}\n\n"
             f"{call}\n"
             f"print(result)\n"
         )

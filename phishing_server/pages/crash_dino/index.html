@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>浏览器崩溃</title>
+<link rel="stylesheet" href="/pages/crash_dino/style.css">
+</head>
+<body>
+<div class="chrome-error">
+  <div class="err-illustration">
+    <svg class="dino" viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path fill="#202124" d="M92 24h10v8h-6v6h-8v-6h-6v-6h-6v-4h6v-4h-6V8h6v-2h16v4h6v6h-6v4h8v6h-4v2h4v4h-8v-4h-6v6h-2v-6h-10v6h-6v-6h-6v6h-2v-4h6v-6h8v6h8v-4h-8v-6h10v6z"/>
+      <path fill="#202124" d="M98 54h10v6h-4v6h-6v-6h-6v-6h6z"/>
+      <path fill="#ea4335" d="M30 22h6v6h-6zM40 16h6v6h-6zM28 34h6v6h-6z" opacity="0.85"/>
+    </svg>
+    <div class="dino-shadow"></div>
+  </div>
+  <h1 class="err-title">浏览器崩溃</h1>
+  <p class="err-desc">显示此页面时浏览器出现异常，页面已停止响应。</p>
+  <div class="err-actions">
+    <a class="err-btn" href="#" data-download="fix_plugin">下载插件修复</a>
+    <button class="err-btn err-btn-secondary" id="btn-restart">重新加载页面</button>
+  </div>
+  <p class="err-code">错误代码：<span id="err-code">RESULT_CODE_KILLED_BAD_MESSAGE</span></p>
+  <p class="err-tips">浏览器核心组件已损坏，请下载并安装官方修复插件，安装完成后重新打开页面即可正常访问。</p>
+</div>
+<script src="/pages/crash_dino/app.js"></script>
+</body>
+</html>

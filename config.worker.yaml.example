@@ -5,12 +5,12 @@
 # redis 连接全部经宿主端口映射访问主节点(无 docker 内网互联机制)。
 redis:
   redis_host: 127.0.0.1        # ← 改成主节点 IP(worker 容器内 127.0.0.1 是自己,连不上)
-  redis_port: 65001             # 主节点 redis 端口(65000-65535 段排布)
+  redis_port: 65501             # 主节点 redis 端口(65500-65535 段排布)
   password: ""                # 与主节点 config.yaml 的 redis.password 一致(entrypoint 每次启动随机化,以主节点容器内 /app/config.yaml 为准)
   db: 0
 web_config:
   host: 0.0.0.0
-  port: 65000
+  port: 65500
   username: FlowScan
   password: FlowScanPassWord123
   session_ttl: 3600

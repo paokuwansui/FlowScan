@@ -1,9 +1,9 @@
 {
   "server_host": "0.0.0.0",
-  "server_port": 65003,
-  "client_port": 65004,
+  "server_port": 65503,
+  "client_port": 65504,
   "socket_timeout": 30,
-  "implant_key": "",
+  "implant_key": "c2a26a985282f1047b65fde4f36436edb33b659aa916158dc424df8f64d690fd",
   "client_key": "",
   "modules_dir": "modules",
   "server_modules_dir": "s_modules",

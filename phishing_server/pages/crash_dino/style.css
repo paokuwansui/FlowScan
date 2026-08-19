@@ -1,0 +1,40 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: #f8f9fa;
+  color: #202124;
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+}
+.chrome-error {
+  width: 100%; max-width: 560px;
+  text-align: center;
+  padding: 2rem 1.5rem;
+}
+.err-illustration { margin-bottom: 1.2rem; position: relative; display: inline-block; }
+.dino { width: 120px; height: 120px; }
+.dino-shadow {
+  width: 90px; height: 8px;
+  margin: -6px auto 0;
+  background: radial-gradient(ellipse, rgba(0,0,0,0.22) 0%, transparent 70%);
+  border-radius: 50%;
+}
+.err-title { font-size: 1.5rem; font-weight: 500; margin-bottom: 0.5rem; }
+.err-desc { color: #5f6368; font-size: 0.92rem; margin-bottom: 1.4rem; }
+.err-actions { display: flex; gap: 0.7rem; justify-content: center; margin-bottom: 1.4rem; }
+.err-btn {
+  background: #1a73e8; color: #fff; border: none;
+  border-radius: 22px; padding: 0.55rem 1.5rem;
+  font-size: 0.88rem; cursor: pointer;
+  box-shadow: 0 1px 3px rgba(60,64,67,0.3);
+  transition: box-shadow 150ms;
+}
+.err-btn:hover { box-shadow: 0 2px 6px rgba(60,64,67,0.35); }
+.err-btn-secondary {
+  background: #fff; color: #1a73e8; border: 1px solid #dadce0;
+  box-shadow: none;
+}
+.err-btn-secondary:hover { background: #f8f9fa; box-shadow: none; }
+.err-code { color: #80868b; font-size: 0.78rem; margin-bottom: 0.8rem; }
+.err-tips { color: #80868b; font-size: 0.8rem; line-height: 1.6; }

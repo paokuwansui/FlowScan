@@ -16,12 +16,30 @@
 </nav>
 {% endif %}
 
-{# ── JSON 报告 Tab：结构化漏洞列表 ── #}
+{# ── JSON 报告 Tab:结构化漏洞列表(前端渲染:搜索/过滤/分组/去重/自动刷新) ── #}
 <div id="tab-json" {% if tab != 'json' %}style="display:none"{% endif %}>
     {% if findings %}
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+        <div class="form-group" style="margin:0;flex:1;min-width:220px;">
+            <input type="text" id="xr-search" class="form-control" placeholder="搜索 URL / host / 插件 / payload..." style="font-size:0.8rem;" aria-label="搜索漏洞">
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;" id="xr-sev-filter" role="group" aria-label="按严重等级过滤">
+            <button class="btn btn-sm xr-sev-btn active" data-sev="all">全部</button>
+            <button class="btn btn-sm xr-sev-btn" data-sev="critical" style="color:var(--danger);border-color:var(--danger);">Critical</button>
+            <button class="btn btn-sm xr-sev-btn" data-sev="high" style="color:var(--warning);border-color:var(--warning);">High</button>
+            <button class="btn btn-sm xr-sev-btn" data-sev="medium" style="color:var(--accent);border-color:var(--accent);">Medium</button>
+            <button class="btn btn-sm xr-sev-btn" data-sev="low">Low</button>
+            <button class="btn btn-sm xr-sev-btn" data-sev="info">Info</button>
+        </div>
+        <button class="btn btn-sm" id="xr-expand-all">展开全部</button>
+        <button class="btn btn-sm" id="xr-collapse-all">收起全部</button>
+        <label style="display:flex;align-items:center;gap:6px;font-size:0.76rem;color:var(--text-muted);cursor:pointer;">
+            <input type="checkbox" id="xr-autorefresh" checked> 自动刷新
+        </label>
+    </div>
     <div class="mini-stats" style="margin-bottom:16px;">
         <div class="mini-stat">
-            <span class="ms-value">{{ findings|length }}</span>
+            <span class="ms-value" id="xr-total">{{ findings|length }}</span>
             <span class="ms-label">发现总数</span>
         </div>
         <div class="mini-stat">
@@ -41,33 +59,10 @@
             <span class="ms-label">Low / Info</span>
         </div>
     </div>
-    <div style="display:grid;gap:12px;">
-        {% for f in findings %}
-        <div class="card" style="padding:14px 16px;">
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
-                <span class="badge {{ sev_badge[f.severity] }}">{{ f.severity }}</span>
-                <span class="mono" style="color:var(--accent);font-size:0.82rem;">{{ f.plugin }}</span>
-                {% if f.vuln_class %}
-                <span class="badge badge-purple">{{ f.vuln_class }}</span>
-                {% endif %}
-                {% if f.create_time_iso %}
-                <span class="mono" style="margin-left:auto;color:var(--text-faint);font-size:0.7rem;">{{ f.create_time_iso }}</span>
-                {% endif %}
-            </div>
-            {% if f.url %}
-            <div class="mono" style="font-size:0.78rem;word-break:break-all;margin-bottom:6px;">
-                {{ f.url }}{% if f.port %} <span style="color:var(--text-faint);">({{ f.host or '?' }}:{{ f.port }})</span>{% endif %}
-            </div>
-            {% endif %}
-            {% if f.payload %}
-            <pre class="mono" style="margin:0;padding:10px 12px;background:rgba(3,7,15,.55);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:0.75rem;white-space:pre-wrap;word-break:break-all;max-height:180px;overflow-y:auto;">{{ (f.payload or '')[:900] }}{% if f.payload|length > 900 %}…{% endif %}</pre>
-            {% endif %}
-        </div>
-        {% endfor %}
-    </div>
+    <div id="xr-groups" style="display:grid;gap:12px;"></div>
     <div style="margin-top:14px;display:flex;gap:10px;align-items:center;">
         <a class="btn btn-sm btn-primary" href="{{ url_for('xray_report_json') }}" target="_blank">原始 JSON</a>
-        <button class="btn btn-sm" onclick="location.reload()">刷新状态</button>
+        <button class="btn btn-sm" onclick="xrLoad()">立即刷新</button>
     </div>
     {% else %}
     <div class="empty-state" style="margin-top:30px;">
@@ -76,7 +71,7 @@
     {% endif %}
 </div>
 
-{# ── HTML 报告 Tab：iframe 展示 ── #}
+{# ── HTML 报告 Tab:iframe 展示 ── #}
 <div id="tab-html" {% if tab != 'html' %}style="display:none"{% endif %}>
     {% if html_exists %}
     <div class="card">
@@ -112,10 +107,201 @@
         <h3 style="justify-content:center;margin-bottom:8px;">xray 还没有输出被动扫描报告</h3>
         <p class="help-text" style="margin:0 auto 10px;max-width:560px;">
             xray 被动代理运行时会同时把扫描结果写到 <code>reports/xray_out.json</code> 与 <code>reports/xray_out.html</code>。<br>
-            请确认主节点容器内 xray 已启动（默认监听 <code>7777</code>，见 <code>start_xray.sh</code>），并把目标流量（浏览器或 katana）导向该代理。
+            请确认主节点容器内 xray 已启动（默认监听 <code>{{ xray_port }}</code>，端口见 <code>config.yaml</code> 的 <code>xray_listen_http_proxy</code>），并把目标流量（浏览器或 katana）导向该代理。
         </p>
         <button class="btn btn-sm" onclick="location.reload()">刷新状态</button>
     </div>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ══════════ xray 报告前端渲染:去重 / host 分组 / 搜索 / severity 过滤 / payload 展开 / 自动刷新 ══════════
+var xrFindings = {{ findings | tojson | safe }};
+var xrSevBadge = {'critical': 'badge-danger', 'high': 'badge-warn', 'medium': 'badge-event', 'low': 'badge-muted', 'info': 'badge-muted'};
+var xrSearch = '';
+var xrSev = 'all';
+var xrTimer = null;
+var xrCollapsed = {};   // key -> true 表示该组折叠
+
+function xrHost(f) {
+    var h = f.host || '';
+    if (h) return h;
+    try {
+        var u = new URL(f.url);
+        return u.hostname || '';
+    } catch (e) { return ''; }
+}
+
+// 去重:同 host + plugin + url 合并,计数
+function xrDedup(list) {
+    var map = {};
+    var order = [];
+    list.forEach(function (f) {
+        var key = xrHost(f) + '|' + f.plugin + '|' + f.url;
+        if (map[key]) {
+            map[key].count++;
+            map[key].items.push(f);
+        } else {
+            map[key] = {count: 1, items: [f], f: f};
+            order.push(key);
+        }
+    });
+    return order.map(function (k) { return map[k]; });
+}
+
+function xrMatches(f) {
+    if (xrSev !== 'all' && f.severity !== xrSev) return false;
+    if (!xrSearch) return true;
+    var hay = (f.url + ' ' + f.host + ' ' + f.plugin + ' ' + f.vuln_class + ' ' + f.payload).toLowerCase();
+    return hay.indexOf(xrSearch.toLowerCase()) !== -1;
+}
+
+function xrRender() {
+    var groups = {};
+    var order = [];
+    xrDedup(xrFindings).forEach(function (g) {
+        var items = g.items.filter(xrMatches);
+        if (!items.length) return;
+        var h = xrHost(g.f);
+        if (!groups[h]) { groups[h] = []; order.push(h); }
+        groups[h].push({count: g.count, items: items, f: g.f});
+    });
+    // 统计过滤后总数
+    var total = order.reduce(function (n, h) {
+        return n + groups[h].reduce(function (m, g) { return m + g.count; }, 0);
+    }, 0);
+    var t = document.getElementById('xr-total');
+    if (t) t.textContent = total;
+
+    var box = document.getElementById('xr-groups');
+    if (!box) return;
+    if (!order.length) {
+        box.innerHTML = '<div class="empty-state" style="padding:30px;"><p>没有匹配的漏洞</p></div>';
+        return;
+    }
+    var html = '';
+    order.forEach(function (h) {
+        var key = h || '(unknown)';
+        var collapsed = xrCollapsed[key];
+        var group = groups[h];
+        var n = group.reduce(function (m, g) { return m + g.count; }, 0);
+        html += '<div class="card" style="padding:0;overflow:hidden;">';
+        html += '<div class="card-title" style="cursor:pointer;padding:10px 16px;" onclick="xrToggleGroup(\'' + escapeHtml(key) + '\')">';
+        html += '<span style="font-weight:600;font-size:0.82rem;color:var(--accent);">' + (collapsed ? '▸' : '▾') + '</span> ';
+        html += '<span class="mono" style="font-size:0.82rem;color:var(--text);">' + escapeHtml(h || '(unknown)') + '</span>';
+        html += '<span class="cnt" style="margin-left:8px;">' + n + '</span>';
+        html += '</div>';
+        if (!collapsed) {
+            html += '<div style="padding:4px 16px 14px;">';
+            group.forEach(function (g) {
+                var f = g.f;
+                var sev = f.severity || 'info';
+                html += '<div style="border-top:1px solid var(--border);padding:10px 0 0;margin-top:10px;">';
+                html += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">';
+                html += '<span class="badge ' + (xrSevBadge[sev] || 'badge-muted') + '">' + escapeHtml(sev) + '</span>';
+                html += '<span class="mono" style="color:var(--accent);font-size:0.8rem;">' + escapeHtml(f.plugin) + '</span>';
+                if (f.vuln_class) html += '<span class="badge badge-purple">' + escapeHtml(f.vuln_class) + '</span>';
+                if (g.count > 1) html += '<span class="badge badge-event" title="相同 plugin+URL 去重合并">×' + g.count + '</span>';
+                if (f.create_time_iso) html += '<span class="mono" style="margin-left:auto;color:var(--text-faint);font-size:0.7rem;">' + escapeHtml(f.create_time_iso) + '</span>';
+                html += '</div>';
+                if (f.url) {
+                    html += '<div class="mono" style="font-size:0.78rem;word-break:break-all;margin-bottom:6px;">';
+                    html += escapeHtml(f.url);
+                    if (f.port) html += ' <span style="color:var(--text-faint);">(' + escapeHtml(f.host || '?') + ':' + escapeHtml(String(f.port)) + ')</span>';
+                    html += '</div>';
+                }
+                // payload 全文:点击展开/折叠
+                var payloads = g.items.map(function (i) { return i.payload || ''; }).filter(Boolean);
+                var uniqP = [];
+                payloads.forEach(function (p) { if (uniqP.indexOf(p) === -1) uniqP.push(p); });
+                if (uniqP.length) {
+                    var pid = 'xr-pay-' + Math.random().toString(36).slice(2, 8);
+                    html += '<div class="xr-payload-wrap" style="margin-top:4px;">';
+                    html += '<details class="xr-payload"><summary style="cursor:pointer;font-size:0.72rem;color:var(--text-muted);">payload' + (uniqP.length > 1 ? ' ×' + uniqP.length : '') + '</summary>';
+                    html += '<div style="margin-top:6px;">';
+                    uniqP.forEach(function (p) {
+                        html += '<pre class="mono" style="margin:0 0 8px;padding:10px 12px;background:rgba(3,7,15,.55);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:0.75rem;white-space:pre-wrap;word-break:break-all;max-height:260px;overflow-y:auto;">' + escapeHtml(p) + '</pre>';
+                    });
+                    html += '</div></details></div>';
+                }
+                html += '</div>';
+            });
+            html += '</div>';
+        }
+        html += '</div>';
+    });
+    box.innerHTML = html;
+}
+
+function xrToggleGroup(key) {
+    xrCollapsed[key] = !xrCollapsed[key];
+    xrRender();
+}
+
+function xrExpandAll() {
+    xrCollapsed = {};
+    xrRender();
+}
+
+function xrCollapseAll() {
+    Object.keys(xrCollapsed).forEach(function (k) { xrCollapsed[k] = true; });
+    // 兜底:收集所有组 key
+    xrDedup(xrFindings).forEach(function (g) { xrCollapsed[xrHost(g.f) || '(unknown)'] = true; });
+    xrRender();
+}
+
+async function xrLoad() {
+    try {
+        var r = await fetch('{{ url_for("xray_report_findings") }}', {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+        var d = await r.json();
+        if (d.ok) {
+            xrFindings = d.findings || [];
+            xrRender();
+        }
+    } catch (e) {}
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    var box = document.getElementById('xr-groups');
+    if (!box) return;
+    xrRender();
+
+    var search = document.getElementById('xr-search');
+    if (search) {
+        search.addEventListener('input', function () {
+            xrSearch = this.value.trim();
+            xrRender();
+        });
+    }
+
+    document.querySelectorAll('.xr-sev-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.xr-sev-btn').forEach(function (b) { b.classList.remove('active'); });
+            this.classList.add('active');
+            xrSev = this.getAttribute('data-sev');
+            xrRender();
+        });
+    });
+
+    var ex = document.getElementById('xr-expand-all');
+    if (ex) ex.addEventListener('click', xrExpandAll);
+    var cl = document.getElementById('xr-collapse-all');
+    if (cl) cl.addEventListener('click', xrCollapseAll);
+
+    var ar = document.getElementById('xr-autorefresh');
+    if (ar) {
+        ar.addEventListener('change', function () {
+            if (this.checked) {
+                xrTimer = setInterval(xrLoad, 15000);
+            } else if (xrTimer) {
+                clearInterval(xrTimer);
+                xrTimer = null;
+            }
+        });
+        if (ar.checked) xrTimer = setInterval(xrLoad, 15000);
+    }
+});
+</script>
 {% endblock %}

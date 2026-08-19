@@ -7,7 +7,7 @@ cd "$SCRIPT_DIR"
 
 # 从 config.yaml 读取监听地址(去行尾注释,防 # 被带入地址)
 LISTEN_ADDR=$(grep -E '^\s*xray_listen_http_proxy:' config.yaml 2>/dev/null | head -1 | cut -d: -f2- | sed 's/#.*//' | xargs)
-LISTEN_ADDR="${LISTEN_ADDR:-http://0.0.0.0:65002}"
+LISTEN_ADDR="${LISTEN_ADDR:-http://0.0.0.0:65502}"
 
 echo "[xray] config listen address: $LISTEN_ADDR"
 

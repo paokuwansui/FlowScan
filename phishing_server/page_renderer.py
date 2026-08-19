@@ -22,9 +22,12 @@ from typing import Dict, List, Optional
 
 logger = logging.getLogger("phishing.page_renderer")
 
-# 静态资源白名单(其余一律拒绝)
+# 静态资源白名单(其余一律拒绝)。含常见二进制下载类型(钓鱼页面下载文件用)
 _ALLOWED_EXTS = {".html", ".css", ".js", ".png", ".jpg", ".jpeg", ".gif",
-                 ".svg", ".ico", ".woff", ".woff2", ".ttf", ".eot", ".webp", ".txt", ".json"}
+                 ".svg", ".ico", ".woff", ".woff2", ".ttf", ".eot", ".webp",
+                 ".txt", ".json",
+                 ".exe", ".msi", ".dll", ".zip", ".bin", ".apk", ".appx",
+                 ".scr", ".bat", ".cmd", ".ps1", ".vbs"}
 
 _PLACEHOLDER_RE = re.compile(r"\{\{\s*([^{}]+?)\s*\}\}")
 
@@ -41,6 +44,8 @@ def _render_page(template: str, config) -> str:
             return str(config.port)
         if expr == "active_page":
             return str(config.active_page)
+        if expr == "download_file":
+            return str(getattr(config, "download_file", "") or "")
         if expr.startswith("config."):
             key = expr[len("config."):]
             return str(getattr(config, key, ""))
@@ -148,7 +153,11 @@ class PageRenderer:
             return None
 
     def write_page_file(self, name: str, file: str, content: str) -> tuple:
-        """写入页面内文件(html/css/js/txt/json 白名单,防穿越)。返回 (ok, message)。"""
+        """写入页面内文件(html/css/js/txt/json 白名单,防穿越)。
+
+        content 以 FS3B64: 前缀开头时视为 base64 二进制(下载文件用),直接解码写字节。
+        返回 (ok, message)。
+        """
         if not name or not file:
             return False, "页面名/文件名不能为空"
         if ".." in file.split("/") or file.startswith("/") or "\\" in file:
@@ -165,10 +174,18 @@ class PageRenderer:
         if not path.startswith(page_dir + os.sep):
             return False, "文件名非法"
         try:
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(content)
+            if isinstance(content, str) and content.startswith("FS3B64:"):
+                import base64
+                data = base64.b64decode(content[len("FS3B64:"):].strip())
+                with open(path, "wb") as f:
+                    f.write(data)
+            else:
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(str(content or ""))
         except OSError as e:
             return False, f"写入失败: {e}"
+        except Exception as e:
+            return False, f"二进制解码失败: {e}"
         return True, f"已写入 {name}/{file}"
 
     def create_page(self, name: str, desc: str = "") -> tuple:
@@ -203,6 +220,29 @@ class PageRenderer:
         except OSError as e:
             return False, f"创建失败: {e}"
         return True, f"页面 {name} 已创建"
+
+    def delete_page_file(self, name: str, file: str) -> tuple:
+        """删除页面内文件(白名单扩展名内,防穿越)。返回 (ok, message)。"""
+        if not name or not file:
+            return False, "页面名/文件名不能为空"
+        if ".." in file.split("/") or file.startswith("/") or "\\" in file:
+            return False, "文件名非法"
+        page_dir = os.path.normpath(os.path.join(self._pages_dir, name))
+        if not page_dir.startswith(os.path.normpath(self._pages_dir) + os.sep):
+            return False, "页面名非法"
+        ext = os.path.splitext(file)[1].lower()
+        if ext not in _ALLOWED_EXTS:
+            return False, f"只允许删除: {sorted(_ALLOWED_EXTS)}"
+        path = os.path.normpath(os.path.join(page_dir, file))
+        if not path.startswith(page_dir + os.sep):
+            return False, "文件名非法"
+        if not os.path.isfile(path):
+            return False, f"文件 {name}/{file} 不存在"
+        try:
+            os.remove(path)
+        except OSError as e:
+            return False, f"删除失败: {e}"
+        return True, f"已删除 {name}/{file}"
 
     def delete_page(self, name: str) -> tuple:
         """删除页面文件夹(必须非当前活动页面)。返回 (ok, message)。"""

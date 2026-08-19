@@ -1,26 +1,31 @@
 #!/usr/bin/env python3
 """
-Quick UFW firewall setup + Docker 发布端口 IP 限制。
+FlowScan 防火墙管理 —— init 封死 + 累加白名单(宿主机 + docker 双链同步,仅 TCP)
 
-背景:Docker 发布端口(-p 8080:8080)的流量走 iptables FORWARD/DOCKER 链,
-不经过 UFW 管理的 INPUT 链——ufw allow from <ip> 对 docker 端口无效。
-正确解法:Docker 官方保留的 DOCKER-USER 链(FORWARD 链最前、专供用户自定义、
-docker 不会清理),对它插入"仅允许指定 IP + 其余拒绝"的规则。
+用法:
+    python3 ufw_setup.py init                                    # 仅 22/tcp 任意 IP 可达,其余端口全部封死
+    python3 ufw_setup.py -p 65500,65501                          # 放行这些端口(全来源;不写 -i = 全网)
+    python3 ufw_setup.py -i 192.168.0.5 -p 65500,65501           # 仅该 IP 可访问(可多次执行,累加不失效)
+    python3 ufw_setup.py -i 192.168.0.1-10 -p 65530-65535        # IP 段 / 端口范围
+    python3 ufw_setup.py -i 192.168.0.0/24 -p 65500              # CIDR
+    python3 ufw_setup.py -i 192.168.0.1,192.168.0.2 -p 65535,65534  # 多 IP / 多端口
+    python3 ufw_setup.py status                                  # 查看双链规则
 
-Usage:
-    python3 ufw_setup.py                                # ensure SSH open + enable UFW
-    python3 ufw_setup.py -p 6379,8080                   # allow any IP to ports(仅 ufw,不限制 docker)
-    python3 ufw_setup.py -p 8080 -i 1.2.3.4,5.6.7.8     # 只允许这些 IP 访问 8080
-                                                        #   → ufw INPUT 规则 + Docker DOCKER-USER 链限制
-    python3 ufw_setup.py status                         # UFW 状态 + Docker 限制规则
-    python3 ufw_setup.py docker-status                  # 查看 DOCKER-USER 链规则
-    python3 ufw_setup.py docker-clear                   # 清空全部 DOCKER-USER 限制(恢复 docker 默认开放)
-    python3 ufw_setup.py docker-save                    # 持久化 iptables 规则(rules.v4,重启保留)
+规则说明:
+- 只放行 TCP(udp 不放行)
+- 宿主机进程流量走 UFW INPUT 链;docker 发布端口流量走 iptables DOCKER-USER 链,两条链同步
+- 规则状态保存在 <项目>/tools/flowscan-firewall.json,重复执行累加,init 重置
+- 所有命令需要 root(sudo 前缀)
 """
 
 import argparse
+import ipaddress
+import json
+import os
 import subprocess
-import sys
+
+# 状态文件默认写项目 tools 目录(与脚本同目录)
+STATE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "flowscan-firewall.json")
 
 
 def run(cmd, check=True):
@@ -34,191 +39,268 @@ def run(cmd, check=True):
         return False, str(e)
 
 
-# ══════════════════════════ UFW 部分 ══════════════════════════
+# ══════════════════════════ 解析器 ══════════════════════════
 
-def ufw_installed():
-    _, out = run("which ufw", check=False)
-    return bool(out and "ufw" in out)
-
-
-def ufw_enabled():
-    _, out = run("sudo ufw status", check=False)
-    return "Status: active" in out
-
-
-def ssh_open_to_any():
-    """Check if port 22/tcp is allowed from anywhere."""
-    _, out = run("sudo ufw status numbered", check=False)
-    for line in out.splitlines():
-        if "22/tcp" in line and "ALLOW" in line and ("Anywhere" in line or "0.0.0.0" in line):
-            return True
-    return False
-
-
-def ensure_ssh():
-    if ssh_open_to_any():
-        print("  SSH (22/tcp) already open to anywhere — skip")
-        return
-    print("  Adding SSH (22/tcp) allow from anywhere...")
-    run("sudo ufw allow 22/tcp")
-
-
-def allow_port(port, ip=None):
-    """Allow tcp+udp on port, optionally restricted to ip(UFW INPUT 链,本地/常规进程用)。"""
-    for proto in ("tcp", "udp"):
-        if ip:
-            rule = f"sudo ufw allow from {ip} to any port {port} proto {proto}"
-            print(f"  Allow {ip} -> :{port}/{proto}")
+def parse_ips(raw):
+    """-i 解析:单 IP / 逗号多 IP / a.b.c.d-m 段 / CIDR。段压缩为 CIDR 集合返回。"""
+    out = []
+    for part in str(raw or "").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "/" in part:
+            ipaddress.ip_network(part, strict=False)   # 校验
+            out.append(part)
+        elif "-" in part:
+            base, _, end = part.rpartition("-")
+            if not base or not end:
+                raise ValueError(f"非法 IP 段: {part}")
+            start = ipaddress.ip_address(base)
+            if "." not in end:
+                end_ip = ipaddress.ip_address(base.rsplit(".", 1)[0] + "." + end)
+            else:
+                end_ip = ipaddress.ip_address(end)
+            if int(end_ip) < int(start):
+                raise ValueError(f"段起点大于终点: {part}")
+            for net in ipaddress.summarize_address_range(start, end_ip):
+                out.append(str(net))
         else:
-            rule = f"sudo ufw allow {port}/{proto}"
-            print(f"  Allow any -> :{port}/{proto}")
-        run(rule)
+            ipaddress.ip_address(part)                 # 校验
+            out.append(part)
+    return out
 
 
-def enable_ufw():
-    if ufw_enabled():
-        print("  UFW already enabled — skip")
+def parse_ports(raw):
+    """-p 解析:单端口 / 逗号多端口 / a-b 范围 → ['a'] 或 ['a:b']。"""
+    out = []
+    for part in str(raw or "").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "-" in part:
+            a, _, b = part.partition("-")
+            lo, hi = int(a), int(b)
+            if not (0 < lo <= hi <= 65535):
+                raise ValueError(f"非法端口范围: {part}")
+            out.append(f"{lo}:{hi}")
+        else:
+            p = int(part)
+            if not (0 < p <= 65535):
+                raise ValueError(f"非法端口: {part}")
+            out.append(str(p))
+    return out
+
+
+# ══════════════════════════ 状态文件 ══════════════════════════
+
+def load_state():
+    if not os.path.exists(STATE_PATH):
+        return {"rules": []}
+    try:
+        with open(STATE_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"rules": []}
+
+
+def save_state(state):
+    os.makedirs(os.path.dirname(STATE_PATH), exist_ok=True)
+    with open(STATE_PATH, "w", encoding="utf-8") as f:
+        json.dump(state, f, ensure_ascii=False, indent=2)
+
+
+def merge_rules(state, ips, ports):
+    """ips×ports 笛卡尔积去重合并;ips=None 表示全来源(规则 ip='any')。"""
+    existing = {(r["ip"], r["port"]) for r in state["rules"]}
+    for port in ports:
+        if ips is None:
+            key = ("any", port)
+            if key not in existing:
+                state["rules"].append({"ip": "any", "port": port})
+                existing.add(key)
+        else:
+            for ip in ips:
+                key = (ip, port)
+                if key not in existing:
+                    state["rules"].append({"ip": ip, "port": port})
+                    existing.add(key)
+    return state
+
+
+# ══════════════════════════ UFW 侧(宿主机入站)══════════════════════════
+
+def ufw_available():
+    ok, out = run("which ufw", check=False)
+    return ok and out.strip()
+
+
+def ufw_clear_all_except_ssh():
+    """删除 ufw 全部应用规则,仅保留 22/tcp(IPv4+IPv6)。
+
+    枚举 `ufw status numbered` 解析规则行,非 22/tcp 的一律删除(编号从大到小,
+    避免删除后编号移位)。default deny incoming 兜底,删除间隙不暴露端口。
+    """
+    _, out = run("sudo ufw status numbered", check=False)
+    to_delete = []
+    for line in out.splitlines():
+        line = line.strip()
+        # 形如: [ 1] 22/tcp ALLOW IN Anywhere
+        if not line.startswith("["):
+            continue
+        try:
+            num = int(line.split("]")[0].strip("[").strip())
+            spec = line.split("]", 1)[1].strip()
+        except (ValueError, IndexError):
+            continue
+        # 22/tcp 及其 v6 形式保留,其余全部删除
+        if spec.startswith("22/tcp"):
+            continue
+        to_delete.append((num, spec))
+    for num, spec in sorted(to_delete, reverse=True):
+        run(f"sudo ufw --force delete {num}", check=False)
+        print(f"  [ufw] 删除残留规则 #{num}: {spec}")
+
+
+def ufw_init():
+    """封死:默认拒绝入站 + 只放行 22;清空其余全部规则(含历史残留)。
+
+    顺序关键:先 allow 22 再 enable(启用瞬间规则文件已含 22,SSH 不断);
+    再删非 22 规则 + default deny incoming 兜底。
+    """
+    run("sudo ufw allow 22/tcp")                 # 先写规则(未启用时仅改配置文件)
+    run("sudo ufw --force enable")               # 启用时加载规则,22 已在白名单
+    run("sudo ufw default deny incoming")
+    run("sudo ufw default allow routed")         # 容器网络必须;限制交给 DOCKER-USER
+    ufw_clear_all_except_ssh()                   # 删干净(含状态文件之外的历史残留)
+    for rule in load_state()["rules"]:
+        ip, port = rule["ip"], rule["port"]
+        if ip == "any":
+            run(f"sudo ufw delete allow {port}/tcp", check=False)
+        else:
+            run(f"sudo ufw delete allow from {ip} to any port {port} proto tcp", check=False)
+
+
+def ufw_allow_rule(ip, port):
+    """增量放行(TCP)。ip='any' 表示全来源;port 为 'a' 或 'a:b'。"""
+    if ip == "any":
+        run(f"sudo ufw allow {port}/tcp")
     else:
-        print("  Enabling UFW...")
-        # Use --force to avoid interactive prompt
-        run("sudo ufw --force enable")
-    # ⚠️ Docker 关键:UFW 默认 FORWARD 策略是 DROP,启用后会掐断 docker 容器网络
-    # (docker 发布的端口流量走 FORWARD 链)。必须放行路由流量,再靠 DOCKER-USER 链做限制。
-    ok, out = run("sudo ufw default allow routed", check=False)
-    if not ok:
-        print("  [!] 'ufw default allow routed' 失败,容器网络可能被 ufw 掐断: " + out[:200])
-    else:
-        print("  UFW routed 策略: allow(docker 容器流量放行,限制交给 DOCKER-USER 链)")
+        run(f"sudo ufw allow from {ip} to any port {port} proto tcp")
 
 
-def show_status():
-    _, out = run("sudo ufw status verbose", check=False)
-    print(out)
-
-
-# ══════════════════════════ Docker DOCKER-USER 部分 ══════════════════════════
+# ══════════════════════════ DOCKER-USER 侧(容器入站)══════════════════════════
 
 def docker_chain_exists():
-    """DOCKER-USER 链存在 = docker daemon 运行中(该链由 docker 创建)。"""
     ok, out = run("sudo iptables -L DOCKER-USER -n", check=False)
     return ok and "DOCKER-USER" in out
 
 
-def docker_limit_port(port, ips, proto="tcp"):
-    """只允许 ips 访问 docker 发布的 port,其余 IP 一律拒绝。
+def docker_init():
+    """清空 DOCKER-USER 并加兜底:容器流量默认全拒(仅新连接)。
 
-    规则写在 DOCKER-USER 链(FORWARD 最前,先于 DOCKER 链评估):
-      - 先清掉该端口的旧规则(幂等)
-      - 按序插入:先插 DROP,再逐个插 ACCEPT(-I 插链首,ACCEPT 最终排在 DROP 之前)
-    顺序结果:ACCEPT(允许IP)... ACCEPT DROP → 指定 IP 放行,其余落到 DROP。
+    关键:DROP 兜底只匹配 NEW(新连接),ESTABLISHED/RELATED 一律放行——
+    否则容器回程包(SYN-ACK,源=容器 IP)不匹配入站白名单,会被 DROP all
+    双向掐死,表现为"SYN 能进、应答出不来"(2026-08 云端实测 timeout)。
+    顺序:ESTABLISHED ACCEPT → NEW DROP 兜底(白名单 ACCEPT 由 docker_allow 插在最前)。
     """
     if not docker_chain_exists():
-        print(f"  [!] DOCKER-USER 链不存在(docker 未运行?),跳过 docker 端口 {port} 限制")
-        return False
-    # 清理旧规则(忽略不存在)
-    run(f"sudo iptables -D DOCKER-USER -p {proto} --dport {port} -j DROP", check=False)
-    for ip in ips:
-        run(f"sudo iptables -D DOCKER-USER -p {proto} --dport {port} -s {ip} -j ACCEPT", check=False)
-    # 先 DROP 后 ACCEPT(-I 插链首,后插的 ACCEPT 排在前面)
-    run(f"sudo iptables -I DOCKER-USER -p {proto} --dport {port} -j DROP")
-    for ip in ips:
-        run(f"sudo iptables -I DOCKER-USER -p {proto} --dport {port} -s {ip} -j ACCEPT")
-    print(f"  [docker] 端口 {port}/{proto}: 仅允许 {' '.join(ips)} 访问,其余拒绝(DOCKER-USER 链)")
-    return True
-
-
-def docker_clear():
-    """清空 DOCKER-USER 链(恢复 docker 默认开放行为)。"""
-    if not docker_chain_exists():
-        print("  DOCKER-USER 链不存在(docker 未运行?)")
+        print("  [!] DOCKER-USER 链不存在(docker 未运行),跳过 docker 侧封死")
         return
     run("sudo iptables -F DOCKER-USER")
-    print("  DOCKER-USER 链已清空(docker 端口恢复默认开放)")
+    run("sudo iptables -A DOCKER-USER -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT")
+    run("sudo iptables -A DOCKER-USER -m conntrack --ctstate NEW -j DROP")
 
 
-def docker_status():
+def docker_allow(ip, port):
+    """单条白名单 TCP:ACCEPT 插在 DROP 兜底之前。ip='any' 不带 -s。
+
+    port 表示:单值 'a' → --dport a;范围 'a:b' → --dport a:b;
+    多值用逗号(调用方先按逗号拆成单值逐条添加,避免 --dports 兼容性问题)。
+    """
     if not docker_chain_exists():
-        print("DOCKER-USER 链不存在(docker 未运行)")
+        print(f"  [!] DOCKER-USER 链不存在,跳过 docker 端口 {port} 放行")
         return
-    ok, out = run("sudo iptables -L DOCKER-USER -n --line-numbers", check=False)
-    print(out if ok else "(读取失败)")
+    port_opt = f"--dport {port}"
+    src = f"-s {ip} " if ip != "any" else ""
+    run(f"sudo iptables -I DOCKER-USER -p tcp {src}{port_opt} -j ACCEPT")
 
 
-def docker_save():
-    """持久化 iptables 规则(DOCKER-USER 限制在重启后保留)。"""
-    ok, out = run("sudo mkdir -p /etc/iptables && sudo iptables-save | sudo tee /etc/iptables/rules.v4 >/dev/null", check=False)
-    if ok:
-        print("  iptables 规则已保存到 /etc/iptables/rules.v4")
-        print("  提示:安装 iptables-persistent 可开机自动恢复(sudo apt install -y iptables-persistent)")
+def docker_replay(state):
+    """全量重建:flush → 兜底 DROP → 按状态文件插 ACCEPT(ACCEPT 排在 DROP 前)。"""
+    docker_init()
+    for rule in state["rules"]:
+        docker_allow(rule["ip"], rule["port"])
+
+
+# ══════════════════════════ 展示 ══════════════════════════
+
+def show_status():
+    print("=== UFW(宿主机入站)===")
+    _, out = run("sudo ufw status verbose", check=False)
+    print(out)
+    print("=== Docker DOCKER-USER(容器入站)===")
+    if docker_chain_exists():
+        _, out = run("sudo iptables -L DOCKER-USER -n --line-numbers", check=False)
+        print(out)
     else:
-        print("  [!] 保存失败: " + out[:200])
+        print("(DOCKER-USER 链不存在,docker 未运行)")
+    state = load_state()
+    if state["rules"]:
+        print(f"=== 状态文件 {STATE_PATH}({len(state['rules'])} 条)===")
+        for r in state["rules"]:
+            print(f"  {r['ip']} -> :{r['port']}/tcp")
 
+
+# ══════════════════════════ 主流程 ══════════════════════════
 
 def main():
-    parser = argparse.ArgumentParser(description="UFW firewall + Docker 端口 IP 限制 setup")
-    parser.add_argument("-i", "--ip",   default=None, help="来源 IP,逗号分隔多个,如: 10.0.0.1,10.0.0.2")
-    parser.add_argument("-p", "--port", default=None, help="开放端口,逗号分隔多个,如: 6379,8080")
-    parser.add_argument("--proto", default="tcp", choices=["tcp", "udp"],
-                        help="docker 限制的协议,默认 tcp")
-    parser.add_argument("command", nargs="?", default="setup",
-                        choices=["setup", "status", "docker-status", "docker-clear", "docker-save"],
-                        help="Action: setup (default) / status / docker-status / docker-clear / docker-save")
+    parser = argparse.ArgumentParser(
+        description="FlowScan 防火墙:init 封死 + 累加白名单(宿主机+docker 双链,仅 TCP)")
+    parser.add_argument("action", nargs="?", default="",
+                        choices=["", "init", "status"],
+                        help="init=仅 22 可达其余封死 / status=查看规则(默认空=提示用法)")
+    parser.add_argument("-i", "--ip", default=None,
+                        help="来源 IP:单IP/逗号多IP/CIDR/段(如 192.168.0.1-10);省略=全来源")
+    parser.add_argument("-p", "--port", default=None,
+                        help="端口:单端口/逗号多端口/范围(如 65530-65535)")
     args = parser.parse_args()
 
-    if args.command == "status":
+    if not args.action and not args.port:
+        parser.print_help()
+        return 0
+    if not ufw_available():
+        print("UFW 未安装: sudo apt install ufw -y")
+        return 1
+
+    if args.action == "status":
         show_status()
-        print()
-        print("=== Docker DOCKER-USER 限制规则 ===")
-        docker_status()
-        return
+        return 0
 
-    if args.command == "docker-status":
-        docker_status()
-        return
-    if args.command == "docker-clear":
-        docker_clear()
-        return
-    if args.command == "docker-save":
-        docker_save()
-        return
+    if args.action == "init":
+        save_state({"rules": []})
+        print("=== init:仅 22/tcp 任意 IP 可达,其余端口全部封死(宿主+docker)===")
+        ufw_init()
+        docker_init()
+        show_status()
+        return 0
 
-    # ── setup ──
-    if not ufw_installed():
-        print("UFW not installed. Run: sudo apt install ufw -y")
-        sys.exit(1)
-
-    ips   = [x.strip() for x in args.ip.split(",") if x.strip()]   if args.ip   else []
-    ports = [x.strip() for x in args.port.split(",") if x.strip()] if args.port else []
-
-    print("=== UFW Setup ===")
-
-    ensure_ssh()
-
-    if ports:
-        for port in ports:
-            if ips:
-                for ip in ips:
-                    allow_port(port, ip)
-            else:
-                allow_port(port)
-
-    enable_ufw()
-
-    # Docker 发布端口限制:有 -i 时,受限端口同时写 DOCKER-USER 链(否则 ufw 规则管不到 docker 流量)
-    if ports and ips and docker_chain_exists():
-        print()
-        print("=== Docker 端口限制(DOCKER-USER 链)===")
-        for port in ports:
-            docker_limit_port(port, ips, proto=args.proto)
-    elif ports and ips:
-        print("\n  [!] DOCKER-USER 链不存在(docker 未运行):docker 发布的端口暂不受本规则限制")
-        print("      docker 启动后重跑本命令即可")
-
-    print()
+    # -p(可带 -i):累加添加
+    ports = parse_ports(args.port)
+    ips = parse_ips(args.ip) if args.ip else None     # None = 全来源
+    state = load_state()
+    before = len(state["rules"])
+    state = merge_rules(state, ips, ports)
+    added = len(state["rules"]) - before
+    save_state(state)
+    scope = "全来源" if ips is None else ", ".join(ips)
+    print(f"=== 添加 {added} 条规则(现有 {len(state['rules'])} 条,来源: {scope})===")
+    for rule in state["rules"]:
+        print(f"  {rule['ip']} -> :{rule['port']}/tcp")
+    for rule in state["rules"]:
+        ufw_allow_rule(rule["ip"], rule["port"])
+    docker_replay(state)
     show_status()
-    print("\nDone.")
-    print("提示:docker 发布端口的外部流量限制在 DOCKER-USER 链生效;")
-    print("      docker-status 查看 / docker-clear 清空 / docker-save 持久化")
+    return 0
 
 
 if __name__ == "__main__":

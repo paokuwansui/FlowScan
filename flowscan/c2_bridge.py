@@ -18,16 +18,68 @@ _C2_LOCK = threading.Lock()
 _C2_INIT_ERROR = ""  # 初始化失败信息
 _C2_PROJECT_ROOT = ""   # 最近一次 init_c2 的参数(restart 用)
 _C2_CONFIG_FILE = "config.json"
+_C2_MANUAL_STOP = False  # 用户手动停止标志:停止后各接口不再自动拉起(显式 start 才恢复)
+
+
+def c2_running() -> bool:
+    """纯查询:C2 是否已初始化且运行中(不触发启动)。"""
+    srv = _C2
+    if srv is None:
+        return False
+    try:
+        return bool(srv.running)
+    except Exception:
+        return False
+
+
+def was_manual_stopped() -> bool:
+    """用户是否手动停止过 C2(停止后各接口不自动拉起,需显式 start)。"""
+    return _C2_MANUAL_STOP
+
+
+def start_c2(project_root: str, config_file: str = "config.json") -> tuple:
+    """显式启动 C2(清除手动停止标志后 init)。返回 (ok, message)。"""
+    global _C2_MANUAL_STOP
+    _C2_MANUAL_STOP = False
+    srv = init_c2(project_root, config_file)
+    if not srv:
+        return False, _C2_INIT_ERROR or "C2 启动失败"
+    return True, "C2 已启动"
+
+
+def stop_c2() -> tuple:
+    """显式停止 C2 server(headless 线程 stop,实例置 None)。返回 (ok, message)。"""
+    global _C2, _C2_MANUAL_STOP
+    with _C2_LOCK:
+        old = _C2
+        if old is not None:
+            try:
+                old.stop()
+            except Exception as exc:
+                return False, f"stop 失败: {exc}"
+            _C2 = None
+        _C2_MANUAL_STOP = True
+    return True, "C2 已停止"
 
 
 def init_c2(project_root: str, config_file: str = "config.json"):
-    """懒加载初始化 C2 server。已初始化直接返回;失败记录错误并返回 None。"""
+    """懒加载初始化 C2 server。已初始化直接返回;失败记录错误并返回 None。
+
+    手动停止后(_C2_MANUAL_STOP=True)不自动拉起——任何懒加载入口
+    (面板 API / agent 工具)都会拿到 None,须显式 start_c2() 恢复。
+    """
     global _C2, _C2_INIT_ERROR, _C2_PROJECT_ROOT, _C2_CONFIG_FILE
     if _C2 is not None:
         return _C2
+    if _C2_MANUAL_STOP:
+        _C2_INIT_ERROR = "C2 已手动停止,请先在面板点「启动」"
+        return None
     with _C2_LOCK:
         if _C2 is not None:
             return _C2
+        if _C2_MANUAL_STOP:
+            _C2_INIT_ERROR = "C2 已手动停止,请先在面板点「启动」"
+            return None
         _C2_PROJECT_ROOT = os.path.abspath(project_root)
         _C2_CONFIG_FILE = config_file
         project_root = _C2_PROJECT_ROOT
@@ -637,7 +689,7 @@ def update_listener_config(updates: dict) -> tuple:
 
 def restart_c2() -> tuple:
     """重启 C2 server(headless 线程 stop → 重新 init)。返回 (ok, message)。"""
-    global _C2
+    global _C2, _C2_MANUAL_STOP
     with _C2_LOCK:
         old = _C2
         if old is not None:
@@ -646,6 +698,7 @@ def restart_c2() -> tuple:
             except Exception as exc:
                 return False, f"stop 失败: {exc}"
             _C2 = None
+        _C2_MANUAL_STOP = False   # 重启=重新拉起,清除手动停止标志
     if not _C2_PROJECT_ROOT:
         return False, "未初始化过 C2,无法重启"
     srv = init_c2(_C2_PROJECT_ROOT, _C2_CONFIG_FILE)

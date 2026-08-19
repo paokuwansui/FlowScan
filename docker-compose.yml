@@ -22,11 +22,11 @@ services:
     restart: unless-stopped
     command: ["web", "--host", "0.0.0.0"]    # 端口从挂载的 config.yaml web_config.port 读取(配置驱动)
     ports:
-      # 65000-65535 段整体映射(端口排布:web=65000 / redis=65001 / xray=65002 / c2 implant=65003 / c2 client=65004 / xss+钓鱼页面=65005)
+      # 65500-65535 段整体映射(端口排布:web=65500 / redis=65501 / xray=65502 / c2 implant=65503 / c2 client=65504 / xss+钓鱼页面=65505)
       # 容器内其余服务如需对外,直接用段内端口即可(无需改 compose)
-      - "65000-65535:65000-65535"
+      - "65500-65535:65500-65535"
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:${WEB_PORT:-65000}/login"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:${WEB_PORT:-65500}/login"]
       interval: 15s
       timeout: 5s
       retries: 6
