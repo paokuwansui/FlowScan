@@ -32,7 +32,8 @@ ai_analysis:
   agent_max_iterations: 50
   agent_scan_gap_seconds: 5
   agent_plan_mode: false
-  agent_context_max_chars: 60000
+  agent_context_max_chars: 60000        # 旧字段,已由 token 预算替代
+  agent_context_max_tokens: 24000      # Agent 上下文压缩预算(token 近似计量,CJK 1 token/字)
   agent_approval_mode: ai        # 危险操作审批模式: auto=自动放行 / ai=AI审批 / human=人工审批
 c2:
   enabled: true                # C2 服务默认启动(面板 C2 工作台首次访问即内嵌启动,懒加载)

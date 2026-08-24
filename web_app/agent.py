@@ -129,6 +129,11 @@ AGENT_TOOLS = [
         "host": {"type": "string", "description": "反连地址,可选"}}, "required": ["name"]}}},
     {"type": "function", "function": {"name": "phishing_reports", "description": "读取钓鱼页面受害浏览器回传记录(类型/IP/URL/数据)。", "parameters": {"type": "object", "properties": {
         "limit": {"type": "integer", "description": "返回条数,默认 20"}}}}},
+    {"type": "function", "function": {"name": "spawn_subagent", "description": "启动一个隔离子代理执行只读侦察/分析任务(无危险工具,不能再生子代理)。子代理在后台独立上下文运行,不占用你的上下文预算;完成后用 subagent_status 查询结论。适合把耗上下文的独立子任务(逐个资产分析/批量信息整理)分派出去。", "parameters": {"type": "object", "properties": {
+        "name": {"type": "string", "description": "子代理名称,如 端口分析"},
+        "task": {"type": "string", "description": "子代理任务描述(要它调查/分析什么,给出明确目标)"}}, "required": ["name", "task"]}}},
+    {"type": "function", "function": {"name": "subagent_status", "description": "查询子代理运行状态与结论(spawn_subagent 后轮询;done 后返回最终结论,可重复读取)。", "parameters": {"type": "object", "properties": {
+        "subagent_id": {"type": "string"}}, "required": ["subagent_id"]}}},
 ]
 
 _AGENT_DANGEROUS = ("remove_event", "blacklist_add", "http_request", "run_python", "run_shell", "c2_exec",
@@ -140,7 +145,8 @@ _AGENT_DANGEROUS = ("remove_event", "blacklist_add", "http_request", "run_python
 # core 必有(事件/扫描指挥基础能力);其余按任务关键词 + 历史使用记录动态注入,
 # 省 token(29 个工具 schema ≈ 4000+ token/轮)并减少 AI 误调用无关工具。
 _CORE_TOOL_NAMES = {"list_events", "get_children", "scan_status", "inject", "remove_event",
-                    "blacklist_add", "log", "read_ai_logs", "get_spill", "xray_report", "load_skill", "search_skills"}
+                    "blacklist_add", "log", "read_ai_logs", "get_spill", "xray_report", "load_skill", "search_skills",
+                    "spawn_subagent", "subagent_status"}
 
 _TOOL_GROUP_NAMES = {
     "c2": ["c2_beacons", "c2_exec", "c2_result", "c2_modules", "c2_module_build", "c2_module_exec",
@@ -164,6 +170,13 @@ _TOOL_GROUP_KEYWORDS = {
 _DEFAULT_EXTRA_GROUPS = ("web",)   # 搜索/浏览默认开(情报收集基础能力)
 
 _TOOL_GROUP_OF = {name: group for group, names in _TOOL_GROUP_NAMES.items() for name in names}
+
+# ── 子代理只读工具集(隔离上下文执行,无危险工具/无注入/不能再生子代理) ──
+_SUBAGENT_TOOL_NAMES = {
+    "list_events", "get_children", "scan_status", "read_ai_logs", "xray_report",
+    "get_spill", "load_skill", "search_skills", "log", "subagent_status",
+}
+_SUBAGENT_TOOLS = [t for t in AGENT_TOOLS if t["function"]["name"] in _SUBAGENT_TOOL_NAMES]
 
 
 def _select_agent_tools(user_input: str, history: List[Dict[str, Any]],
@@ -213,7 +226,9 @@ def _agent_system_prompt(skill_section: str = "") -> str:
         "重要发现用 log 工具沉淀(priority: high 立即关注/medium 值得跟进/low 备忘)。\n"
         "漏洞扫描结果(如 xray 被动扫描)可用 xray_report 工具读取 reports/xray_out.json。\n"
         "原则:基于事实(工具返回的结果)决策,不编造;注入事件要复用已有的正确事件类型和格式;"
-        "除非明确需要,不要删除事件或加黑名单。"
+        "除非明确需要,不要删除事件或加黑名单。\n"
+        "并行/大任务:可独立拆分的子任务(逐个资产分析、批量信息整理)用 spawn_subagent 派发给"
+        "只读子代理在后台独立执行,不占用你的上下文;完成后用 subagent_status 查询其结论并汇入最终答案。"
     )
     if skill_section:
         base += "\n\n" + skill_section
@@ -255,8 +270,10 @@ def _delete_agent_session(redis: FlowScanRedis, session_id: str) -> bool:
     existed = bool(redis.conn.exists(f"fs3:agent:session:{session_id}"))
     pipe = redis.conn.pipeline()
     pipe.delete(f"fs3:agent:session:{session_id}")
+    pipe.delete(f"fs3:agent:session:{session_id}:events")
     pipe.delete(f"fs3:agent:session:{session_id}:messages")
     pipe.delete(f"fs3:agent:session:{session_id}:state")
+    pipe.delete(f"fs3:agent:session:{session_id}:goal")
     pipe.delete(f"fs3:agent:session:{session_id}:audit")
     pipe.zrem("fs3:agent:sessions", session_id)
     pipe.execute()
@@ -288,27 +305,95 @@ def _recover_orphan_agent_sessions(redis: FlowScanRedis) -> int:
 
 
 def _append_agent_message(redis: FlowScanRedis, session_id: str, msg: Dict[str, Any]) -> None:
-    msg = {**msg, "ts": time.time()}
-    redis.conn.rpush(f"fs3:agent:session:{session_id}:messages", json.dumps(msg, ensure_ascii=False))
-    redis.conn.ltrim(f"fs3:agent:session:{session_id}:messages", -500, -1)
+    """追加一条消息到会话事件日志(append-only)。
+
+    会话日志是唯一事实源:每条模型可见的消息都是一个事件(带 type 字段),
+    读取端(_get_agent_messages)从事件流投影模型历史;未来 fork/checkpoint/重放
+    都从这条事件流派生,删除/覆盖不影响历史。
+    """
+    evt = {**msg, "type": "msg", "ts": time.time()}
+    redis.conn.rpush(f"fs3:agent:session:{session_id}:events", json.dumps(evt, ensure_ascii=False))
+    redis.conn.ltrim(f"fs3:agent:session:{session_id}:events", -2000, -1)
     redis.conn.hincrby(f"fs3:agent:session:{session_id}", "message_count", 1)
     redis.conn.hset(f"fs3:agent:session:{session_id}", "last_active", time.time())
 
 
 def _get_agent_messages(redis: FlowScanRedis, session_id: str, limit: int = 200) -> List[Dict[str, Any]]:
-    raw = redis.conn.lrange(f"fs3:agent:session:{session_id}:messages", -limit, -1)
-    return [json.loads(x) for x in raw if x.strip()]
+    """从会话事件日志投影模型历史消息(只取 type=msg 的事件,去掉 type 字段)。
+
+    旧会话(messages list 时代)没有事件日志 → 回退读旧 messages list,兼容存量数据。
+    """
+    raw = redis.conn.lrange(f"fs3:agent:session:{session_id}:events", -limit, -1)
+    msgs: List[Dict[str, Any]] = []
+    for x in raw:
+        if not x.strip():
+            continue
+        try:
+            evt = json.loads(x)
+        except Exception:
+            continue
+        if evt.get("type") != "msg":
+            continue
+        msgs.append({k: v for k, v in evt.items() if k != "type"})
+    if msgs or raw:
+        return msgs
+    # 旧数据兼容:事件日志为空 → 读旧的 messages list
+    raw_old = redis.conn.lrange(f"fs3:agent:session:{session_id}:messages", -limit, -1)
+    return [json.loads(x) for x in raw_old if x.strip()]
 
 
 def _get_agent_state(redis: FlowScanRedis, session_id: str) -> Dict[str, Any]:
     raw = redis.conn.hgetall(f"fs3:agent:session:{session_id}:state")
     state = {k: _json_or_raw(v) for k, v in raw.items()} if raw else {}
     state["queue_length"] = _agent_queue_len(redis, session_id)
+    state["goal"] = _get_agent_goal(redis, session_id, state)
     return state
 
 
 def _set_agent_state(redis: FlowScanRedis, session_id: str, updates: Dict[str, Any]) -> None:
     redis.conn.hset(f"fs3:agent:session:{session_id}:state", mapping={k: json.dumps(v, ensure_ascii=False) if not isinstance(v, str) else v for k, v in updates.items()})
+
+
+# ── 目标状态机(goal) ──
+# 目标文本存 Redis hash;phase 由 state.status 投影(不重复存储,单一事实源):
+#   running → active / done → complete / blocked·error → blocked / interrupted·awaiting_hitl → paused
+_GOAL_PHASE_MAP = {
+    "running": "active",
+    "done": "complete",
+    "blocked": "blocked",
+    "error": "blocked",
+    "interrupted": "paused",
+    "awaiting_hitl": "paused",
+}
+
+
+def _set_agent_goal(redis: FlowScanRedis, session_id: str, goal_text: str) -> None:
+    """记录/更新会话目标文本(每次新指令覆盖为最新任务;created_at 保留首次)。"""
+    goal_text = (goal_text or "").strip()[:500]
+    if not goal_text:
+        return
+    now = time.time()
+    raw = redis.conn.hgetall(f"fs3:agent:session:{session_id}:goal")
+    created = raw.get("created_at") if raw else ""
+    redis.conn.hset(f"fs3:agent:session:{session_id}:goal", mapping={
+        "goal": goal_text,
+        "created_at": created or str(now),
+        "updated_at": str(now),
+    })
+
+
+def _get_agent_goal(redis: FlowScanRedis, session_id: str, state: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """读取会话目标快照:goal 文本 + phase(从 state.status 投影)+ 时间戳。"""
+    raw = redis.conn.hgetall(f"fs3:agent:session:{session_id}:goal")
+    if not raw:
+        return {"goal": "", "phase": "none", "created_at": "", "updated_at": ""}
+    status = str((state if state is not None else _get_agent_state(redis, session_id)).get("status", ""))
+    return {
+        "goal": raw.get("goal", ""),
+        "phase": _GOAL_PHASE_MAP.get(status, "active"),
+        "created_at": raw.get("created_at", ""),
+        "updated_at": raw.get("updated_at", ""),
+    }
 
 
 # ── 审计(全自动 + 人工审计 + AI 自动审计) ──
@@ -719,6 +804,30 @@ def _dispatch_agent_tool(name: str, args: Dict[str, Any], redis: FlowScanRedis,
             limit = min(int(args.get("limit") or 20), 100)
             reports = phishing_bridge.list_reports(limit)
             result = json.dumps({"ok": True, "count": len(reports), "reports": reports}, ensure_ascii=False)
+    elif name == "spawn_subagent":
+        ai_cfg = _ai_config(config or {})
+        sub_name = str(args.get("name") or "").strip()[:50]
+        task = str(args.get("task") or "").strip()[:2000]
+        if not task:
+            result = json.dumps({"ok": False, "error": "task 不能为空"}, ensure_ascii=False)
+        else:
+            sub_id = _spawn_subagent(redis, session_id, sub_name or "子代理", task, ai_cfg)
+            result = json.dumps({"ok": True, "subagent_id": sub_id, "status": "running",
+                                 "note": "子代理后台运行中(只读,最多 15 轮),稍后用 subagent_status 查询结论"},
+                                ensure_ascii=False)
+    elif name == "subagent_status":
+        sub_id = str(args.get("subagent_id") or "").strip()
+        info = _get_subagent(redis, sub_id) if sub_id else None
+        if not info:
+            result = json.dumps({"ok": False, "error": f"subagent '{sub_id}' 不存在"}, ensure_ascii=False)
+        else:
+            result = json.dumps({"ok": True, "subagent_id": sub_id,
+                                 "name": info.get("name", ""),
+                                 "status": info.get("status", ""),
+                                 "rounds": info.get("rounds", 0),
+                                 "error": info.get("error", ""),
+                                 "answer": str(info.get("answer") or "")[:4000]},
+                                ensure_ascii=False)
     else:
         result = json.dumps({"ok": False, "error": f"未知工具: {name}"}, ensure_ascii=False)
     duration = time.time() - t0
@@ -970,6 +1079,30 @@ def _messages_char_count(messages: List[Dict[str, Any]]) -> int:
     return total
 
 
+_CJK_RE = re.compile(r"[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]")
+
+
+def _estimate_tokens(text: str) -> int:
+    """近似 token 计量(中英混合):CJK 字符约 1 token/字,其余约 4 字符/token。
+
+    相比纯字符数,中文占比高的消息 token 估算更贴近真实计费,压缩预算更准。
+    """
+    if not text:
+        return 0
+    cjk = len(_CJK_RE.findall(text))
+    other = max(0, len(text) - cjk)
+    return cjk + other // 4
+
+
+def _messages_token_count(messages: List[Dict[str, Any]]) -> int:
+    total = 0
+    for m in messages:
+        total += _estimate_tokens(str(m.get("content", "")))
+        for tc in (m.get("tool_calls") or []):
+            total += _estimate_tokens(str(tc))
+    return total
+
+
 def _split_message_rounds(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """把消息序列切成"轮":assistant(可能带 tool_calls)+ 紧随其后的 tool 结果配对成一轮;
     独立消息(user/system)自成一轮。压缩时按轮丢弃,保证 tool_call/tool_result 永不拆散。"""
@@ -1004,27 +1137,28 @@ def _flatten_rounds(rounds: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return out
 
 
-def _compact_agent_messages(messages: List[Dict[str, Any]], max_chars: int) -> List[Dict[str, Any]]:
-    """上下文预算压缩:先截断超长工具输出;仍超限则按"轮"丢弃最旧中间轮(保首尾)。
+def _compact_agent_messages(messages: List[Dict[str, Any]], max_tokens: int) -> List[Dict[str, Any]]:
+    """上下文预算压缩(token 计量):先截断超长工具输出;仍超限则按"轮"丢弃最旧中间轮(保首尾)。
 
-    按轮为单位(assistant 的 tool_calls 与其 tool 结果同生共死),
-    避免旧实现逐条丢消息导致 tool_call/tool_result 错配被 API 拒绝。
+    预算语义(参照 deepseek-harness):保留带价签的近期尾部——从尾部累积
+    消息 token,保留到 max_tokens 预算;丢弃的永远是最旧中间轮,
+    保证 assistant 的 tool_calls 与其 tool 结果同生共死(tool_call/tool_result 不错配)。
     """
-    if _messages_char_count(messages) <= max_chars or len(messages) <= 2:
+    if _messages_token_count(messages) <= max_tokens or len(messages) <= 2:
         return messages
     msgs = []
     for m in messages:
-        if m.get("role") == "tool" and len(str(m.get("content", ""))) > 2000:
+        if m.get("role") == "tool" and _estimate_tokens(str(m.get("content", ""))) > 500:
             m = {**m, "content": _truncate_for_context(str(m["content"]), 2000)}
         msgs.append(m)
-    if _messages_char_count(msgs) <= max_chars:
+    if _messages_token_count(msgs) <= max_tokens:
         return msgs
     rounds = _split_message_rounds(msgs)
     if not rounds:
         return msgs
     head, tail = [rounds[0]], [rounds[-1]]   # 保留首轮(system)+ 末轮(最新)
     middle = rounds[1:-1]
-    while middle and _messages_char_count(_flatten_rounds(head + middle + tail)) > max_chars:
+    while middle and _messages_token_count(_flatten_rounds(head + middle + tail)) > max_tokens:
         middle = middle[1:]
     return _flatten_rounds(head + middle + tail)
 
@@ -1073,7 +1207,10 @@ def _generate_agent_report(redis: FlowScanRedis, session_id: str, answer: str) -
     """
     state = _get_agent_state(redis, session_id)
     msgs = _get_agent_messages(redis, session_id, limit=200)
-    goal = ""
+    # 目标状态机优先(准确反映最新任务);无 goal 记录时回退到首条 user 消息
+    goal_info = state.get("goal") or {}
+    goal = str(goal_info.get("goal") or "")[:200]
+    goal_phase = str(goal_info.get("phase") or "")
     tool_counts: Dict[str, int] = {}
     injects, dels, blacks, others = [], [], [], []
     for m in msgs:
@@ -1098,6 +1235,7 @@ def _generate_agent_report(redis: FlowScanRedis, session_id: str, answer: str) -
     lines = [
         f"Agent 会话报告 [{session_id}]",
         f"任务目标: {goal or '(无)'}",
+        f"目标阶段: {goal_phase or '-'}",
         f"状态: {state.get('status')} | 工具调用总数: {sum(tool_counts.values())}",
         f"工具使用: {', '.join(f'{k}×{v}' for k, v in sorted(tool_counts.items())) or '无'}",
     ]
@@ -1142,7 +1280,11 @@ def _run_agent_loop(redis: FlowScanRedis, session_id: str, user_input: str, ai_c
                     max_iterations: int = 50, scan_gap_seconds: int = 5, resume: bool = False) -> None:
     _set_agent_state(redis, session_id, {"status": "running", "iteration": 0, "error": ""})
     config = config or {}
-    context_max = int(ai_cfg.get("agent_context_max_chars", 60000) or 60000)
+    # 目标状态机:新指令(非空 user_input)更新目标文本;resume 不覆盖
+    if user_input:
+        _set_agent_goal(redis, session_id, user_input)
+    # 上下文预算:token 计量(agent_context_max_tokens,默认 24000)
+    context_max = int(ai_cfg.get("agent_context_max_tokens") or 24000)
     plan_mode = bool(ai_cfg.get("agent_plan_mode", False))
     approval_mode = _resolve_approval_mode(ai_cfg)
     approval_note = (
@@ -1200,9 +1342,13 @@ def _run_agent_loop(redis: FlowScanRedis, session_id: str, user_input: str, ai_c
             interrupted = True
             _append_agent_message(redis, session_id, {"role": "system", "content": "[已打断] 用户打断了当前任务,停止推进并接入新指令。"})
             break
-        # AI 自动审计 + 计划注入
+        # AI 自动审计 + 计划注入 + 当前目标注入(参照 goal 状态机:让 AI 始终明确最新任务目标,
+        # 打断后续跑/排队新指令后不会丢失方向)
         audit = _audit_summary(redis, session_id)
         system_content = _agent_system_prompt(prompt_suffix)
+        goal_info = _get_agent_goal(redis, session_id)
+        if goal_info.get("goal"):
+            system_content += f"\n\n[当前目标] {goal_info['goal']} (阶段: {goal_info.get('phase') or 'active'})"
         if plan:
             steps = "\n".join(f"{i + 1}. {s}" for i, s in enumerate(plan))
             system_content += f"\n\n[执行计划] 请按以下步骤推进(已完成可跳过,完成后收工):\n{steps}"
@@ -1348,6 +1494,112 @@ def _run_agent_loop(redis: FlowScanRedis, session_id: str, user_input: str, ai_c
                            tail_msg={"role": "assistant", "content": f"已达到最大轮数 {max_iterations},停止。"})
 
 
+# ── 子代理(subagent):隔离只读 ReAct 循环 ──
+# 存储:
+#   fs3:agent:sub:{id}            hash — 子代理元数据/状态/结论
+#   fs3:agent:sub:{id}:messages   list — 子代理自己的消息(append-only,同事件日志)
+#   fs3:agent:subs                zset — 索引
+_SUB_MAX_ITERATIONS = 15
+_SUB_CONTEXT_TOKENS = 12000   # 子代理上下文预算(独立小预算,不占用主循环)
+
+
+def _sub_key(sub_id: str) -> str:
+    return f"fs3:agent:sub:{sub_id}"
+
+
+def _sub_msg_key(sub_id: str) -> str:
+    return f"fs3:agent:sub:{sub_id}:messages"
+
+
+def _append_sub_message(redis: FlowScanRedis, sub_id: str, msg: Dict[str, Any]) -> None:
+    evt = {**msg, "type": "msg", "ts": time.time()}
+    redis.conn.rpush(_sub_msg_key(sub_id), json.dumps(evt, ensure_ascii=False))
+    redis.conn.ltrim(_sub_msg_key(sub_id), -500, -1)
+
+
+def _get_subagent(redis: FlowScanRedis, sub_id: str) -> Optional[Dict[str, Any]]:
+    raw = redis.conn.hgetall(_sub_key(sub_id))
+    return {k: _json_or_raw(v) for k, v in raw.items()} if raw else None
+
+
+def _set_subagent(redis: FlowScanRedis, sub_id: str, updates: Dict[str, Any]) -> None:
+    info = _get_subagent(redis, sub_id) or {}
+    info.update(updates)
+    redis.conn.hset(_sub_key(sub_id), mapping={k: json.dumps(v, ensure_ascii=False) if not isinstance(v, str) else v
+                                               for k, v in info.items()})
+
+
+def _spawn_subagent(redis: FlowScanRedis, parent_session: str, name: str, task: str,
+                    ai_cfg: Dict[str, Any]) -> str:
+    """启动子代理(后台线程独立循环)。返回 sub_id。"""
+    sub_id = uuid.uuid4().hex[:12]
+    now = time.time()
+    info = {"subagent_id": sub_id, "parent": parent_session, "name": name, "task": task,
+            "status": "running", "answer": "", "rounds": 0, "error": "",
+            "created_at": now, "finished_at": 0}
+    redis.conn.hset(_sub_key(sub_id), mapping={k: json.dumps(v, ensure_ascii=False) if not isinstance(v, str) else v
+                                               for k, v in info.items()})
+    redis.conn.zadd("fs3:agent:subs", {sub_id: now})
+    threading.Thread(target=_run_subagent_loop, args=(redis, sub_id, task, ai_cfg),
+                     daemon=True, name=f"fs3-subagent-{sub_id[:8]}").start()
+    return sub_id
+
+
+def _run_subagent_loop(redis: FlowScanRedis, sub_id: str, task: str, ai_cfg: Dict[str, Any]) -> None:
+    """子代理独立 ReAct 循环:只读工具集,小上下文预算,达到轮数上限或 LLM 无工具调用即收尾。
+
+    结论写入子代理记录(answer),主循环通过 subagent_status 工具读取。
+    """
+    system = (
+        "你是 FlowScan 的子代理,负责执行主代理分派的只读侦察/分析任务。\n"
+        "可用工具:查询事件(list_events/get_children/scan_status)、读历史 AI 日志(read_ai_logs)、"
+        "读 xray 报告(xray_report)、取回截断内容(get_spill)、查技能(load_skill/search_skills)、"
+        "记录结论(log)。\n"
+        "原则:基于工具返回的事实分析,不编造;重要发现用 log 沉淀;完成后给出结构化结论(发现/证据/建议)。"
+    )
+    _append_sub_message(redis, sub_id, {"role": "user", "content": task})
+    messages: List[Dict[str, Any]] = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": task},
+    ]
+    answer = ""
+    for iteration in range(_SUB_MAX_ITERATIONS):
+        _set_subagent(redis, sub_id, {"rounds": iteration + 1})
+        messages = _compact_agent_messages(messages, _SUB_CONTEXT_TOKENS)
+        resp = _call_llm_with_tools(ai_cfg, messages, _SUBAGENT_TOOLS)
+        if not resp.get("ok"):
+            _set_subagent(redis, sub_id, {"status": "error",
+                                          "error": str(resp.get("error", ""))[:500],
+                                          "finished_at": time.time()})
+            return
+        tool_calls = resp.get("tool_calls") or []
+        answer = resp.get("answer") or ""
+        if not tool_calls:
+            _set_subagent(redis, sub_id, {"status": "done", "answer": answer,
+                                          "rounds": iteration + 1, "finished_at": time.time()})
+            return
+        _append_sub_message(redis, sub_id, {"role": "assistant", "content": answer, "tool_calls": tool_calls})
+        messages.append({"role": "assistant", "content": answer, "tool_calls": tool_calls})
+        for call in tool_calls:
+            fn = call.get("function", {})
+            name = str(fn.get("name", ""))
+            try:
+                args = json.loads(fn.get("arguments") or "{}")
+            except Exception:
+                args = {}
+            result = _dispatch_agent_tool_safe(name, args, redis, sub_id, config={})
+            if len(result) > _SPILL_MAX:
+                ref = f"spill_{int(time.time() * 1000)}"
+                redis.conn.hset(f"fs3:agent:spill:{sub_id}", ref, result)
+                result = _truncate_for_context(result, _SPILL_MAX, ref)
+            _append_sub_message(redis, sub_id, {"role": "tool", "tool_call_id": call.get("id", ""),
+                                                "name": name, "content": result})
+            messages.append({"role": "tool", "tool_call_id": call.get("id", ""), "content": result})
+    _set_subagent(redis, sub_id, {"status": "done",
+                                  "answer": (answer or "") + "\n(达到轮数上限)",
+                                  "rounds": _SUB_MAX_ITERATIONS, "finished_at": time.time()})
+
+
 def _start_agent_task(redis: FlowScanRedis, session_id: str, user_input: str, ai_cfg: Dict[str, Any],
                       config: Optional[Dict[str, Any]] = None, resume: bool = False) -> None:
     """后台异步跑 agent 循环。"""
@@ -1405,8 +1657,12 @@ def register(app):
         mode = str(data.get("mode", "") or "").strip().lower() or "normal"
         if mode not in ("normal", "queue", "interrupt"):
             mode = "normal"
-        if not session_id or not user_input:
-            return jsonify({"ok": False, "error": "session_id/message 为空"}), 400
+        if not session_id:
+            return jsonify({"ok": False, "error": "session_id 为空"}), 400
+        # interrupt 模式允许空消息(纯打断:停止当前任务,不排队新指令);
+        # normal/queue 必须带消息
+        if not user_input and mode != "interrupt":
+            return jsonify({"ok": False, "error": "message 为空"}), 400
         if not _load_agent_session(redis, session_id):
             return jsonify({"ok": False, "error": "会话不存在"}), 404
         state_status = _get_agent_state(redis, session_id).get("status")
@@ -1415,22 +1671,26 @@ def register(app):
         if task_running or state_status == "running":
             # 运行中:interrupt=打断并注入新指令;normal/queue=排队(回车=队列发送)。
             # 先入队再置打断标志:循环消费标志后总能取到该消息。
-            _agent_queue_push(redis, session_id, user_input)
+            # interrupt 且消息为空 = 纯打断,不入队(避免 curl 打断被迫携带旧消息重复执行)。
+            if user_input:
+                _agent_queue_push(redis, session_id, user_input)
             if mode == "interrupt":
                 _request_interrupt(session_id)
-            return jsonify({"ok": True, "queued": True,
+            return jsonify({"ok": True, "queued": bool(user_input),
                             "interrupted": mode == "interrupt",
                             "queue_length": _agent_queue_len(redis, session_id)})
         if state_status == "awaiting_hitl":
             if mode in ("queue", "interrupt"):
                 # 人工审批挂起中:新指令排队,批准完成后按打断标志优先接入
+                if not user_input:
+                    return jsonify({"ok": False, "error": "存在待人工批准的危险操作,请先在界面批准/拒绝后再继续"}), 400
                 _agent_queue_push(redis, session_id, user_input)
                 if mode == "interrupt":
                     _request_interrupt(session_id)
                 return jsonify({"ok": True, "queued": True,
                                 "interrupted": mode == "interrupt",
                                 "queue_length": _agent_queue_len(redis, session_id)})
-            return jsonify({"ok": False, "error": "存在待人工批准的危险操作，请先在界面批准/拒绝后再继续"}), 400
+            return jsonify({"ok": False, "error": "存在待人工批准的危险操作,请先在界面批准/拒绝后再继续"}), 400
         # 空闲/完成/被打断/出错 → 开新任务(清掉残留打断标记)
         with _AGENT_INTERRUPT_LOCK:
             _AGENT_INTERRUPT.pop(session_id, None)

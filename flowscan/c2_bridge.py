@@ -12,6 +12,22 @@ import json
 import os
 import sys
 import threading
+from datetime import datetime, timezone
+
+# C2 server 内部用 datetime.now()(服务器本地 naive 时间)记录时间戳,
+# 直接 isoformat() 输出无时区信息,前端 new Date() 会按访问者浏览器本地时区解析,
+# 服务器与访问页面电脑时区不同时,beacon 心跳/上线时间显示偏差(如服务器 UTC、
+# 浏览器 +8 会差 8 小时)。统一转 UTC 并显式标注 Z,前端自动换算本地时间。
+def _iso_utc(dt) -> str:
+    """datetime → UTC ISO 字符串(YYYY-MM-DDTHH:MM:SSZ)。naive 按服务器本地时区解释后转 UTC。"""
+    if dt is None:
+        return ""
+    try:
+        if dt.tzinfo is None:
+            dt = dt.astimezone(timezone.utc)
+        return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    except Exception:
+        return str(dt)
 
 _C2 = None          # PyExec2Server 单例
 _C2_LOCK = threading.Lock()
@@ -193,8 +209,8 @@ def _beacon_dict(rec) -> dict:
         "is_fork": bool(getattr(rec, "is_fork", False)),
         "is_shell": bool(getattr(rec, "is_shell", False)),
         "is_client": bool(rec.is_client),
-        "first_seen": rec.first_seen.isoformat() if rec.first_seen else "",
-        "last_seen": rec.last_seen.isoformat() if rec.last_seen else "",
+        "first_seen": _iso_utc(rec.first_seen),
+        "last_seen": _iso_utc(rec.last_seen),
         "result_count": len(rec.results),
     }
 
@@ -223,7 +239,7 @@ def get_beacon(client_id: str):
                 "task_id": r.task_id,
                 "output": r.output or "",
                 "error": r.error or "",
-                "received_at": r.received_at.isoformat() if r.received_at else "",
+                "received_at": _iso_utc(r.received_at),
             }
             for r in list(rec.results)[-20:]
         ]
@@ -263,8 +279,11 @@ def get_current_beacon() -> str:
     server = get_c2()
     if not server:
         return ""
-    with _C2_LOCK:
-        return str(getattr(server._dispatcher, "current_beacon", "") or "")
+    try:
+        with _C2_LOCK:
+            return str(getattr(server._dispatcher, "current_beacon", "") or "")
+    except Exception:
+        return ""  # server 对象不完整(中间态/stop 后)时审计等调用方不崩
 
 
 # ── 模块管理(植入模块 modules/ + server 模块 s_modules/) ──
@@ -505,6 +524,7 @@ def status_detail() -> dict:
                 "socks5_port": cfg.socks5_port or 0,
                 "client_timeout": cfg.client_timeout,
                 "exec_timeout": cfg.exec_timeout,
+                "beacon_expire_seconds": cfg.beacon_expire_seconds,
                 "max_tasks_per_client": cfg.max_tasks_per_client,
                 "max_results_per_beacon": cfg.max_results_per_beacon,
                 "auto_commands": list(getattr(cfg, "auto_commands", []) or []),
@@ -555,7 +575,7 @@ def beacon_detail(client_id: str) -> dict:
                 "task_id": r.task_id,
                 "output": r.output or "",
                 "error": r.error or "",
-                "received_at": r.received_at.isoformat() if r.received_at else "",
+                "received_at": _iso_utc(r.received_at),
             }
             for r in list(rec.results)[-50:]
         ]
@@ -574,7 +594,7 @@ def _task_list_unlocked(server, client_id: str, limit: int = 50) -> list:
     for task in list(q)[:limit]:
         items.append({
             "task_id": task.task_id,
-            "created_at": task.created_at.isoformat() if task.created_at else "",
+            "created_at": _iso_utc(task.created_at),
             "is_init": bool(getattr(task, "is_init", False)),
             "result_processor": task.result_processor or "",
             "code_preview": str(task.code or "")[:120],
@@ -652,7 +672,8 @@ def update_listener_config(updates: dict) -> tuple:
     cfg_path = _config_path_of(server)
     allowed = {"server_host", "server_port", "client_port", "client_tls", "https_port",
                "dns_port", "relay_port", "socks5_port", "relay_host",
-               "client_timeout", "exec_timeout", "interval", "jitter",
+               "client_timeout", "exec_timeout", "beacon_expire_seconds",
+               "interval", "jitter",
                "max_tasks_per_client", "max_results_per_beacon"}
     with _C2_LOCK:
         try:

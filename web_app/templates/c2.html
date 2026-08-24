@@ -56,6 +56,18 @@
                     <button class="btn btn-sm btn-primary" onclick="execBatchCmd()">批量执行</button>
                     <button class="btn btn-sm" onclick="clearBeaconSel()">清除</button>
                 </div>
+                <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+                    <button id="hidden-toggle" class="btn btn-sm" onclick="toggleHiddenPanel()" title="已隐藏的 beacon 收纳在此,点击可查看/恢复"
+                            style="padding:2px 10px;font-size:0.72rem;">📦 收纳 (<span id="hidden-count">0</span>)</button>
+                    <span class="help-text" style="margin:0;font-size:0.68rem;" id="hidden-hint"></span>
+                </div>
+                <div id="hidden-panel" style="display:none;margin-bottom:8px;border:1px dashed var(--border);border-radius:8px;padding:6px;">
+                    <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+                        <span style="font-size:0.72rem;color:var(--text-muted);">已隐藏 beacon(未过期)</span>
+                        <button class="btn btn-sm" style="margin-left:auto;padding:1px 8px;font-size:0.68rem;" onclick="toggleHiddenPanel()">收起</button>
+                    </div>
+                    <div id="hidden-list" class="beacon-list"></div>
+                </div>
                 <div id="beacon-list" class="beacon-list"></div>
             </div>
             <div class="card panel-auto">
@@ -1187,7 +1199,89 @@ async function loadBeacons() {
             if (up.length) showNotice('⬇ beacon 掉线/清理: ' + up.map(function(id) { return id.slice(0, 8); }).join(', '), false);
         }
         renderBeaconList();
+        loadHidden();   // 同步收纳计数(隐藏 beacon 被清理/恢复后计数刷新)
     } catch (e) {}
+}
+
+// ── 收纳列表(隐藏 beacon) ──
+let hiddenBeacons = [];
+let hiddenPanelOpen = false;
+
+async function loadHidden() {
+    try {
+        const resp = await fetch('/api/c2/hidden');
+        const data = await resp.json();
+        if (!data.ok) return;
+        hiddenBeacons = data.beacons || [];
+        document.getElementById('hidden-count').textContent = hiddenBeacons.length;
+        const hint = document.getElementById('hidden-hint');
+        if (hint) hint.textContent = hiddenBeacons.length ? '未过期 ' + hiddenBeacons.filter(function(b) { return !b.expired; }).length + ' / 过期 ' + hiddenBeacons.filter(function(b) { return b.expired; }).length : '';
+        if (hiddenPanelOpen) renderHiddenList();
+    } catch (e) {}
+}
+
+function toggleHiddenPanel() {
+    hiddenPanelOpen = !hiddenPanelOpen;
+    document.getElementById('hidden-panel').style.display = hiddenPanelOpen ? 'block' : 'none';
+    document.getElementById('beacon-list').style.display = hiddenPanelOpen ? 'none' : 'block';
+    document.getElementById('hidden-toggle').textContent = '📦 收纳 (' + hiddenBeacons.length + ')';
+    if (hiddenPanelOpen) renderHiddenList();
+}
+
+function renderHiddenList() {
+    const box = document.getElementById('hidden-list');
+    // 收纳列表只展示未过期的隐藏 beacon(过期=离线超过清理时限,点击无意义)
+    const alive = hiddenBeacons.filter(function(b) { return !b.expired; });
+    if (!alive.length) {
+        box.innerHTML = '<span class="empty" style="font-size:0.7rem;">无未过期的隐藏 beacon</span>';
+        return;
+    }
+    let html = '';
+    alive.forEach(function(b) {
+        const hid = fmtLocal(b.hidden_at);
+        const last = fmtAgo(b.last_seen);
+        html += '<div class="beacon-card" style="padding:5px 7px;margin-bottom:4px;" onclick="openBeaconDetail(\'' + b.client_id + '\')">' +
+            '<div class="bc-head">' +
+            '<span class="li-title" style="cursor:pointer;font-size:0.72rem;" title="点击查看详情">' + escapeHtml(b.client_id) + '</span>' +
+            '<span class="dot-online" style="margin:0;opacity:0.5;" title="已隐藏"></span></div>' +
+            '<div class="bc-meta" style="font-size:0.66rem;">' +
+            escapeHtml(b.sys_platform || '?') + ' · ' + escapeHtml(b.sys_user || '?') + '<br>' +
+            '隐藏 ' + hid + ' · 心跳 ' + last +
+            '</div>' +
+            '<div style="display:flex;gap:4px;margin-top:3px;">' +
+            '<button class="btn btn-sm" style="flex:1;padding:1px 6px;font-size:0.66rem;" onclick="event.stopPropagation();openBeaconDetail(\'' + b.client_id + '\')">查看</button>' +
+            '<button class="btn btn-sm" style="flex:1;padding:1px 6px;font-size:0.66rem;" onclick="event.stopPropagation();unhideBeacon(\'' + b.client_id + '\')">恢复</button>' +
+            '</div></div>';
+    });
+    box.innerHTML = html;
+}
+
+async function hideBeacon(bid) {
+    if (!confirm('隐藏 beacon ' + bid.slice(0, 8) + '?将移入收纳列表,可随时恢复。')) return;
+    try {
+        const resp = await fetch('/api/c2/beacon/' + encodeURIComponent(bid) + '/hide', {method: 'POST'});
+        const data = await resp.json();
+        if (!data.ok) { showNotice(data.error || '隐藏失败', false); return; }
+        // 若当前选中/轮询的是被隐藏的 beacon,清掉选中态
+        if (currentBid === bid) {
+            currentBid = '';
+            stopResultPolling();
+        }
+        showNotice('已隐藏 ' + bid.slice(0, 8), true);
+        await loadBeacons();
+        await loadHidden();
+    } catch (e) { showNotice('隐藏失败: ' + e.message, false); }
+}
+
+async function unhideBeacon(bid) {
+    try {
+        const resp = await fetch('/api/c2/beacon/' + encodeURIComponent(bid) + '/unhide', {method: 'POST'});
+        const data = await resp.json();
+        if (!data.ok) { showNotice(data.error || '恢复失败', false); return; }
+        showNotice('已恢复 ' + bid.slice(0, 8), true);
+        await loadBeacons();
+        await loadHidden();
+    } catch (e) { showNotice('恢复失败: ' + e.message, false); }
 }
 
 function beaconSearchText(b) {
@@ -1206,11 +1300,24 @@ function fmtAgo(tsStr) {
     return Math.round(s / 86400) + 'd 前';
 }
 
+// 服务器时间统一输出 UTC ISO(带 Z 后缀,见 c2_bridge._iso_utc),
+// 这里解析后转访问者浏览器本地时区显示;无时区后缀的旧字符串按本地解析(兼容)。
+function fmtLocal(tsStr) {
+    if (!tsStr) return '-';
+    const t = new Date(tsStr.replace(' ', 'T')).getTime();
+    if (!t) return String(tsStr);
+    const d = new Date(t);
+    const p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
+        ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+}
+
 function renderBeaconList() {
     const list = document.getElementById('beacon-list');
     beaconIds = [];
     const q = (document.getElementById('beacon-search').value || '').trim().toLowerCase();
-    const filtered = q ? allBeacons.filter(function(b) { return beaconSearchText(b).includes(q); }) : allBeacons;
+    // 主列表过滤已隐藏(收纳)的 beacon
+    const filtered = q ? allBeacons.filter(function(b) { return !b.hidden && beaconSearchText(b).includes(q); }) : allBeacons.filter(function(b) { return !b.hidden; });
     if (!filtered.length) {
         list.innerHTML = '<span class="empty">' + (allBeacons.length ? '无匹配 beacon' : '暂无在线 beacon') + '</span>';
         updateSelInfo();
@@ -1228,7 +1335,8 @@ function renderBeaconList() {
             '<div class="bc-head">' +
             '<input type="checkbox" class="bc-check" ' + checked + ' onclick="event.stopPropagation();toggleBeaconSel(\'' + b.client_id + '\')" aria-label="选择 beacon" title="多选">' +
             '<span class="li-title" style="cursor:pointer;" title="点击查看详情" onclick="event.stopPropagation();openBeaconDetail(\'' + b.client_id + '\')">' + escapeHtml(b.client_id) + '</span>' +
-            '<span class="dot-online" style="margin:0;" title="' + online + '"></span></div>' +
+            '<span class="dot-online" style="margin:0;" title="' + online + '"></span>' +
+            '<span class="bc-hide" title="隐藏到收纳列表" onclick="event.stopPropagation();hideBeacon(\'' + b.client_id + '\')" style="margin-left:auto;cursor:pointer;font-size:0.8rem;opacity:0.55;padding:0 2px;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.55">📦</span></div>' +
             '<div class="bc-meta">' +
             escapeHtml(b.sys_platform || '?') + ' · ' + escapeHtml(b.sys_user || '?') + ' · ' + escapeHtml(b.sys_os || '') + '<br>' +
             (b.via ? 'via ' + escapeHtml(b.via) + ' · ' : '') +
@@ -1338,6 +1446,10 @@ function startResultPolling() {
     resultPollTimer = setInterval(trackBeaconResults, 2000);
 }
 
+function stopResultPolling() {
+    if (resultPollTimer) { clearInterval(resultPollTimer); resultPollTimer = null; }
+}
+
 // ── 自动刷新 ──
 let autoRefreshTimer = null;
 function toggleAutoRefresh() {
@@ -1370,8 +1482,8 @@ async function openBeaconDetail(bid) {
             '平台      : ' + (b.sys_platform || '-'),
             'via       : ' + (b.via || '直连') + (b.is_fork ? ' (fork)' : '') + (b.is_shell ? ' (shell)' : ''),
             '标签      : ' + ((b.tags || []).join(', ') || '-'),
-            '首次上线  : ' + (b.first_seen || '-'),
-            '最后心跳  : ' + (b.last_seen || '-'),
+            '首次上线  : ' + fmtLocal(b.first_seen),
+            '最后心跳  : ' + fmtLocal(b.last_seen),
             '结果数    : ' + (b.result_count || 0) + ' / 待办任务: ' + (b.pending_count || 0),
         ];
         document.getElementById('bd-info').textContent = lines.join('\n');
@@ -1387,7 +1499,7 @@ function renderBdTasks() {
     const tasks = bdBeacon.tasks || [];
     if (!tasks.length) { box.textContent = '（无待办任务）'; return; }
     box.textContent = tasks.map(function(t) {
-        return '[' + (t.is_init ? 'init' : 'task') + '] ' + (t.task_id || '').slice(0, 8) + ' ' + (t.created_at || '') + ' ' + (t.result_processor ? '(proc:' + t.result_processor + ')' : '') + ' :: ' + (t.code_preview || '');
+        return '[' + (t.is_init ? 'init' : 'task') + '] ' + (t.task_id || '').slice(0, 8) + ' ' + fmtLocal(t.created_at) + ' ' + (t.result_processor ? '(proc:' + t.result_processor + ')' : '') + ' :: ' + (t.code_preview || '');
     }).join('\n');
 }
 
@@ -1507,7 +1619,7 @@ function renderAudit() {
         return ((e.line || '') + ' ' + (e.client || '') + ' ' + (e.ts_iso || '')).toLowerCase().indexOf(q) !== -1;
     }) : c2Audit;
     document.getElementById('audit-list').textContent = list.map(function(e) {
-        return '[' + (e.ts_iso || '') + '] ' + (e.client ? '#' + String(e.client).slice(0, 8) + ' ' : '') + '> ' + (e.line || '') + (e.output_head ? '\n    ↳ ' + e.output_head : '');
+        return '[' + fmtLocal(e.ts_iso) + '] ' + (e.client ? '#' + String(e.client).slice(0, 8) + ' ' : '') + '> ' + (e.line || '') + (e.output_head ? '\n    ↳ ' + e.output_head : '');
     }).join('\n') || '（暂无操作记录）';
 }
 
@@ -2624,7 +2736,7 @@ async function loadWsHistory() {
                     '<div class="li-title" style="display:flex;gap:8px;align-items:center;">' +
                     '<span class="mono" style="color:' + okCls + ';">' + (h.ok ? '✓' : '✗') + '</span>' +
                     '<span class="mono" style="font-size:0.8rem;">' + escapeHtml(h.command) + '</span>' +
-                    '<span class="help-text" style="margin-left:auto;font-size:0.7rem;">' + escapeHtml(h.ts_iso || '') + ' · ' + h.ms + 'ms</span></div>' +
+                    '<span class="help-text" style="margin-left:auto;font-size:0.7rem;">' + fmtLocal(h.ts_iso) + ' · ' + h.ms + 'ms</span></div>' +
                     (h.error ? '<div class="mono" style="color:var(--danger);font-size:0.75rem;margin-top:2px;">' + escapeHtml(h.error) + '</div>' : '') +
                     '<div class="mono ws-hist-out" style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;white-space:pre-wrap;word-break:break-all;max-height:80px;overflow:hidden;">' + escapeHtml((h.output || '').slice(0, 300)) + '</div>' +
                     '</div>';
@@ -3379,7 +3491,7 @@ async function loadPhReports() {
             var uas = phUaSummary(r.ua || '');
             if (uas) html += '<span style="color:var(--text-faint);font-size:0.68rem;">' + escapeHtml(uas) + '</span>';
             html += '<span style="flex:1;"></span>';
-            html += '<span style="color:var(--text-faint);">' + escapeHtml(r.ts_iso || '') + '</span>';
+            html += '<span style="color:var(--text-faint);">' + fmtLocal(r.ts_iso) + '</span>';
             html += '</div>';
             if (r.url) html += '<div style="color:var(--accent);margin-top:3px;word-break:break-all;">' + escapeHtml(r.url) + '</div>';
             if (dataStr) html += '<div style="color:var(--text-muted);margin-top:2px;word-break:break-all;">' + escapeHtml(dataStr) + '</div>';
@@ -3474,7 +3586,7 @@ async function openPhAuditModal() {
         if (!entries.length) { box.innerHTML = '<span style="color:var(--text-muted);">暂无操作日志</span>'; return; }
         var html = '';
         entries.forEach(function(e) {
-            html += '<div style="margin-bottom:8px;">[' + escapeHtml(e.ts_iso || '') + '] ' + escapeHtml(e.line || '') + (e.output_head ? ' → ' + escapeHtml(e.output_head) : '') + '</div>';
+            html += '<div style="margin-bottom:8px;">[' + fmtLocal(e.ts_iso) + '] ' + escapeHtml(e.line || '') + (e.output_head ? ' → ' + escapeHtml(e.output_head) : '') + '</div>';
         });
         box.innerHTML = html;
     } catch (e) { box.innerHTML = '加载失败'; }

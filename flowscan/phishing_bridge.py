@@ -372,7 +372,7 @@ def _report_callback(redis, payload: dict, ip: str, ua: str) -> None:
         entry = {
             "id": rid,
             "ts": now,
-            "ts_iso": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now)),
+            "ts_iso": time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()) + "Z",  # UTC 带 Z,前端 fmtLocal 转本地时区
             "ip": ip or "",
             "ua": (ua or "")[:200],
             "type": str(payload.get("type") or payload.get("module") or "report"),

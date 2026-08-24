@@ -57,6 +57,8 @@ def _ai_config(config: Dict[str, Any]) -> Dict[str, Any]:
         "agent_scan_gap_seconds": int(cfg.get("agent_scan_gap_seconds", 5) or 5),
         "agent_plan_mode": _to_bool(cfg.get("agent_plan_mode", False)),
         "agent_context_max_chars": int(cfg.get("agent_context_max_chars", 60000) or 60000),
+        # 上下文预算(token 计量):压缩按 token 近似计量(替代字符数预算,中英混合更准)
+        "agent_context_max_tokens": int(cfg.get("agent_context_max_tokens", 24000) or 24000),
         "agent_approval_mode": approval_mode,
         "agent_require_approval": approval_mode == "human",  # 兼容旧调用方
         "reasoning_effort": str(cfg.get("reasoning_effort", "off") or "off").strip().lower()
@@ -67,7 +69,8 @@ def _ai_config(config: Dict[str, Any]) -> Dict[str, Any]:
 
 _AI_CONFIG_FIELDS = ("base_url", "api_key", "model", "timeout_seconds", "max_events", "log_api_key",
                      "agent_max_iterations", "agent_scan_gap_seconds", "agent_plan_mode",
-                     "agent_context_max_chars", "agent_approval_mode", "reasoning_effort")
+                     "agent_context_max_chars", "agent_context_max_tokens",
+                     "agent_approval_mode", "reasoning_effort")
 
 
 def _skill_dirs(config: Dict[str, Any]) -> List[str]:
@@ -293,7 +296,7 @@ def register(app):
                     continue  # 脱敏值或空,保留原值
                 if any(ord(c) > 127 for c in v):
                     continue  # 含非 ASCII(粘贴错误/UI 文案误存),拒绝写入
-            elif k in ("timeout_seconds", "max_events", "agent_max_iterations", "agent_scan_gap_seconds", "agent_context_max_chars"):
+            elif k in ("timeout_seconds", "max_events", "agent_max_iterations", "agent_scan_gap_seconds", "agent_context_max_chars", "agent_context_max_tokens"):
                 try:
                     v = int(v)
                 except (TypeError, ValueError):

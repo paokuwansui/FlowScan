@@ -27,6 +27,11 @@
         <div style="min-width:0;">
             <div class="card">
                 <h3 id="current-title">Agent 会话</h3>
+                <div id="agent-goal-bar" style="display:none;margin:6px 0;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:rgba(3,7,15,0.4);font-size:0.74rem;gap:8px;align-items:center;">
+                    <span style="white-space:nowrap;">🎯 目标</span>
+                    <span id="agent-goal-text" style="flex:1;color:var(--text);word-break:break-all;min-width:0;"></span>
+                    <span id="agent-goal-phase" class="badge badge-node" style="white-space:nowrap;flex-shrink:0;"></span>
+                </div>
                 <p class="help-text">
                     输入任务后 Agent 自主循环：查看事件 → 注入扫描 → 看增量 → 再决策，直到收敛。
                     危险工具（删除/黑名单/网络/Python/命令/MCP）按审批模式执行（自动放行 / AI 审批 / 人工审批），全部落审计，下方可展开查看。
@@ -285,8 +290,12 @@
                 <input type="number" id="cfg-agent_scan_gap_seconds" min="0" max="120" class="form-control" style="width:110px;font-family:var(--font-mono);">
             </div>
             <div class="form-group" style="margin:0;">
-                <label for="cfg-agent_context_max_chars">上下文预算（字符）</label>
-                <input type="number" id="cfg-agent_context_max_chars" min="10000" max="500000" class="form-control" style="width:150px;font-family:var(--font-mono);">
+                <label for="cfg-agent_context_max_tokens">上下文预算（token）</label>
+                <input type="number" id="cfg-agent_context_max_tokens" min="4000" max="120000" class="form-control" style="width:150px;font-family:var(--font-mono);" title="Agent 上下文压缩预算,按 token 近似计量(CJK 1 token/字,其余 4 字符/token)">
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label for="cfg-agent_context_max_chars">上下文预算（字符·旧）</label>
+                <input type="number" id="cfg-agent_context_max_chars" min="10000" max="500000" class="form-control" style="width:150px;font-family:var(--font-mono);" title="旧字段,已由 token 预算替代(保留兼容旧配置)">
             </div>
             <div class="form-group" style="margin:0;">
                 <label for="cfg-reasoning_effort">思考强度</label>
@@ -671,7 +680,7 @@ function updateInputHint() {
     const el = document.getElementById('agent-input-hint');
     if (!el) return;
     if (agentRunning) {
-        let text = '运行中：回车=排队发送 · Ctrl+回车=打断并发送 · Shift+回车换行';
+        let text = '运行中：回车=排队发送 · Ctrl+回车=打断(空内容=纯打断) · Shift+回车换行';
         if (agentQueueLen > 0) text += '（已排队 ' + agentQueueLen + ' 条）';
         el.textContent = text;
         el.style.color = 'var(--warning)';
@@ -682,10 +691,12 @@ function updateInputHint() {
 }
 
 async function sendAgentMessage(mode) {
-    const msg = document.getElementById('agent-message').value.trim();
+    const el = document.getElementById('agent-message');
+    const msg = el.value.trim();
     if (!currentSessionId) { alert('请先新建或选择一个会话'); return; }
-    if (!msg) { alert('任务描述不能为空'); return; }
-    document.getElementById('agent-message').value = '';
+    // interrupt 模式允许空消息 = 纯打断(停止当前任务,不重复发送旧语句)
+    if (!msg && mode !== 'interrupt') { alert('任务描述不能为空'); return; }
+    el.value = '';
     const resp = await fetch(AGENT_RUN_URL, {method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({session_id: currentSessionId, message: msg, mode: mode})});
     const data = await resp.json();
@@ -729,7 +740,22 @@ async function fetchMessages(incremental) {
         box.appendChild(renderMessage(m));
     }
     box.scrollTop = box.scrollHeight;
+    updateGoalBar(data.state || {});
     return data.state || {};
+}
+
+// 目标状态机显示:state.goal {goal, phase} → 顶部目标条
+const GOAL_PHASE_LABEL = {active: '进行中', complete: '已完成', blocked: '已阻塞', paused: '已暂停', none: ''};
+function updateGoalBar(state) {
+    const bar = document.getElementById('agent-goal-bar');
+    const g = (state.goal || {});
+    const text = g.goal || '';
+    if (!text) { bar.style.display = 'none'; return; }
+    document.getElementById('agent-goal-text').textContent = text;
+    const ph = document.getElementById('agent-goal-phase');
+    ph.textContent = GOAL_PHASE_LABEL[g.phase] || (g.phase || '');
+    ph.style.color = g.phase === 'complete' ? 'var(--success)' : (g.phase === 'blocked' ? 'var(--danger)' : (g.phase === 'paused' ? 'var(--warning)' : ''));
+    bar.style.display = 'flex';
 }
 
 function renderMessage(m) {
@@ -889,6 +915,7 @@ async function loadAiConfig() {
     document.getElementById('cfg-max_events').value = c.max_events || 200;
     document.getElementById('cfg-agent_max_iterations').value = c.agent_max_iterations || 50;
     document.getElementById('cfg-agent_scan_gap_seconds').value = c.agent_scan_gap_seconds || 5;
+    document.getElementById('cfg-agent_context_max_tokens').value = c.agent_context_max_tokens || 24000;
     document.getElementById('cfg-agent_context_max_chars').value = c.agent_context_max_chars || 60000;
     document.getElementById('cfg-reasoning_effort').value = c.reasoning_effort || 'off';
     document.getElementById('cfg-agent_plan_mode').checked = !!c.agent_plan_mode;
@@ -1048,6 +1075,7 @@ async function saveAiConfig() {
         max_events: parseInt(document.getElementById('cfg-max_events').value) || 200,
         agent_max_iterations: parseInt(document.getElementById('cfg-agent_max_iterations').value) || 50,
         agent_scan_gap_seconds: parseInt(document.getElementById('cfg-agent_scan_gap_seconds').value) || 5,
+        agent_context_max_tokens: parseInt(document.getElementById('cfg-agent_context_max_tokens').value) || 24000,
         agent_context_max_chars: parseInt(document.getElementById('cfg-agent_context_max_chars').value) || 60000,
         reasoning_effort: document.getElementById('cfg-reasoning_effort').value,
         agent_plan_mode: document.getElementById('cfg-agent_plan_mode').checked,

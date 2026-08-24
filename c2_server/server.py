@@ -399,7 +399,7 @@ class PyExec2Server:
             while self._running:
                 time.sleep(60)
                 offline = self._mgr.get_offline_clients(
-                    timeout=self._config.client_timeout)
+                    timeout=self._config.beacon_expire_seconds)
                 for c in offline:
                     if c.active:
                         continue  # 活跃会话（正在执行任务）不清理

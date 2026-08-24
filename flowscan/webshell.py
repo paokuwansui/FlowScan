@@ -13,7 +13,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 _CONN_KEY = lambda cid: f"fs3:webshell:conn:{cid}"  # noqa: E731
 _LIST_KEY = "fs3:webshell:connections"
@@ -346,7 +346,7 @@ def push_history(redis, conn_id: str, kind: str, command: str, output: str,
         entry = {
             "id": uuid.uuid4().hex[:8],
             "ts": time.time(),
-            "ts_iso": datetime.fromtimestamp(time.time()).isoformat(timespec="seconds"),
+            "ts_iso": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),  # UTC 带 Z,前端 fmtLocal 转本地时区
             "kind": kind,          # exec / fileop(list/read/write/...)
             "command": command[:500],
             "output": output[:2000],

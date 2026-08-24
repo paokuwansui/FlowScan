@@ -17,6 +17,7 @@
   "max_connections": 256,
   "client_timeout": 300,
   "exec_timeout": 300,
+  "beacon_expire_seconds": 86400,
   "client_tls": false,
   "https_port": 0,
   "dns_port": 0,

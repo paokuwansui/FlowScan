@@ -17,7 +17,9 @@ execution:
   command: echo "{{subdomain_q}}" | dnsx -a -silent -ro | cdncheck -e -silent
   output_parse_code: |
     lines = [line.strip() for line in data["stdout"].splitlines() if line.strip()]
-    if len(lines) == 1:
-        return [{"IP_ADDRESS": lines[0]}]
-    else:
-        return []
+    # 每行一个 IP(dnsx -a 对多 A 记录/负载均衡会输出多个 IP,逐个产出不遗漏);
+    # 上限 20 防泛解析域名输出几十个 IP 全量入队爆炸
+    results = []
+    for ip in lines[:20]:
+        results.append({"IP_ADDRESS": ip})
+    return results

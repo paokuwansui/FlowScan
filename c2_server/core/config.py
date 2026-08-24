@@ -55,6 +55,7 @@ class ServerConfig:
     max_connections: int = 256
     client_timeout: int = 300
     exec_timeout: int = 300          # exec 模块命令超时（秒，默认 5 分钟）
+    beacon_expire_seconds: int = 86400  # beacon 过期清理时限（秒，默认 1 天；超时未回连即移除）
     client_tls: bool = False         # client 远程通道启用 TLS（防嗅探）
     https_port: int = 0              # HTTPS 传输监听端口（0=禁用，f8）
     dns_port: int = 0                # DNS 隧道监听端口（0=禁用，53 需 root）
@@ -82,6 +83,7 @@ class ServerConfig:
             ("max_connections", self.max_connections),
             ("client_timeout", self.client_timeout),
             ("exec_timeout", self.exec_timeout),
+            ("beacon_expire_seconds", self.beacon_expire_seconds),
         ):
             if not isinstance(val, int) or val <= 0:
                 problems.append(f"{name}: must be positive int, got {val!r}")
