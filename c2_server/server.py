@@ -296,8 +296,11 @@ class PyExec2Server:
                     break
                 if len(data) < 24:
                     continue
-                # M4：心跳包 = <bid 16 字符 hex><HMAC(_K, bid)[:8]>
-                bid = data[:-8].decode("ascii", "replace")
+                # M4：心跳包 = <bid 16 字符 hex><填充 0-40B 可选><HMAC(_K, bid)[:8]>
+                # ——bid 取固定 16 字节前缀,mac 取帧尾 8 字节,中间填充为
+                # 流量混淆(2026-08-25)忽略;假心跳(纯随机)bid 前缀查不到或
+                # MAC 校验失败,自然忽略。
+                bid = data[:16].decode("ascii", "replace")
                 mac = data[-8:]
                 rec = self._mgr.get_client(bid)
                 if rec is None:

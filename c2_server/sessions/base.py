@@ -30,6 +30,16 @@ class SessionError(Exception):
         self.message = message
 
 
+def _drain_exact(sock, n: int) -> None:
+    """读取并丢弃 n 字节（TCP 直连通道的首包随机前缀）。"""
+    got = b""
+    while len(got) < n:
+        chunk = sock.recv(n - len(got))
+        if not chunk:
+            raise ConnectionError("prefix eof")
+        got += chunk
+
+
 def handshake(sock, key: bytes, expected_role: str,
               max_frame_size: int) -> dict:
     """执行握手并返回 register 消息。
@@ -37,6 +47,13 @@ def handshake(sock, key: bytes, expected_role: str,
     Raises:
         SessionError: 失败（错误码 + 消息）
     """
+    # 流量混淆: TCP 直连通道连接首包为 256B 随机前缀
+    # (implant connect_transport / client RemoteClient 发送),先吞掉再读
+    # register 帧;HTTPS/DNS 无状态通道不走 handshake,不受影响。
+    try:
+        _drain_exact(sock, 256)
+    except (ConnectionError, ValueError) as e:
+        raise SessionError(BAD_FRAME, f"prefix drain failed: {e}") from e
     try:
         raw = recv_frame(sock, key, max_frame_size=max_frame_size)
     except (ConnectionError, ValueError) as e:
@@ -57,7 +74,8 @@ def handshake(sock, key: bytes, expected_role: str,
             f"(expected '{expected_role}')")
 
     version = msg.get("version", PROTOCOL_VERSION)
-    if version > PROTOCOL_VERSION:
+    # v2: 协议版本严格相等——旧版植入物(version=1)直接拒绝,不做向下兼容
+    if version != PROTOCOL_VERSION:
         raise SessionError(
             VERSION_MISMATCH,
             f"server protocol v{PROTOCOL_VERSION}, peer v{version}")

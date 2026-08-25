@@ -10,8 +10,9 @@ MODULE = {
 
 
 def run(key_hex):
-    global _K
+    global _K, _CK
     _K = bytes.fromhex(key_hex)
+    _CK = _K  # 同步当前连接密钥:cycle 每轮 CONN_KEY=_CK
     return f"key updated ({len(_K)} bytes)"
 
 

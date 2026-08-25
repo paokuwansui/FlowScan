@@ -105,12 +105,20 @@ class ClientManager:
             if rec:
                 rec.last_seen = datetime.now()
 
-    def add_result(self, client_id: str, result: TaskResult) -> None:
-        """记录任务执行结果。"""
+    def add_result(self, client_id: str, result: TaskResult) -> bool:
+        """记录任务执行结果。
+
+        v2 批量模型:implant 可能重发未获 ACK 的结果——按 task_id 去重,
+        已存在则跳过。返回 True=新增, False=重复或 beacon 不存在。
+        """
         with self._lock:
             rec = self._clients.get(client_id)
-            if rec:
-                rec.results.append(result)
+            if not rec:
+                return False
+            if any(r.task_id == result.task_id for r in rec.results):
+                return False  # 重复上报,跳过
+            rec.results.append(result)
+            return True
 
     def remove_client(self, client_id: str) -> None:
         """移除客户端记录。"""

@@ -133,10 +133,18 @@ def _sh_exec(cmd):
 
 
 def run():
-    """进入交互式 shell 循环，直到收到 exit/break 文本任务。"""
+    """进入交互式 shell 循环，直到收到 exit/break 文本任务。
+
+    v2 批量模型: 与主模板同协议（register batch=true → 上报本地结果 →
+    fetch → 收 TASKS 批量任务 → pong 断开）。shell 命令在本地子进程
+    执行，结果暂存 _SH_PENDING，下次回连批量上报（与主模型一致）。
+    """
     G = globals()
     G["_BS"] = False
     G["_IN_SHELL"] = True
+    G.setdefault("_SH_PENDING", {})            # task_id -> (output, error)
+    G.setdefault("_SH_PENDING_LOCK", _th.Lock())
+    lock = G["_SH_PENDING_LOCK"]
     try:
         try:
             G["_SH"] = _start_shell()
@@ -145,39 +153,55 @@ def run():
         while not G["_BS"]:
             try:
                 t = _T()
-                p(t, g.dumps({"type": "register", "version": 1,
-                              "role": "beacon", "id": _D,
-                              "shell": True}).encode())
-                while not G["_BS"]:
-                    u = g.loads(q(t).decode())
+                send_frame(t, js.dumps({"type": "register", "version": 2,
+                                        "role": "beacon", "id": _D,
+                                        "shell": True, "batch": True}).encode())
+                while True:
+                    u = js.loads(recv_frame(t).decode())
                     v = u.get("type")
                     if v == "welcome":
-                        continue
-                    if v in ("task", "init_task"):
-                        cmd = u["code"].strip()
-                        if cmd in ("exit", "break"):
-                            G["_BS"] = True
-                            p(t, g.dumps({"type": "result",
-                                          "task_id": u.get("task_id", ""),
-                                          "output": "(shell exit)",
-                                          "error": ""}).encode())
-                            break
-                        # 幂等：server 断线重发机制可能把 shell 任务本身
-                        # 重发回来（主连接执行 shell 时阻塞，server 等
-                        # result 超时 → push_front 重发）。已在 shell 模式
-                        # 时跳过，防止嵌套 shell 循环互相覆盖 _BS。
-                        if ("def _sh_exec" in u["code"]
-                                or "def _start_shell" in u["code"]):
-                            p(t, g.dumps({"type": "result",
-                                          "task_id": u.get("task_id", ""),
-                                          "output": "(已在 shell 模式，"
-                                                    "忽略重复的 shell 任务)",
-                                          "error": ""}).encode())
-                            continue
-                        w, x = _sh_exec(cmd)
-                        p(t, g.dumps({"type": "result",
-                                      "task_id": u.get("task_id", ""),
-                                      "output": w, "error": x}).encode())
+                        break
+                    if v == "error":
+                        raise ConnectionError("error frame")
+                # ① 上报本地结果（逐条发 + 收确认）
+                with lock:
+                    pending = list(G["_SH_PENDING"].items())
+                for tid, res in pending:
+                    send_frame(t, js.dumps({"type": "result", "task_id": tid,
+                                            "output": res[0],
+                                            "error": res[1]}).encode())
+                    u = js.loads(recv_frame(t).decode())
+                    if u.get("type") == "tasks":
+                        for a in u.get("acked") or []:
+                            with lock:
+                                G["_SH_PENDING"].pop(a, None)
+                    else:
+                        break
+                # ② 领取批量任务：shell 命令写子进程执行，结果暂存待上报
+                send_frame(t, js.dumps({"type": "fetch"}).encode())
+                while not G["_BS"]:
+                    u = js.loads(recv_frame(t).decode())
+                    v = u.get("type")
+                    if v == "tasks":
+                        for tk in u.get("tasks") or []:
+                            if G["_BS"]:
+                                break
+                            cmd = tk.get("code", "").strip()
+                            if cmd in ("exit", "break"):
+                                G["_BS"] = True
+                                with lock:
+                                    G["_SH_PENDING"][tk.get("task_id", "")] = ("(shell exit)", "")
+                                break
+                            # 幂等：重复下发 shell 任务本身时跳过（防嵌套 shell）
+                            if ("def _sh_exec" in tk.get("code", "")
+                                    or "def _start_shell" in tk.get("code", "")):
+                                with lock:
+                                    G["_SH_PENDING"][tk.get("task_id", "")] = (
+                                        "(已在 shell 模式，忽略重复的 shell 任务)", "")
+                                continue
+                            w, x = _sh_exec(cmd)
+                            with lock:
+                                G["_SH_PENDING"][tk.get("task_id", "")] = (w, x)
                     elif v == "pong":
                         break
                     elif v == "error":
@@ -186,7 +210,7 @@ def run():
             except Exception:
                 pass
             if not G["_BS"]:
-                f.sleep(s())
+                tm.sleep(sleep_jitter())
     finally:
         G["_IN_SHELL"] = False
         sh = G.get("_SH")

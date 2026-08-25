@@ -31,6 +31,9 @@
         <button class="btn btn-sm" onclick="openDeployModal()" title="生成 implant 部署命令">部署向导</button>
         <button class="btn btn-sm" onclick="openListenerModal()" title="配置 HTTPS/DNS/relay/socks5 等通道">通道配置</button>
         <button class="btn btn-sm" onclick="openAuditModal()" title="C2 操作审计日志">操作日志</button>
+        <button class="btn btn-sm" onclick="downloadExportConfig()" title="导出独立 server 部署包(代码+配置+说明),在另一台服务器解压即可启动">导出配置</button>
+        <button class="btn btn-sm btn-primary" onclick="openRemoteModal()" title="以 client 模式连接远端独立 server 进行远程管理">远程模式</button>
+        <span id="remote-badge" style="display:none;color:var(--success);white-space:nowrap;">🔗 远程: <b id="remote-badge-url">-</b></span>
     </div>
 
     <div class="c2-workbench">
@@ -239,6 +242,31 @@
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
             <button class="btn btn-secondary" onclick="closeBeaconDetail()">关闭</button>
+        </div>
+    </div>
+</div>
+
+{# ── 远程模式: client 连接远端独立 server ── #}
+<div id="remote-modal" class="modal-backdrop" style="display:none;">
+    <div class="modal" style="width:min(680px,92vw);">
+        <h3>远程模式 · client 连接远端 Server</h3>
+        <p class="help-text">在另一台服务器部署独立 C2 server（「导出配置」下载部署包 → 解压 → ./start.sh），再用本界面对其远程管理：填写远端地址与 client_key 即可连接，Beacon 列表 / 终端 / 模块执行均操作远端。</p>
+        <div class="form-row" style="gap:10px;margin:12px 0;flex-wrap:wrap;">
+            <div class="form-group" style="margin:0;flex:1;min-width:200px;">
+                <label for="rm-url">远端地址</label>
+                <input type="text" id="rm-url" class="form-control" placeholder="1.2.3.4:65504 或 https://1.2.3.4:65504" style="font-family:var(--font-mono);font-size:0.8rem;" onkeydown="if(event.key==='Enter'){event.preventDefault();remoteConnect();}">
+            </div>
+            <div class="form-group" style="margin:0;flex:1;min-width:230px;">
+                <label for="rm-key">client_key 密钥 (64 hex)</label>
+                <input type="password" id="rm-key" class="form-control" placeholder="远端 server 的 client_key（s_exec keygen 生成）" style="font-family:var(--font-mono);font-size:0.8rem;" onkeydown="if(event.key==='Enter'){event.preventDefault();remoteConnect();}">
+            </div>
+        </div>
+        <div id="rm-status" class="help-text" style="margin-bottom:6px;">未连接</div>
+        <div class="help-text" style="margin-bottom:12px;color:var(--text-faint);">密钥仅存于内存,不落盘;断开即清除。</div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+            <button id="rm-connect-btn" class="btn btn-primary" onclick="remoteConnect()">连接</button>
+            <button id="rm-disconnect-btn" class="btn btn-sm" onclick="remoteDisconnect()" style="display:none;">断开</button>
+            <button class="btn btn-secondary" onclick="closeRemoteModal()">关闭</button>
         </div>
     </div>
 </div>
@@ -1040,7 +1068,8 @@ async function termCmd(line) {
         loadBeacons();
     }
     try {
-        const resp = await fetch('/api/c2/exec', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({line: line})});
+        const api = isRemote() ? '/api/c2/remote/command' : '/api/c2/exec';
+        const resp = await fetch(api, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({line: line})});
         const data = await resp.json();
         termAppend((data.ok ? '' : '[!] ' + (data.error || '') + '\n') + (data.output || ''), '');
     } catch (err) {
@@ -1182,9 +1211,99 @@ async function loadCommands() {
 let allBeacons = [];
 let selectedBeacons = {};   // bid -> true
 
+// ══════════ 远程模式(client 连接远端独立 server) ══════════
+let c2Remote = { connected: false, url: '' };
+
+async function apiRemote(path, opts) {
+    const resp = await fetch(path, opts);
+    return resp.json();
+}
+
+function isRemote() { return c2Remote.connected; }
+
+function downloadExportConfig() {
+    window.location.href = '/api/c2/export-config';
+    showNotice('正在导出独立 server 部署包(代码+配置+说明)...', true);
+}
+
+function openRemoteModal() {
+    document.getElementById('remote-modal').style.display = 'flex';
+    loadRemoteStatus();
+}
+
+function closeRemoteModal() { document.getElementById('remote-modal').style.display = 'none'; }
+
+async function loadRemoteStatus() {
+    try {
+        const data = await apiRemote('/api/c2/remote/status');
+        const was = c2Remote.connected;
+        c2Remote = { connected: !!data.connected, url: data.url || '' };
+        applyRemoteUI();
+        const st = document.getElementById('rm-status');
+        if (!st) return;
+        if (c2Remote.connected) {
+            st.textContent = '已连接: ' + c2Remote.url + (data.connected_at ? ' (' + fmtLocal(data.connected_at) + ')' : '');
+            st.style.color = 'var(--success)';
+        } else {
+            st.textContent = data.error ? '连接已断开: ' + data.error : '未连接';
+            st.style.color = 'var(--text-muted)';
+        }
+        document.getElementById('rm-connect-btn').style.display = c2Remote.connected ? 'none' : '';
+        document.getElementById('rm-disconnect-btn').style.display = c2Remote.connected ? '' : 'none';
+        if (was !== c2Remote.connected) { loadBeacons(); loadModules(); }
+    } catch (e) {}
+}
+
+async function remoteConnect() {
+    const url = document.getElementById('rm-url').value.trim();
+    const key = document.getElementById('rm-key').value.trim();
+    const st = document.getElementById('rm-status');
+    if (!url) { st.textContent = '请输入远端地址'; st.style.color = 'var(--danger)'; return; }
+    st.textContent = '连接中...'; st.style.color = 'var(--text-muted)';
+    try {
+        const data = await apiRemote('/api/c2/remote/connect', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url: url, key: key})});
+        st.textContent = data.message || (data.error || '失败');
+        st.style.color = data.ok ? 'var(--success)' : 'var(--danger)';
+        if (data.ok) {
+            document.getElementById('rm-key').value = '';
+            c2Remote = { connected: true, url: url };
+            applyRemoteUI();
+            document.getElementById('rm-connect-btn').style.display = 'none';
+            document.getElementById('rm-disconnect-btn').style.display = '';
+            loadBeacons(); loadModules(); startResultPolling();
+        }
+    } catch (e) { st.textContent = '请求失败: ' + e.message; st.style.color = 'var(--danger)'; }
+}
+
+async function remoteDisconnect() {
+    try {
+        await apiRemote('/api/c2/remote/disconnect', {method: 'POST'});
+    } catch (e) {}
+    c2Remote = { connected: false, url: '' };
+    applyRemoteUI();
+    loadRemoteStatus();
+    loadBeacons(); loadModules();
+}
+
+function applyRemoteUI() {
+    const on = c2Remote.connected;
+    const badge = document.getElementById('remote-badge');
+    if (badge) {
+        badge.style.display = on ? '' : 'none';
+        document.getElementById('remote-badge-url').textContent = c2Remote.url;
+    }
+    // 本地专属按钮远程模式下禁用
+    ['c2-toggle-btn'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) { el.disabled = on; el.title = on ? '远程模式下不可用(管理远端 server)' : el.title; }
+    });
+}
+
+// ── 数据源分发(本地 c2_bridge / 远端 RemoteClient) ──
 async function loadBeacons() {
     try {
-        const resp = await fetch('/api/c2/beacons');
+        const api = isRemote() ? '/api/c2/remote/beacons' : '/api/c2/beacons';
+        const resp = await fetch(api);
         const data = await resp.json();
         if (!data.ok) return;
         const prev = {};
@@ -1399,14 +1518,26 @@ async function selectBeacon(bid) {
     startResultPolling();
     document.getElementById('console-beacon').textContent = 'beacon: ' + bid.slice(0, 8) + '…';
     termAppend('[>] 已选中 beacon: ' + bid, 'tinfo');
-    // 同步后端 Dispatcher 的 current_beacon(等价 use <bid>),终端命令直接作用于选中 beacon
-    try {
-        const resp = await fetch('/api/c2/select', {method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({client_id: bid})});
-        const data = await resp.json();
-        if (!data.ok) termAppend('[!] 后端同步失败: ' + (data.message || data.error || ''), 'terror');
-    } catch (e) {
-        termAppend('[!] 后端同步失败: ' + e.message, 'terror');
+    if (isRemote()) {
+        // 远端同步 use <bid> + 拉详情文本
+        try {
+            const d = await apiRemote('/api/c2/remote/command', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({line: 'use ' + bid})});
+            if (!d.ok) termAppend('[!] 远端 use 失败: ' + (d.error || ''), 'terror');
+            const det = await apiRemote('/api/c2/remote/beacon/' + encodeURIComponent(bid));
+            if (det.ok && det.detail) {
+                termAppend('── 远端详情 ──', 'tinfo');
+                termAppend(det.detail, 'tplain');
+            }
+        } catch (e) { termAppend('[!] 远端同步失败: ' + e.message, 'terror'); }
+    } else {
+        try {
+            const resp = await fetch('/api/c2/select', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({client_id: bid})});
+            const data = await resp.json();
+            if (!data.ok) termAppend('[!] 后端同步失败: ' + (data.message || data.error || ''), 'terror');
+        } catch (e) {
+            termAppend('[!] 后端同步失败: ' + e.message, 'terror');
+        }
     }
     loadBeacons();
 }
@@ -1414,9 +1545,27 @@ async function selectBeacon(bid) {
 // ══════════ beacon 结果自动回显(轮询当前选中 beacon,增量显示) ══════════
 let shownResultKeys = {};
 let resultPollTimer = null;
+let remoteLastDetail = '';   // 远程模式: 上次详情文本(增量对比)
 
 function trackBeaconResults() {
     if (!currentBid) return;
+    if (isRemote()) {
+        // 远程模式: 拉远端详情文本,内容变化时增量展示
+        fetch('/api/c2/remote/beacon/' + encodeURIComponent(currentBid))
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (!d.ok) return;
+                if (!remoteLastDetail) remoteLastDetail = '';
+                if (d.detail && d.detail !== remoteLastDetail) {
+                    const fresh = d.detail.slice(remoteLastDetail.length) || d.detail;
+                    remoteLastDetail = d.detail;
+                    termAppend('── 远端结果更新 ──', 'tinfo');
+                    termAppend(fresh, 'tok');
+                }
+            })
+            .catch(function() {});
+        return;
+    }
     fetch('/api/c2/beacon/' + encodeURIComponent(currentBid))
         .then(function(r) { return r.json(); })
         .then(function(d) {
@@ -1497,7 +1646,11 @@ function renderBdTasks() {
     const box = document.getElementById('bd-tasks');
     if (!bdBeacon) return;
     const tasks = bdBeacon.tasks || [];
-    if (!tasks.length) { box.textContent = '（无待办任务）'; return; }
+    if (!tasks.length) {
+        // v2 批量模型: 任务一次性下发至 implant 本地队列,服务端队列下发即空
+        box.textContent = '（服务端无待办——批量模式下任务已一次性下发至 implant 本地队列，执行结果回连时带回）';
+        return;
+    }
     box.textContent = tasks.map(function(t) {
         return '[' + (t.is_init ? 'init' : 'task') + '] ' + (t.task_id || '').slice(0, 8) + ' ' + fmtLocal(t.created_at) + ' ' + (t.result_processor ? '(proc:' + t.result_processor + ')' : '') + ' :: ' + (t.code_preview || '');
     }).join('\n');
@@ -1718,14 +1871,21 @@ let serverMods = [];
 
 async function loadModules() {
     try {
-        const resp = await fetch('/api/c2/modules');
+        const api = isRemote() ? '/api/c2/remote/modules' : '/api/c2/modules';
+        const resp = await fetch(api);
         const data = await resp.json();
         if (!data.ok) {
             document.getElementById('module-list').innerHTML = '<div class="flash error">' + escapeHtml(data.error) + '</div>';
             return;
         }
-        implantMods = data.implant || [];
-        serverMods = data.server || [];
+        if (isRemote()) {
+            // 远程模式: 只返回植入模块列表(结构 {name,type,desc,params})
+            implantMods = data.modules || [];
+            serverMods = [];
+        } else {
+            implantMods = data.implant || [];
+            serverMods = data.server || [];
+        }
         implantNames = implantMods.map(m => m.name);
         smodNames = serverMods.map(m => m.name);
         Object.keys(modDescs).forEach(k => delete modDescs[k]);
@@ -1830,12 +1990,14 @@ async function buildModulePreview() {
 async function execModuleFromModal() {
     if (!currentModule) return;
     if (!currentBid) { fs3Alert('请先在左侧选中一个 beacon'); return; }
-    const resp = await fetch('/api/c2/module/exec', {method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({client_id: currentBid, name: currentModule.name, args: mmArgs()})});
+    const payload = {client_id: currentBid, name: currentModule.name, args: mmArgs()};
+    const api = isRemote() ? '/api/c2/remote/exec' : '/api/c2/module/exec';
+    const resp = await fetch(api, {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)});
     const data = await resp.json();
-    showMmOutput((data.ok ? '[+] ' : '[!] ') + (data.message || data.error || ''));
+    showMmOutput((data.ok ? '[+] ' : '[!] ') + (data.message || data.output || data.error || ''));
     termAppend('pyexec> ' + currentModule.name + ' ' + mmArgs().join(' '), 'techo');
-    termAppend((data.ok ? '' : '[!] ') + (data.message || data.error || ''), '');
+    termAppend((data.ok ? '' : '[!] ') + (data.message || data.output || data.error || ''), '');
     loadBeacons();
 }
 

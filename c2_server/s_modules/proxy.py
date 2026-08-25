@@ -60,20 +60,23 @@ def X(dat,k,n):
 def E(q,k):
  ek,mk=h.sha256(b"e"+k).digest(),h.sha256(b"m"+k).digest()
  n=l.token_bytes(12);ct=X(c.compress(q),ek,n)
- return d.b64encode(n+ct+hm.new(mk,n+ct,h.sha256).digest())
+ pl=n+ct+hm.new(mk,n+ct,h.sha256).digest()
+ pd=l.token_bytes(l.randbelow(256))
+ return pl+pd+bytes([len(pd)])
 def D(q,k):
- z=d.b64decode(q);ek,mk=h.sha256(b"e"+k).digest(),h.sha256(b"m"+k).digest()
+ pd=q[-1];z=q[:-1-pd]
+ ek,mk=h.sha256(b"e"+k).digest(),h.sha256(b"m"+k).digest()
  n,ct,tg=z[:12],z[12:-32],z[-32:]
  if not hm.compare_digest(tg,hm.new(mk,n+ct,h.sha256).digest()):raise ValueError("MAC")
  return c.decompress(X(ct,ek,n))
-def S(s,d,k):q=E(d,k);s.sendall(b.pack(">I",len(q))+q)
+def S(s,d,k):q=E(d,k);s.sendall(b.pack(">I",len(q)^int.from_bytes(h.sha256(k+b"len").digest()[:4],"big"))+q)
 def R(s,k):
  r=b""
  while 4-len(r):
   t=s.recv(4-len(r))
   if not t:raise ConnectionError()
   r+=t
- u=b.unpack(">I",r)[0]
+ u=b.unpack(">I",r)[0]^int.from_bytes(h.sha256(k+b"len").digest()[:4],"big")
  if u==0:return b""
  v=b""
  while u-len(v):
@@ -93,6 +96,8 @@ def TL(c):
   _o.unlink(cf.name);_o.unlink(kf.name)
 def a2s(c,u):
  try:
+  _p=b""
+  while len(_p)<256:_p+=c.recv(256-len(_p))
   while 1:
    d=R(c,_PK);m=e.loads(d.decode())
    if m.get("type")=="register":m["via"]={via!r}
@@ -107,6 +112,7 @@ def fwd(c):
  u=None
  try:
   u=a.socket();u.settimeout(30);u.connect((_SH,_SP))
+  u.sendall(l.token_bytes(256))
   f.Thread(target=a2s,args=(c,u),daemon=True).start()
   s2a(c,u)
  except:pass

@@ -25,7 +25,7 @@ def run(host, port, key_hex, fingerprint):
     fingerprint = str(fingerprint).strip().lower()
 
     code = f'''\
-import ssl as _sl, hashlib as _hl, socket as _sa
+import ssl as _sl, hashlib as _hl, socket as _sa, os as _os
 def _nT():
     s = _sa.socket()
     s.settimeout(30)
@@ -38,6 +38,7 @@ def _nT():
     if _hl.sha256(der).hexdigest() != {fingerprint!r}:
         t.close()
         raise ConnectionError("tls fingerprint mismatch")
+    t.sendall(_os.urandom(256))  # 混淆: 首包随机前缀(proxy a2s 吞掉;TLS 变体连 proxy 走 TCP 语义)
     return t
 '''
     return code

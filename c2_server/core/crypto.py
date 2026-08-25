@@ -1,24 +1,25 @@
 """
-core/crypto.py — 加密/解密管道 (ChaCha20 + HMAC-SHA256 + zlib + Base64)
+core/crypto.py — 加密/解密管道 (ChaCha20 + HMAC-SHA256 + zlib + 帧混淆)
 
 编码管道:
   原始数据 (bytes)
     → zlib.compress()
     → ChaCha20 加密 (每帧派生密钥)
     → HMAC-SHA256 完整性标签 (encrypt-then-MAC)
-    → base64.b64encode()
+    → 帧尾随机 padding (0-255 字节 + 1 字节 pad_len)   ← 流量混淆: 打乱长度分布
 
 解码管道 (逆向):
-  Base64 ASCII → base64.b64decode() → 验 HMAC → ChaCha20 解密 → zlib.decompress()
+  剥除帧尾 padding → 验 HMAC → ChaCha20 解密 → zlib.decompress()
 
 每帧派生密钥: 主密钥 K 经 sha256(domain_separation || K) 派生出
 enc_key / mac_key；每帧随机 12 字节 nonce，杜绝流密码 nonce 复用。
 
 ChaCha20 为 RFC 8439 变体（96-bit nonce + 32-bit counter），公有领域。
 MAC 用 hmac.compare_digest 常数时间比较，防时序侧信道。
+
+2026-08-25 混淆改造: 移除 base64(字符集指纹),新增帧尾随机 padding。
 """
 
-import base64
 import hashlib
 import hmac
 import secrets
@@ -118,20 +119,30 @@ def open_sealed(sealed: bytes, master: bytes) -> bytes:
     return chacha20_xor(ciphertext, enc, nonce)
 
 
-# ── 帧管道（对外接口不变）──
+# ── 帧管道（对外接口不变；2026-08-25 混淆: 去 base64 + 帧尾 padding）──
+
+_MAX_PAD = 255
+
 
 def encode_frame(data: bytes, key: bytes) -> bytes:
+    """data → 混淆帧: seal(...) + 随机 padding(0-255) + 1B pad_len。
+
+    pad_len 放帧尾最后 1 字节,decode 时先剥除,再走 MAC 校验。
+    padding 让帧长度分布带上 0-255 随机偏移,打掉包大小指纹。
+    """
     compressed = zlib.compress(data)
-    return base64.b64encode(seal(compressed, key))
+    sealed = seal(compressed, key)
+    pad_len = secrets.randbelow(_MAX_PAD + 1)
+    return sealed + secrets.token_bytes(pad_len) + bytes([pad_len])
 
 
 def decode_frame(data: bytes, key: bytes) -> bytes:
     if not data:
         raise ValueError("decode_frame: data must not be empty")
-    try:
-        sealed = base64.b64decode(data)
-    except (ValueError, base64.binascii.Error) as e:
-        raise ValueError(f"decode_frame: invalid Base64 data: {e}") from e
+    pad_len = data[-1]
+    if len(data) < _NONCE_SIZE + _TAG_SIZE + 1 + pad_len:
+        raise ValueError("decode_frame: frame too short")
+    sealed = data[: -1 - pad_len]
     try:
         plaintext = open_sealed(sealed, key)
     except ValueError as e:

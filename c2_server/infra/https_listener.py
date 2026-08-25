@@ -16,10 +16,10 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from server.core.crypto import encode_frame, decode_frame
-from server.core.protocol import (REGISTER, RESULT, WELCOME, PONG, TASK,
-                                  validate_message)
+from server.core.protocol import (REGISTER, RESULT, WELCOME, PONG, TASKS,
+                                  frame_mask, validate_message)
 from server.sessions.engine import (
-    register_beacon, store_result, build_auto_tasks, InFlight,
+    register_beacon, store_result, build_auto_tasks, take_task_batch, InFlight,
 )
 
 
@@ -50,7 +50,8 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _frame(self, msg: dict, srv) -> bytes:
         payload = encode_frame(json.dumps(msg).encode("utf-8"), srv.key)
-        return struct.pack(">I", len(payload)) + payload
+        # 长度头掩码(与 protocol.send_frame 一致,混淆长度分布)
+        return struct.pack(">I", len(payload) ^ frame_mask(srv.key)) + payload
 
     def _handle(self, body: bytes, srv) -> bytes:
         if body:
@@ -69,7 +70,7 @@ class _Handler(BaseHTTPRequestHandler):
                     for task in build_auto_tasks(srv.config.auto_commands,
                                                  bid, srv.dispatcher):
                         srv.tq.push(bid, task)
-                return self._frame({"type": WELCOME, "version": 1}, srv)
+                return self._frame({"type": WELCOME, "version": 2}, srv)
             if mtype == RESULT:
                 bid = self.path.rsplit("/", 1)[-1]
                 rp, pa = srv.inflight.take(msg.get("task_id", ""))
@@ -78,19 +79,37 @@ class _Handler(BaseHTTPRequestHandler):
                              srv.mgr, srv.events, srv.config.max_result_size,
                              smods=srv.smods, dispatcher=srv.dispatcher,
                              result_processor=rp, proc_arg=pa)
-                return self._frame({"type": PONG}, srv)
+                # v2 批量: 逐条确认(acked=[该 task_id]) + 顺带领取一批新任务
+                return self._batch_response(srv, bid, [msg.get("task_id", "")])
+            if mtype == FETCH:
+                bid = self.path.rsplit("/", 1)[-1]
+                return self._batch_response(srv, bid, [])
             return self._frame({"type": PONG}, srv)
 
-        # 空 body：轮询取任务
+        # 空 body：轮询领取任务（v2 批量: 每次响应一批,取完继续轮询）
         bid = self.path.rsplit("/", 1)[-1]
         if bid and bid != "poll":
-            task = srv.tq.pop(bid)
-            if task is not None:
-                srv.inflight.track(task)
-                return self._frame(
-                    {"type": TASK, "task_id": task.task_id,
-                     "code": task.code}, srv)
+            return self._batch_response(srv, bid, [])
         return self._frame({"type": PONG}, srv)
+
+    def _batch_response(self, srv, bid: str, acked: list) -> bytes:
+        """按预算领取一批任务 → TASKS 帧(acked 确认 + tasks 批量)。
+
+        无任务时: 有 acked 回空 TASKS 帧(确认必须送达), 否则 PONG。
+        """
+        budget = max(4096, int(getattr(srv.config, "max_frame_size", 512 * 1024) * 0.8))
+        tasks = take_task_batch(bid, srv.tq, budget)
+        if not tasks:
+            if acked:
+                return self._frame(
+                    {"type": TASKS, "tasks": [], "acked": list(acked)}, srv)
+            return self._frame({"type": PONG}, srv)
+        for t in tasks:
+            srv.inflight.track(t)  # 登记 result_processor(无状态通道续传用)
+        return self._frame(
+            {"type": TASKS,
+             "tasks": [{"task_id": t.task_id, "code": t.code} for t in tasks],
+             "acked": list(acked)}, srv)
 
 
 class HttpsTransport:
