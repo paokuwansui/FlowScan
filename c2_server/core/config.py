@@ -9,7 +9,7 @@ core/config.py — 配置加载 (ServerConfig / ClientConfig)
   max_tasks_per_client, max_results_per_beacon, max_connections,
   client_timeout, auto_commands
 
-客户端配置 (client/config.json):
+  客户端配置 (client/config.json):
   server_host, client_port, client_key
 
 约定 (T1.3):
@@ -57,8 +57,6 @@ class ServerConfig:
     exec_timeout: int = 300          # exec 模块命令超时（秒，默认 5 分钟）
     beacon_expire_seconds: int = 86400  # beacon 过期清理时限（秒，默认 1 天；超时未回连即移除）
     client_tls: bool = False         # client 远程通道启用 TLS（防嗅探）
-    https_port: int = 0              # HTTPS 传输监听端口（0=禁用，f8）
-    dns_port: int = 0                # DNS 隧道监听端口（0=禁用，53 需 root）
     relay_port: int = 0              # 中继通道端口（0=禁用，13/14）
     socks5_port: int = 0             # SOCKS5 动态代理端口（0=禁用，13）
     relay_host: str = "127.0.0.1"    # relay/socks5 监听地址（默认回环，防公网无认证暴露）
@@ -87,13 +85,6 @@ class ServerConfig:
         ):
             if not isinstance(val, int) or val <= 0:
                 problems.append(f"{name}: must be positive int, got {val!r}")
-        # https_port: 0 = 禁用，1..65535 = 启用
-        if (not isinstance(self.https_port, int)
-                or not (0 <= self.https_port <= 65535)):
-            problems.append(f"https_port: invalid port {self.https_port!r}")
-        if (not isinstance(self.dns_port, int)
-                or not (0 <= self.dns_port <= 65535)):
-            problems.append(f"dns_port: invalid port {self.dns_port!r}")
         for name in ("relay_port", "socks5_port"):
             val = getattr(self, name)
             if not isinstance(val, int) or not (0 <= val <= 65535):

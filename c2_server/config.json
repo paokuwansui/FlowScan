@@ -1,9 +1,9 @@
 {
   "server_host": "0.0.0.0",
-  "server_port": 65503,
-  "client_port": 65504,
+  "server_port": 9001,
+  "client_port": 9002,
   "socket_timeout": 30,
-  "implant_key": "c2a26a985282f1047b65fde4f36436edb33b659aa916158dc424df8f64d690fd",
+  "implant_key": "57c71e9723219a34f99b48d07683f72aa196695f6c11b381ef8e96aab896ce42",
   "client_key": "",
   "modules_dir": "modules",
   "server_modules_dir": "s_modules",
@@ -19,10 +19,10 @@
   "exec_timeout": 300,
   "beacon_expire_seconds": 86400,
   "client_tls": false,
-  "https_port": 0,
-  "dns_port": 0,
   "relay_port": 0,
   "socks5_port": 0,
+  "relay_host": "127.0.0.1",
   "auto_commands": [],
-  "base_dir": ""
+  "base_dir": "",
+  "config_path": ""
 }

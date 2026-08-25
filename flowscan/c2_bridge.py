@@ -518,8 +518,6 @@ def status_detail() -> dict:
                 "server_port": cfg.server_port,
                 "client_port": cfg.client_port,
                 "client_tls": bool(getattr(cfg, "client_tls", False)),
-                "https_port": cfg.https_port or 0,
-                "dns_port": cfg.dns_port or 0,
                 "relay_port": cfg.relay_port or 0,
                 "socks5_port": cfg.socks5_port or 0,
                 "client_timeout": cfg.client_timeout,
@@ -534,8 +532,6 @@ def status_detail() -> dict:
             "listeners": {
                 "beacon": {"enabled": True, "port": cfg.server_port},
                 "client": {"enabled": True, "port": cfg.client_port, "ready": bool(getattr(server, "_key_client", b""))},
-                "https": {"enabled": bool(cfg.https_port and cfg.https_port > 0), "port": cfg.https_port or 0},
-                "dns": {"enabled": bool(cfg.dns_port and cfg.dns_port > 0), "port": cfg.dns_port or 0},
                 "relay": {"enabled": bool(cfg.relay_port and cfg.relay_port > 0), "port": cfg.relay_port or 0},
                 "socks5": {"enabled": bool(cfg.socks5_port and cfg.socks5_port > 0), "port": cfg.socks5_port or 0},
             },
@@ -670,8 +666,8 @@ def update_listener_config(updates: dict) -> tuple:
     if not server:
         return False, _C2_INIT_ERROR or "C2 未启动"
     cfg_path = _config_path_of(server)
-    allowed = {"server_host", "server_port", "client_port", "client_tls", "https_port",
-               "dns_port", "relay_port", "socks5_port", "relay_host",
+    allowed = {"server_host", "server_port", "client_port", "client_tls",
+               "relay_port", "socks5_port", "relay_host",
                "client_timeout", "exec_timeout", "beacon_expire_seconds",
                "interval", "jitter",
                "max_tasks_per_client", "max_results_per_beacon"}
@@ -690,7 +686,7 @@ def update_listener_config(updates: dict) -> tuple:
                     v = 0 if k.endswith("_port") else v
                 if k in ("client_tls",):
                     v = bool(v)
-                elif k in ("server_port", "client_port", "https_port", "dns_port",
+                elif k in ("server_port", "client_port",
                            "relay_port", "socks5_port", "client_timeout", "exec_timeout",
                            "max_tasks_per_client", "max_results_per_beacon"):
                     v = int(v)

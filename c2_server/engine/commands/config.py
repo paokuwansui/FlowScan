@@ -12,8 +12,6 @@ def run(disp, args):
         f"Max tasks/beacon: {cfg.max_tasks_per_client}",
         f"exec 超时: {cfg.exec_timeout}s",
         f"client TLS: {'开' if cfg.client_tls else '关'}",
-        f"HTTPS 传输: {cfg.https_port or '关'}",
-        f"DNS 传输: {cfg.dns_port or '关'}",
         f"relay: {cfg.relay_port or '关'} / "
         f"SOCKS5: {cfg.socks5_port or '关'}",
     ]

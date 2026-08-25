@@ -149,7 +149,7 @@
 
                 {# Server 模块 #}
                 <div id="mtab-server" style="display:none;">
-                    <p class="help-text">server 端模块（keygen/build/proxy 等），点击查看详情并可用 s_exec 运行。</p>
+                    <p class="help-text">server 端模块（keygen/build/agent_dns 等），点击查看详情并可用 s_exec 运行。</p>
                     <div id="smodule-list" class="mod-list"></div>
                 </div>
 
@@ -327,7 +327,7 @@
 <div id="listener-modal" class="modal-backdrop" style="display:none;">
     <div class="modal modal-lg" style="width:min(820px,94vw);">
         <h3>通道配置(写回 config.json,重启生效)</h3>
-        <p class="help-text">端口填 0 = 关闭该通道。HTTPS/DNS/relay/socks5 变更需重启 C2(beacon 自动重连);server/client 端口与密钥变更也需重启。</p>
+        <p class="help-text">端口填 0 = 关闭该通道。relay/socks5 变更需重启 C2(beacon 自动重连);server/client 端口与密钥变更也需重启。</p>
         <div class="form-row" style="gap:12px;margin:12px 0;flex-wrap:wrap;">
             <div class="form-group" style="margin:0;">
                 <label for="lc-server_port">server 端口</label>
@@ -336,14 +336,6 @@
             <div class="form-group" style="margin:0;">
                 <label for="lc-client_port">client 端口</label>
                 <input type="number" id="lc-client_port" class="form-control" style="width:90px;font-family:var(--font-mono);">
-            </div>
-            <div class="form-group" style="margin:0;">
-                <label for="lc-https_port">HTTPS 端口</label>
-                <input type="number" id="lc-https_port" class="form-control" style="width:90px;font-family:var(--font-mono);" placeholder="0=关">
-            </div>
-            <div class="form-group" style="margin:0;">
-                <label for="lc-dns_port">DNS 端口</label>
-                <input type="number" id="lc-dns_port" class="form-control" style="width:90px;font-family:var(--font-mono);" placeholder="0=关">
             </div>
         </div>
         <div class="form-row" style="gap:12px;margin:12px 0;flex-wrap:wrap;">
@@ -1796,8 +1788,6 @@ function openListenerModal() {
     function setv(id, v) { document.getElementById(id).value = v; }
     setv('lc-server_port', c.server_port != null ? c.server_port : '');
     setv('lc-client_port', c.client_port != null ? c.client_port : '');
-    setv('lc-https_port', c.https_port || 0);
-    setv('lc-dns_port', c.dns_port || 0);
     setv('lc-relay_port', c.relay_port || 0);
     setv('lc-socks5_port', c.socks5_port || 0);
     setv('lc-client_timeout', c.client_timeout != null ? c.client_timeout : '');
@@ -1815,7 +1805,7 @@ function closeListenerModal() { document.getElementById('listener-modal').style.
 
 async function saveListenerConfig() {
     const payload = {};
-    ['lc-server_port', 'lc-client_port', 'lc-https_port', 'lc-dns_port', 'lc-relay_port', 'lc-socks5_port',
+    ['lc-server_port', 'lc-client_port', 'lc-relay_port', 'lc-socks5_port',
      'lc-client_timeout', 'lc-exec_timeout'].forEach(function(id) {
         const raw = document.getElementById(id).value.trim();
         const key = id.replace('lc-', '');

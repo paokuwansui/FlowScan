@@ -132,23 +132,6 @@ class PyExec2Server:
         self._dispatcher = Dispatcher(self._ctx)
         self._console = Console(self._dispatcher)
 
-        # HTTPS 传输监听（f8）：证书 data/https_tls.*
-        # （依赖 dispatcher/smods——结果处理器 + auto_commands 共用）
-        self._https = None
-        if config.https_port and config.https_port > 0:
-            self._https = self._make_https_transport(config)
-
-        # DNS 隧道监听（f8 基础版）
-        self._dns = None
-        if config.dns_port and config.dns_port > 0:
-            from server.infra.dns_listener import _DnsServer
-            self._dns = _DnsServer(
-                host=config.server_host, port=config.dns_port,
-                key=self._key_implant,
-                mgr=self._mgr, tq=self._tq, events=self._events,
-                config=config, smods=self._smods,
-                dispatcher=self._dispatcher)
-
         # 中继通道（13/14）：socks5 动态代理 + 端口转发
         self._hub = None
         self._socks5 = None
@@ -189,16 +172,6 @@ class PyExec2Server:
             self._socks5.start()
             logger.info("SOCKS5 listening %s:%d", self._config.relay_host,
                         self._config.socks5_port)
-        if self._https:
-            self._https.start()
-            logger.info("HTTPS transport listening %s:%d",
-                        self._config.server_host,
-                        self._config.https_port)
-        if self._dns:
-            self._dns.start()
-            logger.info("DNS transport listening %s:%d",
-                        self._config.server_host,
-                        self._config.dns_port)
 
         if self._headless:
             logger.info("headless mode: 事件写 %s，运行日志见 log_file。"
@@ -235,16 +208,6 @@ class PyExec2Server:
         if self._socks5:
             try:
                 self._socks5.stop()
-            except Exception:
-                pass
-        if self._https:
-            try:
-                self._https.stop()
-            except Exception:
-                pass
-        if self._dns:
-            try:
-                self._dns.stop()
             except Exception:
                 pass
         if self._console:
@@ -341,31 +304,6 @@ class PyExec2Server:
             logger.error("client TLS 证书加载失败: %s", e)
             return None
         return ctx
-
-    def _make_https_transport(self, config):
-        """创建 HTTPS 传输监听器（证书缺失自动生成）。"""
-        from server.infra.https_listener import HttpsTransport
-        from server.s_modules.tls_util import generate_self_signed
-        data_dir = os.path.join(config.base_dir, "data")
-        os.makedirs(data_dir, exist_ok=True)
-        cert_file = os.path.join(data_dir, "https_tls.crt")
-        key_file = os.path.join(data_dir, "https_tls.key")
-        if not (os.path.isfile(cert_file) and os.path.isfile(key_file)):
-            try:
-                generate_self_signed(config.server_host, data_dir)
-                if os.path.isfile(os.path.join(data_dir, "proxy.crt")):
-                    os.replace(os.path.join(data_dir, "proxy.crt"), cert_file)
-                    os.replace(os.path.join(data_dir, "proxy.key"), key_file)
-            except Exception as e:
-                logger.error("HTTPS 证书生成失败: %s", e)
-                return None
-        return HttpsTransport(
-            host=config.server_host, port=config.https_port,
-            key=self._key_implant,
-            mgr=self._mgr, tq=self._tq, events=self._events,
-            cert_file=cert_file, key_file=key_file,
-            config=config, smods=self._smods,
-            dispatcher=self._dispatcher)
 
     def _make_session(self, conn: socket.socket, key: bytes,
                       expected_role: str):

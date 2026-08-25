@@ -32,8 +32,8 @@ def load_commands() -> dict:
     """扫描本目录，返回 {命令名: run}。"""
     commands = {}
     for f in sorted(_COMMANDS_DIR.glob("*.py")):
-        if f.stem == "__init__":
-            continue
+        if f.stem == "__init__" or f.stem.startswith("_"):
+            continue  # 下划线前缀 = 内部共享模块, 不作为命令注册
         mod = _load_command(f)
         if mod is not None and hasattr(mod, "run"):
             commands[f.stem] = mod.run
