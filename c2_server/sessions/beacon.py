@@ -123,7 +123,8 @@ class BeaconSession:
                              self._mgr, self._events,
                              self._config.max_result_size,
                              smods=self._smods, dispatcher=self._dispatcher,
-                             result_processor=rp, proc_arg=pa)
+                             result_processor=rp, proc_arg=pa,
+                             overwrite=bool(result.get("overwrite", False)))
                 acked.append(result.get("task_id", ""))
                 # 逐条确认帧: implant 发一帧收一帧(TCP/HTTPS/DNS 统一),
                 # 未收到确认的结果下次回连重发(服务端 task_id 去重)

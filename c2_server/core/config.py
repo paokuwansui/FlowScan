@@ -57,9 +57,6 @@ class ServerConfig:
     exec_timeout: int = 300          # exec 模块命令超时（秒，默认 5 分钟）
     beacon_expire_seconds: int = 86400  # beacon 过期清理时限（秒，默认 1 天；超时未回连即移除）
     client_tls: bool = False         # client 远程通道启用 TLS（防嗅探）
-    relay_port: int = 0              # 中继通道端口（0=禁用，13/14）
-    socks5_port: int = 0             # SOCKS5 动态代理端口（0=禁用，13）
-    relay_host: str = "127.0.0.1"    # relay/socks5 监听地址（默认回环，防公网无认证暴露）
     auto_commands: list = field(default_factory=list)
     base_dir: str = ""               # 配置文件所在目录（load_config 设置）
     config_path: str = ""            # 配置文件绝对路径（load_config 设置，reload 用）
@@ -85,10 +82,6 @@ class ServerConfig:
         ):
             if not isinstance(val, int) or val <= 0:
                 problems.append(f"{name}: must be positive int, got {val!r}")
-        for name in ("relay_port", "socks5_port"):
-            val = getattr(self, name)
-            if not isinstance(val, int) or not (0 <= val <= 65535):
-                problems.append(f"{name}: invalid port {val!r}")
         if self.implant_key and not _is_hex64(self.implant_key):
             problems.append(
                 f"implant_key: invalid hex "

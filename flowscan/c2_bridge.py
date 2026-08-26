@@ -259,7 +259,7 @@ def execute(line: str) -> str:
 def select_beacon(client_id: str):
     """把前端选中的 beacon 同步到后端 Dispatcher(等价于终端 use <bid>)。
 
-    走命令 handler,自动校验 beacon 存在并同步 relay hub(current_beacon 生效),
+    走命令 handler,自动校验 beacon 存在(current_beacon 生效),
     之后终端里 exec/result 等不带 <bid> 的命令直接作用于该 beacon。
     """
     server = get_c2()
@@ -518,8 +518,6 @@ def status_detail() -> dict:
                 "server_port": cfg.server_port,
                 "client_port": cfg.client_port,
                 "client_tls": bool(getattr(cfg, "client_tls", False)),
-                "relay_port": cfg.relay_port or 0,
-                "socks5_port": cfg.socks5_port or 0,
                 "client_timeout": cfg.client_timeout,
                 "exec_timeout": cfg.exec_timeout,
                 "beacon_expire_seconds": cfg.beacon_expire_seconds,
@@ -532,8 +530,6 @@ def status_detail() -> dict:
             "listeners": {
                 "beacon": {"enabled": True, "port": cfg.server_port},
                 "client": {"enabled": True, "port": cfg.client_port, "ready": bool(getattr(server, "_key_client", b""))},
-                "relay": {"enabled": bool(cfg.relay_port and cfg.relay_port > 0), "port": cfg.relay_port or 0},
-                "socks5": {"enabled": bool(cfg.socks5_port and cfg.socks5_port > 0), "port": cfg.socks5_port or 0},
             },
             "counts": {
                 "beacons": len(beacons),
@@ -667,7 +663,6 @@ def update_listener_config(updates: dict) -> tuple:
         return False, _C2_INIT_ERROR or "C2 未启动"
     cfg_path = _config_path_of(server)
     allowed = {"server_host", "server_port", "client_port", "client_tls",
-               "relay_port", "socks5_port", "relay_host",
                "client_timeout", "exec_timeout", "beacon_expire_seconds",
                "interval", "jitter",
                "max_tasks_per_client", "max_results_per_beacon"}
@@ -687,7 +682,7 @@ def update_listener_config(updates: dict) -> tuple:
                 if k in ("client_tls",):
                     v = bool(v)
                 elif k in ("server_port", "client_port",
-                           "relay_port", "socks5_port", "client_timeout", "exec_timeout",
+                           "client_timeout", "exec_timeout",
                            "max_tasks_per_client", "max_results_per_beacon"):
                     v = int(v)
                 elif k in ("jitter",):

@@ -12,8 +12,6 @@ def run(disp, args):
         f"Max tasks/beacon: {cfg.max_tasks_per_client}",
         f"exec 超时: {cfg.exec_timeout}s",
         f"client TLS: {'开' if cfg.client_tls else '关'}",
-        f"relay: {cfg.relay_port or '关'} / "
-        f"SOCKS5: {cfg.socks5_port or '关'}",
     ]
     if cfg.auto_commands:
         lines.append(f"自动命令: {', '.join(cfg.auto_commands)}")

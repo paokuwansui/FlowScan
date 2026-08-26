@@ -61,7 +61,7 @@ AGENT_TOOLS = [
         "priority": {"type": "string", "enum": ["high", "medium", "low"], "description": "按优先级过滤,可选"},
         "search": {"type": "string", "description": "按消息内容模糊搜索,可选"}}}}},
     {"type": "function", "function": {"name": "c2_beacons", "description": "列出所有在线 C2 beacon(含平台/用户/标签/上线时间)。", "parameters": {"type": "object", "properties": {}}}},
-    {"type": "function", "function": {"name": "c2_exec", "description": "执行 C2 命令(use <bid>/sysinfo/exec <cmd>/result/show/tag/upload/download/portfwd 等),返回输出文本。", "parameters": {"type": "object", "properties": {
+    {"type": "function", "function": {"name": "c2_exec", "description": "执行 C2 命令(use <bid>/sysinfo/exec <cmd>/result/show/tag/upload/download/socks_server/protfwd_server 等),返回输出文本。", "parameters": {"type": "object", "properties": {
         "command": {"type": "string", "description": "完整 C2 命令文本"}}, "required": ["command"]}}},
     {"type": "function", "function": {"name": "c2_result", "description": "查看指定 beacon 的最近执行结果。", "parameters": {"type": "object", "properties": {
         "client_id": {"type": "string", "description": "beacon 的 16 字符 ID"},

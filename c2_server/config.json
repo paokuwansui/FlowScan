@@ -19,9 +19,6 @@
   "exec_timeout": 300,
   "beacon_expire_seconds": 86400,
   "client_tls": false,
-  "relay_port": 0,
-  "socks5_port": 0,
-  "relay_host": "127.0.0.1",
   "auto_commands": [],
   "base_dir": "",
   "config_path": ""

@@ -36,7 +36,7 @@ cd ./bin/xray
 # xray 拒绝覆盖已存在的输出文件,输出到 reports 目录并先清理
 mkdir -p ../../reports
 rm -f ../../reports/xray_out.html ../../reports/xray_out.json
-# 后台轮询放宽报告权限:xray 以 root 写 0640,web 进程(clay64)读不了——
+# 后台轮询放宽报告权限:xray 以 root 写 0640,web 进程读不了——
 # 文件写入后立即 chmod 644(2s 轮询,开销可忽略)
 python3 - <<'PY' &
 import time, os

@@ -58,13 +58,13 @@ def register_beacon(reg: dict, mgr, events) -> tuple:
 
 def store_result(client_id, task_id, output, error, mgr, events,
                  max_result_size, smods=None, dispatcher=None,
-                 result_processor="", proc_arg=""):
+                 result_processor="", proc_arg="", overwrite=False):
     """结果截断 + 落库 + 事件 + 结果处理器（三传输共用）。"""
     if len(output) > max_result_size:
         output = (output[:max_result_size]
                   + f"\n... (truncated, {len(output)} bytes total)")
     mgr.add_result(client_id, TaskResult(task_id=task_id, output=output,
-                                         error=error))
+                                         error=error), overwrite=overwrite)
     events.emit(EVT_TASK_RESULT, client_id, task_id=task_id,
                 output=output[:200])
     if result_processor and smods is not None:

@@ -29,7 +29,7 @@
         <span style="flex:1;"></span>
         <button id="c2-toggle-btn" class="btn btn-sm btn-primary" onclick="toggleC2()" title="启动/停止 C2 server">启动</button>
         <button class="btn btn-sm" onclick="openDeployModal()" title="生成 implant 部署命令">部署向导</button>
-        <button class="btn btn-sm" onclick="openListenerModal()" title="配置 HTTPS/DNS/relay/socks5 等通道">通道配置</button>
+        <button class="btn btn-sm" onclick="openListenerModal()" title="配置 server/client 等通道端口">通道配置</button>
         <button class="btn btn-sm" onclick="openAuditModal()" title="C2 操作审计日志">操作日志</button>
         <button class="btn btn-sm" onclick="downloadExportConfig()" title="导出独立 server 部署包(代码+配置+说明),在另一台服务器解压即可启动">导出配置</button>
         <button class="btn btn-sm btn-primary" onclick="openRemoteModal()" title="以 client 模式连接远端独立 server 进行远程管理">远程模式</button>
@@ -327,7 +327,7 @@
 <div id="listener-modal" class="modal-backdrop" style="display:none;">
     <div class="modal modal-lg" style="width:min(820px,94vw);">
         <h3>通道配置(写回 config.json,重启生效)</h3>
-        <p class="help-text">端口填 0 = 关闭该通道。relay/socks5 变更需重启 C2(beacon 自动重连);server/client 端口与密钥变更也需重启。</p>
+        <p class="help-text">端口填 0 = 关闭该通道。server/client 端口与密钥变更需重启 C2。</p>
         <div class="form-row" style="gap:12px;margin:12px 0;flex-wrap:wrap;">
             <div class="form-group" style="margin:0;">
                 <label for="lc-server_port">server 端口</label>
@@ -339,14 +339,6 @@
             </div>
         </div>
         <div class="form-row" style="gap:12px;margin:12px 0;flex-wrap:wrap;">
-            <div class="form-group" style="margin:0;">
-                <label for="lc-relay_port">relay 端口</label>
-                <input type="number" id="lc-relay_port" class="form-control" style="width:90px;font-family:var(--font-mono);" placeholder="0=关">
-            </div>
-            <div class="form-group" style="margin:0;">
-                <label for="lc-socks5_port">SOCKS5 端口</label>
-                <input type="number" id="lc-socks5_port" class="form-control" style="width:90px;font-family:var(--font-mono);" placeholder="0=关">
-            </div>
             <div class="form-group" style="margin:0;">
                 <label for="lc-client_timeout">client 超时(s)</label>
                 <input type="number" id="lc-client_timeout" class="form-control" style="width:90px;font-family:var(--font-mono);">
@@ -361,7 +353,6 @@
             <button class="btn btn-sm btn-danger" onclick="restartC2()">重启 C2</button>
             <span class="help-text" id="lc-status" style="margin:0;font-family:var(--font-mono);"></span>
         </div>
-        <p class="help-text" id="lc-socks5-hint" style="margin:6px 0 0;display:none;"></p>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
             <button class="btn btn-secondary" onclick="closeListenerModal()">关闭</button>
         </div>
@@ -859,7 +850,7 @@ const BUILTIN_CMD_DESC = {
     's_exec': '执行 server 端 Python',
     'upload': '上传文件到 beacon',
     'download': '从 beacon 下载文件',
-    'portfwd': '端口转发',
+    'portfwd': '端口转发(新: s_exec protfwd_server + 下发 portfwd)',
     'tag': '给 beacon 打标签',
     'broadcast': '向所有 beacon 广播命令',
     'config': '查看/修改配置',
@@ -1571,11 +1562,11 @@ function trackBeaconResults() {
                 const out = res.output || '';
                 const err = res.error || '';
                 if (err) {
-                    termAppend('[结果] ' + (res.task_id || '?') + ': [error] ' + err, 'terr');
+                    termAppend('执行结果 [' + (res.task_id || '?') + ']:\n[error] ' + err, 'terr');
                 } else if (out) {
-                    termAppend('[结果] ' + (res.task_id || '?') + ': ' + out, 'tok');
+                    termAppend('执行结果 [' + (res.task_id || '?') + ']:\n' + out, 'tok');
                 } else {
-                    termAppend('[结果] ' + (res.task_id || '?') + ': (无输出)', 'tplain');
+                    termAppend('执行结果 [' + (res.task_id || '?') + ']:\n(无输出)', 'tplain');
                 }
             }
         })
@@ -1788,24 +1779,15 @@ function openListenerModal() {
     function setv(id, v) { document.getElementById(id).value = v; }
     setv('lc-server_port', c.server_port != null ? c.server_port : '');
     setv('lc-client_port', c.client_port != null ? c.client_port : '');
-    setv('lc-relay_port', c.relay_port || 0);
-    setv('lc-socks5_port', c.socks5_port || 0);
     setv('lc-client_timeout', c.client_timeout != null ? c.client_timeout : '');
     setv('lc-exec_timeout', c.exec_timeout != null ? c.exec_timeout : '');
-    const hint = document.getElementById('lc-socks5-hint');
-    if ((c.socks5_port || 0) > 0) {
-        hint.style.display = 'block';
-        hint.textContent = 'SOCKS5 代理已启用: ' + (c.server_host || '0.0.0.0') + ':' + c.socks5_port + ' —— 浏览器/工具配 SOCKS5 指向该地址即可,目标=当前选中 beacon(需先 use)。';
-    } else {
-        hint.style.display = 'none';
-    }
 }
 
 function closeListenerModal() { document.getElementById('listener-modal').style.display = 'none'; }
 
 async function saveListenerConfig() {
     const payload = {};
-    ['lc-server_port', 'lc-client_port', 'lc-relay_port', 'lc-socks5_port',
+    ['lc-server_port', 'lc-client_port',
      'lc-client_timeout', 'lc-exec_timeout'].forEach(function(id) {
         const raw = document.getElementById(id).value.trim();
         const key = id.replace('lc-', '');

@@ -35,7 +35,6 @@ class CommandContext:
     config: object             # ServerConfig
     modules: object            # ModuleLoader
     smods: object              # ServerModuleLoader
-    hub: object = None         # 中继通道（RelayHub，13/14；S5 共享）
     on_exit: Optional[Callable] = None   # console exit → server.stop()
 
 
@@ -50,7 +49,6 @@ class Dispatcher:
         self.modules = ctx.modules
         self.smods = ctx.smods
         self.on_exit = ctx.on_exit
-        self.hub = getattr(ctx, "hub", None)  # S5：中继共享引用
         self.current_beacon: str = ""
         self._handlers: dict[str, Callable] = {}
         self._register_builtins()

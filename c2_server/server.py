@@ -132,20 +132,6 @@ class PyExec2Server:
         self._dispatcher = Dispatcher(self._ctx)
         self._console = Console(self._dispatcher)
 
-        # 中继通道（13/14）：socks5 动态代理 + 端口转发
-        self._hub = None
-        self._socks5 = None
-        if config.relay_port and config.relay_port > 0:
-            from server.infra.relay import RelayHub, Socks5Server
-            self._hub = RelayHub(
-                host=config.relay_host, relay_port=config.relay_port,
-                tq=self._tq, modules=self._modules,
-                fallback_beacon=lambda: self._dispatcher.current_beacon)
-            self._dispatcher.hub = self._hub
-            if config.socks5_port and config.socks5_port > 0:
-                self._socks5 = Socks5Server(
-                    config.relay_host, config.socks5_port, self._hub)
-
         self._listener: Listener | None = None
         self._cleanup_thread: threading.Thread | None = None
 
@@ -164,14 +150,6 @@ class PyExec2Server:
         self._start_cleanup()
         self._start_listener()
         self._start_udp_heartbeat()
-        if self._hub:
-            self._hub.start()
-            logger.info("relay listening %s:%d", self._config.relay_host,
-                        self._config.relay_port)
-        if self._socks5:
-            self._socks5.start()
-            logger.info("SOCKS5 listening %s:%d", self._config.relay_host,
-                        self._config.socks5_port)
 
         if self._headless:
             logger.info("headless mode: 事件写 %s，运行日志见 log_file。"
@@ -199,16 +177,6 @@ class PyExec2Server:
             try:
                 self._udp_sock.close()
             except OSError:
-                pass
-        if self._hub:
-            try:
-                self._hub.stop()
-            except Exception:
-                pass
-        if self._socks5:
-            try:
-                self._socks5.stop()
-            except Exception:
                 pass
         if self._console:
             self._console.stop()
@@ -323,7 +291,6 @@ class PyExec2Server:
         components = dict(
             mgr=self._mgr, tq=self._tq, logger=self._events,
             config=self._config, modules=self._modules, smods=self._smods,
-            hub=self._hub,
         )
         if expected_role == "beacon":
             return BeaconSession(

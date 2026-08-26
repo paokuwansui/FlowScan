@@ -13,7 +13,7 @@ from server.transports.transport_base import build_upgrade_task
 from server.core.events import EVT_UPLEVEL
 
 # 各协议在 host/port/key 之外的额外传输参数个数(透传给 transport_* 的 run())
-_EXTRA = {"dns": 0, "http": 0, "https": 0, "tls": 1, "mtls": 4}
+_EXTRA = {"dns": 0, "http": 0, "https": 0, "tcp": 0, "tls": 1, "mtls": 4}
 
 
 def run(disp, args, protocol: str):
