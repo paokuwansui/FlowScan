@@ -21,5 +21,6 @@
   "client_tls": false,
   "auto_commands": [],
   "base_dir": "",
-  "config_path": ""
+  "config_path": "",
+  "stage_code": ""
 }

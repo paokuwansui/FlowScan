@@ -35,9 +35,9 @@ def _check_k(k) -> None:
 
 
 def encode_payload(code: str, k: int) -> str:
-    """完整代码 → zlib + 单字节 XOR + Base64 → ASCII 字符串。"""
+    """完整代码 → zlib(9) + 单字节 XOR + Base64 → ASCII 字符串。"""
     _check_k(k)
-    compressed = zlib.compress(code.encode("utf-8"))
+    compressed = zlib.compress(code.encode("utf-8"), 9)  # 最高压缩级别, 载荷瘦身
     obfuscated = bytes(b ^ k for b in compressed)
     return base64.b64encode(obfuscated).decode("ascii")
 

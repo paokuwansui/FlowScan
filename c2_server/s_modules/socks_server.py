@@ -53,7 +53,10 @@ def _h(c):
   if d.startswith('REG '):
    CTRL.append(c)
    while 1:
-    if not c.recv(4096):break
+    try:
+     if not c.recv(4096):break
+    except s.timeout:
+     continue   # 空闲保活: 超时不视为断开(原 120s 空闲断隧道, 2026-08-27 修复)
    try:CTRL.remove(c)
    except:pass
   elif d.startswith('HELLO '):

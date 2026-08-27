@@ -32,6 +32,7 @@
         <button class="btn btn-sm" onclick="openListenerModal()" title="配置 server/client 等通道端口">通道配置</button>
         <button class="btn btn-sm" onclick="openAuditModal()" title="C2 操作审计日志">操作日志</button>
         <button class="btn btn-sm" onclick="downloadExportConfig()" title="导出独立 server 部署包(代码+配置+说明),在另一台服务器解压即可启动">导出配置</button>
+        <button class="btn btn-sm" onclick="openFileEditModal()" title="读取/编辑目标机文件(弹窗内编辑后保存推回)">文件编辑</button>
         <button class="btn btn-sm btn-primary" onclick="openRemoteModal()" title="以 client 模式连接远端独立 server 进行远程管理">远程模式</button>
         <span id="remote-badge" style="display:none;color:var(--success);white-space:nowrap;">🔗 远程: <b id="remote-badge-url">-</b></span>
     </div>
@@ -355,6 +356,36 @@
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
             <button class="btn btn-secondary" onclick="closeListenerModal()">关闭</button>
+        </div>
+    </div>
+</div>
+
+{# ── 文件编辑模态框: fs3-modal-backdrop 模式(同 ai_analysis 新建会话——旧 .modal-backdrop CSS 规则不再匹配, 内联关键样式 + !important 双保险防弹窗不出) ── #}
+<div id="file-edit-modal" class="fs3-modal-backdrop" style="display:none !important;position:fixed;top:0;right:0;bottom:0;left:0;z-index:1000;background:rgba(2,5,12,0.78);align-items:center;justify-content:center;">
+    <div class="fs3-modal-card" style="background:var(--surface);border:1px solid var(--border-bright);border-radius:14px;padding:26px;width:94%;max-width:760px;box-shadow:0 0 60px rgba(34,211,238,0.12),0 24px 60px rgba(0,0,0,0.5);">
+        <h3 style="margin:0 0 14px;">文件编辑</h3>
+        <div class="form-row" style="gap:10px;flex-wrap:wrap;">
+            <div class="form-group" style="margin:0;flex:1;min-width:190px;">
+                <label for="fe-beacon">Beacon</label>
+                <select id="fe-beacon" class="form-control" aria-label="Beacon" style="width:100%;"></select>
+            </div>
+            <div class="form-group" style="margin:0;flex:2;min-width:260px;">
+                <label for="fe-path">文件路径</label>
+                <input type="text" id="fe-path" class="form-control" placeholder="如 /etc/nginx/nginx.conf" style="width:100%;font-family:var(--font-mono);" aria-label="文件路径">
+            </div>
+            <div style="display:flex;align-items:flex-end;gap:8px;">
+                <button class="btn btn-primary" onclick="fileEditRead()" id="fe-read-btn">读取</button>
+            </div>
+        </div>
+        <div class="form-group" style="margin:12px 0 0;">
+            <label for="fe-content">文件内容（修改后点「保存」推回目标机，整文件替换）</label>
+            <textarea id="fe-content" rows="16" spellcheck="false" aria-label="文件内容"
+                      style="width:100%;font-family:var(--font-mono);font-size:0.82rem;background:var(--bg);border:1px solid var(--border-bright);border-radius:8px;padding:10px;resize:vertical;box-sizing:border-box;"></textarea>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;align-items:center;">
+            <span class="help-text" id="fe-status" style="margin-right:auto;font-family:var(--font-mono);"></span>
+            <button class="btn" onclick="closeFileEditModal()">取消</button>
+            <button class="btn btn-primary" onclick="fileEditSave()" id="fe-save-btn">保存</button>
         </div>
     </div>
 </div>
@@ -1784,6 +1815,87 @@ function openListenerModal() {
 }
 
 function closeListenerModal() { document.getElementById('listener-modal').style.display = 'none'; }
+
+// ── 文件编辑弹窗(fs3-modal-backdrop 模式) ──
+function openFileEditModal() {
+    const sel = document.getElementById('fe-beacon');
+    const prev = sel.value;
+    sel.innerHTML = '';
+    (allBeacons || []).forEach(function(b) {
+        const o = document.createElement('option');
+        o.value = b.client_id;
+        o.textContent = b.client_id.slice(0, 8) + ' · ' + (b.sys_platform || '?') + (b.sys_user ? ' · ' + b.sys_user : '');
+        sel.appendChild(o);
+    });
+    if (prev && Array.from(sel.options).some(function(o) { return o.value === prev; })) sel.value = prev;
+    document.getElementById('fe-path').value = '';
+    document.getElementById('fe-content').value = '';
+    document.getElementById('fe-status').textContent = '';
+    document.getElementById('file-edit-modal').style.setProperty('display', 'flex', 'important');
+    setTimeout(function() { document.getElementById('fe-path').focus(); }, 50);
+}
+function closeFileEditModal() {
+    document.getElementById('file-edit-modal').style.setProperty('display', 'none', 'important');
+}
+async function fileEditRead() {
+    const bid = document.getElementById('fe-beacon').value;
+    const path = document.getElementById('fe-path').value.trim();
+    if (!bid || !path) { fs3Alert('请选择 Beacon 并填写文件路径'); return; }
+    const status = document.getElementById('fe-status');
+    status.textContent = '已下发读取，等待结果...';
+    try {
+        const resp = await fetch('/api/c2/file-edit', {method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({action: 'read', beacon_id: bid, path: path})});
+        const data = await resp.json();
+        if (!data.ok) { status.textContent = '✗ ' + (data.message || data.error || ''); return; }
+        status.textContent = '任务已下发，轮询结果...';
+        pollFileEditRead(bid, data.before_count || 0);
+    } catch (e) { status.textContent = '✗ 请求失败: ' + e.message; }
+}
+async function pollFileEditRead(bid, before) {
+    const status = document.getElementById('fe-status');
+    for (let i = 0; i < 50; i++) {
+        await new Promise(function(r) { setTimeout(r, 600); });
+        try {
+            const resp = await fetch('/api/c2/beacon/' + bid + '/detail');
+            const data = await resp.json();
+            if (!data.ok || !data.beacon) continue;
+            const results = data.beacon.results || [];
+            if (results.length > before) {
+                const last = results[results.length - 1];
+                if (last.error) { status.textContent = '✗ 执行错误: ' + last.error; return; }
+                document.getElementById('fe-content').value = last.output || '';
+                status.textContent = '✓ 已加载 (' + (last.output || '').length + ' 字符)';
+                return;
+            }
+        } catch (e) { /* 轮询继续 */ }
+    }
+    status.textContent = '✗ 等待超时(30s)，请查看终端结果';
+}
+async function fileEditSave() {
+    const bid = document.getElementById('fe-beacon').value;
+    const path = document.getElementById('fe-path').value.trim();
+    const content = document.getElementById('fe-content').value;
+    if (!bid || !path) { fs3Alert('请选择 Beacon 并填写文件路径'); return; }
+    const status = document.getElementById('fe-status');
+    status.textContent = '保存中...';
+    try {
+        const resp = await fetch('/api/c2/file-edit', {method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({action: 'write', beacon_id: bid, path: path, content: content})});
+        const data = await resp.json();
+        status.textContent = (data.ok ? '✓ ' : '✗ ') + (data.message || data.error || '');
+    } catch (e) { status.textContent = '✗ 请求失败: ' + e.message; }
+}
+(function() {
+    const m = document.getElementById('file-edit-modal');
+    if (m) m.addEventListener('click', function(e) { if (e.target === this) closeFileEditModal(); });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            const mm = document.getElementById('file-edit-modal');
+            if (mm && mm.style.display !== 'none') closeFileEditModal();
+        }
+    });
+})();
 
 async function saveListenerConfig() {
     const payload = {};

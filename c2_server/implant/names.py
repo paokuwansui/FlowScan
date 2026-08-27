@@ -29,6 +29,12 @@ CONTRACT = {
     "exec_task": "r", "sleep_jitter": "s", "qround": "Q",
     "block": "B", "xor_stream": "X", "encode_frame_": "n",
     "decode_frame_": "o", "cycle": "cyc",
+    # 模板全局中植入模块直接引用的名字 → 保持原名(模块代码 exec 在植入物
+    # 全局里,只能按原名访问;minify 不能把它们池化成随机短名,否则
+    # fork/shell/kill_task/record 等模块在压缩版植入物上 NameError,
+    # 2026-08-27 修复)
+    "_TLS": "_TLS", "_cancel_task": "_cancel_task",
+    "_RECORDS": "_RECORDS", "_RECORDS_LOCK": "_RECORDS_LOCK",
 }
 
 _KEYWORDS = set(keyword.kwlist)
@@ -71,7 +77,7 @@ def minify(source: str) -> str:
 
     class _T(ast.NodeTransformer):
         def visit_Name(self, node):
-            if node.id not in _SKIP:
+            if node.id not in _SKIP and not (node.id.startswith("__") and node.id.endswith("__")):
                 node.id = short(node.id)
             return node
 
@@ -80,6 +86,18 @@ def minify(source: str) -> str:
             return node
 
         def visit_FunctionDef(self, node):
+            if not (node.name.startswith("__") and node.name.endswith("__")):
+                # 方法(self 首参)不重命名——外部 obj.write() 属性调用不受
+                # AST 重命名影响,方法名改了会 AttributeError
+                args = node.args.args
+                if not (args and args[0].arg == "self"):
+                    node.name = short(node.name)
+            self.generic_visit(node)
+            return node
+
+        def visit_ClassDef(self, node):
+            # ⚠️ 缺这个会类定义名保留、类名引用被重命名 → NameError
+            # (class _ThreadStream vs ao('out'))——minify 植入物端到端跑不了
             node.name = short(node.name)
             self.generic_visit(node)
             return node
@@ -93,6 +111,29 @@ def minify(source: str) -> str:
             node.names = [short(n) for n in node.names]
             return node
 
+    class _Doc(ast.NodeTransformer):
+        """剥离模块级/函数级 docstring(unparse 不保留注释, docstring 是
+        Expr(Constant) 会被保留——载荷体积优化: 一并删掉)。"""
+
+        def _strip(self, body):
+            if (body and isinstance(body[0], ast.Expr)
+                    and isinstance(body[0].value, ast.Constant)
+                    and isinstance(body[0].value.value, str)):
+                body.pop(0)
+            return body
+
+        def visit_Module(self, node):
+            node.body = self._strip(node.body)
+            return self.generic_visit(node)
+
+        def visit_FunctionDef(self, node):
+            node.body = self._strip(node.body)
+            return self.generic_visit(node)
+
+        visit_AsyncFunctionDef = visit_FunctionDef
+        visit_ClassDef = visit_FunctionDef
+
     tree = _T().visit(tree)
+    tree = _Doc().visit(tree)   # 删 docstring(载荷瘦身)
     ast.fix_missing_locations(tree)
     return ast.unparse(tree)

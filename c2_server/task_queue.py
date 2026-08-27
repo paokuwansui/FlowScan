@@ -18,13 +18,15 @@ class Task:
     def __init__(self, code: str, is_init: bool = False,
                  task_id: Optional[str] = None,
                  result_processor: str = "",
-                 proc_arg: str = ""):
+                 proc_arg: str = "",
+                 record: bool = False):
         self.task_id = task_id or str(uuid.uuid4())
         self.code = code
         self.is_init = is_init
         self.created_at = datetime.now()
         self.result_processor = result_processor  # Q7：结果处理 server 模块名
         self.proc_arg = proc_arg                  # 处理器参数（如 download 落盘路径）
+        self.record = record                      # True=植入物只记录不上报(record_exec)
 
     def __repr__(self) -> str:
         return f"Task({self.task_id[:8]}..., init={self.is_init})"

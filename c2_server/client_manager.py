@@ -47,6 +47,7 @@ class ClientRecord:
         self.via = ""
         self.is_fork = False
         self.is_shell = False
+        self.running_tasks: list = []  # 植入物 register 上报的运行中任务(task_id 列表)
         self.active = False      # 当前是否有活跃会话（cleanup 跳过，S9）
         self.tags: list = []     # 标签/分组（tag 命令设置，22）
         now = datetime.now()

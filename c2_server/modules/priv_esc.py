@@ -259,7 +259,7 @@ def _check_condition(cond, state):
     if cond == "pkexec_ver":
         # polkit 版本区间 0.105 ≤ v < 0.120(pkexec --version 输出如 "pkexec version 124")
         out = _sh("pkexec --version 2>/dev/null")
-        m = re.search(r"(\\d+)", out)
+        m = re.search(r"(\d+)", out)
         if not m:
             return False
         return 0 <= int(m.group(1)) < 120

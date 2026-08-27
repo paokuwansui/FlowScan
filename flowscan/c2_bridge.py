@@ -212,6 +212,7 @@ def _beacon_dict(rec) -> dict:
         "first_seen": _iso_utc(rec.first_seen),
         "last_seen": _iso_utc(rec.last_seen),
         "result_count": len(rec.results),
+        "running_tasks": list(getattr(rec, "running_tasks", []) or []),
     }
 
 

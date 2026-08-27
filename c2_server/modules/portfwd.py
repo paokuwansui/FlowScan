@@ -69,7 +69,10 @@ def run(server_ip, server_port):
         return "(portfwd error: 连 protfwd_server 失败 %s)" % e
     try:
         while True:
-            data = c.recv(4096)
+            try:
+                data = c.recv(4096)
+            except _s.timeout:
+                continue  # 空闲保活: 服务端未断开,继续等指令(2026-08-27 修复)
             if not data:
                 break  # 服务端停止/断开 → 退出线程
             for line in data.decode("utf-8", "replace").splitlines():

