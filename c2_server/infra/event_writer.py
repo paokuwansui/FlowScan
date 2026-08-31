@@ -27,7 +27,10 @@ class EventWriter:
                  max_bytes: int = 10 * 1024 * 1024,
                  backup_count: int = 5):
         self._path = path
-        self._logger = logging.getLogger("events")
+        # logger 名唯一化: logging 是全局注册表,"events" 单例会被多实例
+        # (双 server/测试环境)互相覆盖 handler, 导致事件串写(2026-08-29 修复)
+        self._logger = logging.getLogger(
+            f"events.{os.path.basename(path)}.{id(self)}")
         self._logger.setLevel(logging.INFO)
         self._logger.propagate = False
         for h in list(self._logger.handlers):

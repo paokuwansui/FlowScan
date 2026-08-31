@@ -80,6 +80,38 @@ class TaskQueue:
                 return None
             return queue[0]
 
+    def update_task(self, client_id: str, task_id: str,
+                    code: Optional[str] = None,
+                    result_processor: Optional[str] = None,
+                    proc_arg: Optional[str] = None) -> bool:
+        """修改队列中指定任务字段(至少一个非 None)。返回是否找到。"""
+        with self._lock:
+            queue = self._queues.get(client_id)
+            if not queue:
+                return False
+            for task in queue:
+                if task.task_id == task_id:
+                    if code is not None:
+                        task.code = code
+                    if result_processor is not None:
+                        task.result_processor = result_processor
+                    if proc_arg is not None:
+                        task.proc_arg = proc_arg
+                    return True
+            return False
+
+    def delete_task(self, client_id: str, task_id: str) -> bool:
+        """删除队列中指定任务。返回是否找到并删除。"""
+        with self._lock:
+            queue = self._queues.get(client_id)
+            if not queue:
+                return False
+            for i, task in enumerate(queue):
+                if task.task_id == task_id:
+                    del queue[i]
+                    return True
+            return False
+
     def clear(self, client_id: str) -> None:
         """清空指定客户端的所有任务。"""
         with self._lock:

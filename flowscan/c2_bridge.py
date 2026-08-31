@@ -590,9 +590,40 @@ def _task_list_unlocked(server, client_id: str, limit: int = 50) -> list:
             "created_at": _iso_utc(task.created_at),
             "is_init": bool(getattr(task, "is_init", False)),
             "result_processor": task.result_processor or "",
+            "code": str(task.code or ""),            # 完整代码(编辑用)
             "code_preview": str(task.code or "")[:120],
         })
     return items
+
+
+def task_update(client_id: str, task_id: str, code: str = "") -> dict:
+    """修改 beacon 待办任务代码(队列中任务未下发时)。"""
+    server = get_c2()
+    if not server:
+        return {"ok": False, "error": _C2_INIT_ERROR or "C2 未启动"}
+    if not code or not str(code).strip():
+        return {"ok": False, "error": "code 不能为空"}
+    with _C2_LOCK:
+        try:
+            tq = server._tq
+        except AttributeError:
+            return {"ok": False, "error": "server 无任务队列"}
+        ok = tq.update_task(client_id, task_id, code=str(code))
+    return {"ok": ok, "error": "" if ok else "任务不存在或已下发"}
+
+
+def task_delete(client_id: str, task_id: str) -> dict:
+    """删除 beacon 待办任务(队列中任务未下发时)。"""
+    server = get_c2()
+    if not server:
+        return {"ok": False, "error": _C2_INIT_ERROR or "C2 未启动"}
+    with _C2_LOCK:
+        try:
+            tq = server._tq
+        except AttributeError:
+            return {"ok": False, "error": "server 无任务队列"}
+        ok = tq.delete_task(client_id, task_id)
+    return {"ok": ok, "error": "" if ok else "任务不存在或已下发"}
 
 
 def task_list(client_id: str, limit: int = 50) -> list:
