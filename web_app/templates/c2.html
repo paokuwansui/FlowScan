@@ -126,6 +126,7 @@
                         </select>
                         <button class="btn btn-sm" onclick="loadSnippet()">载入</button>
                         <button class="btn btn-sm" onclick="saveSnippet()">存片段</button>
+                        <button class="btn btn-sm" onclick="editSnippet()">编辑片段</button>
                         <button class="btn btn-sm btn-danger" onclick="delSnippet()">删片段</button>
                         <button class="btn btn-sm btn-primary" onclick="sendRawCode()">发送到选中 Beacon</button>
                         <button class="btn btn-sm btn-secondary" onclick="clearEditor()">清空</button>
@@ -712,6 +713,21 @@
 </div>
 
 {# ── 通用对话框(替代 prompt/confirm/alert;居中模态框) ── #}
+<div id="snippet-edit-modal" class="fs3-modal-backdrop" style="display:none !important;position:fixed;top:0;right:0;bottom:0;left:0;z-index:1000;background:rgba(2,5,12,0.78);align-items:center;justify-content:center;">
+    <div class="fs3-modal-card" style="background:var(--surface);border:1px solid var(--border-bright);border-radius:14px;padding:26px;width:min(720px,94vw);max-height:86vh;overflow-y:auto;box-shadow:0 0 60px rgba(34,211,238,0.12),0 24px 60px rgba(0,0,0,0.5);">
+        <h3 id="se-title" style="margin:0 0 16px;">保存片段</h3>
+        <label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px;" for="se-name">名称</label>
+        <input type="text" id="se-name" class="form-control" placeholder="片段名称" aria-label="片段名称" style="font-family:var(--font-mono);font-size:0.78rem;margin-bottom:12px;">
+        <label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px;" for="se-note">备注</label>
+        <input type="text" id="se-note" class="form-control" placeholder="用途/说明(可选,悬停下拉可见)" aria-label="片段备注" style="font-family:var(--font-mono);font-size:0.78rem;margin-bottom:12px;">
+        <label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px;" for="se-code">代码</label>
+        <textarea id="se-code" rows="8" class="form-control" spellcheck="false" aria-label="片段代码" placeholder="Python 代码" style="font-family:var(--font-mono);font-size:0.75rem;"></textarea>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+            <button class="btn btn-secondary" onclick="closeSnippetEdit()">取消</button>
+            <button class="btn btn-primary" onclick="saveSnippetEdit()">保存</button>
+        </div>
+    </div>
+</div>
 <div id="fs3-dialog" class="fs3-modal-backdrop" style="display:none !important;position:fixed;top:0;right:0;bottom:0;left:0;z-index:1100;background:rgba(2,5,12,0.78);align-items:center;justify-content:center;">
     <div class="fs3-modal-card" style="background:var(--surface);border:1px solid var(--border-bright);border-radius:14px;padding:26px;width:min(680px,94vw);max-height:85vh;overflow-y:auto;box-shadow:0 0 60px rgba(34,211,238,0.12),0 24px 60px rgba(0,0,0,0.5);">
         <h3 id="fs3-dialog-title" style="margin:0 0 12px;">确认</h3>
@@ -2353,24 +2369,67 @@ function renderSnippets() {
     const sel = document.getElementById('py-snippets');
     const list = getSnippets();
     sel.innerHTML = '<option value="">— 片段库 —</option>' +
-        list.map((s, i) => '<option value="' + i + '">' + escapeHtml(s.name) + '</option>').join('');
+        list.map((s, i) => '<option value="' + i + '" title="' +
+            escapeHtml(s.note) + '">' + escapeHtml(s.name) +
+            (s.note ? ' · ' + escapeHtml(String(s.note).slice(0, 20)) : '') +
+            '</option>').join('');
+}
+
+// ── 片段编辑模态框(名称 + 备注 + 代码)──
+let snippetEditIdx = null;  // null=新建, 数字=编辑对应片段
+
+function openSnippetEditor(idx) {
+    const list = getSnippets();
+    const isEdit = idx !== null && idx !== undefined && list[idx];
+    snippetEditIdx = isEdit ? idx : null;
+    document.getElementById('se-title').textContent = isEdit ? '编辑片段' : '保存片段';
+    document.getElementById('se-name').value = isEdit ? (list[idx].name || '') : '';
+    document.getElementById('se-note').value = isEdit ? list[idx].note : '';
+    document.getElementById('se-code').value = isEdit ? (list[idx].code || '') : pyCode.value.trim();
+    document.getElementById('snippet-edit-modal').style.setProperty('display', 'flex', 'important');
+    document.getElementById('se-name').focus();
+}
+
+function closeSnippetEdit() {
+    document.getElementById('snippet-edit-modal').style.setProperty('display', 'none', 'important');
+    snippetEditIdx = null;
+}
+
+function saveSnippetEdit() {
+    const name = document.getElementById('se-name').value.trim();
+    const note = document.getElementById('se-note').value.trim();
+    const code = document.getElementById('se-code').value;
+    if (!name) { fs3Alert('片段名称不能为空'); return; }
+    if (!code.trim()) { fs3Alert('片段代码不能为空'); return; }
+    const list = getSnippets();
+    if (snippetEditIdx !== null && list[snippetEditIdx]) {
+        list[snippetEditIdx] = {name: name, note: note, code: code};  // 编辑: 更新
+    } else {
+        list.push({name: name, note: note, code: code});              // 新建: 追加
+    }
+    setSnippets(list);
+    const sel = document.getElementById('py-snippets');
+    if (snippetEditIdx !== null) sel.value = String(snippetEditIdx);
+    closeSnippetEdit();
+    fs3Alert('片段已保存: ' + name);
 }
 
 async function saveSnippet() {
-    const code = pyCode.value.trim();
-    if (!code) { fs3Alert('代码为空'); return; }
-    const name = await fs3Prompt('片段名称:', 'snippet-' + new Date().toISOString().slice(11, 19)) || '';
-    if (!name) return;
-    const list = getSnippets();
-    list.push({name: name, code: code});
-    setSnippets(list);
-    fs3Alert('已保存片段: ' + name);
+    openSnippetEditor(null);
 }
 
 function loadSnippet() {
     const sel = document.getElementById('py-snippets');
     if (!sel.value) return;
-    pyCode.value = getSnippets()[parseInt(sel.value, 10)].code;
+    const s = getSnippets()[parseInt(sel.value, 10)];
+    if (!s) return;
+    pyCode.value = s.code;
+}
+
+async function editSnippet() {
+    const sel = document.getElementById('py-snippets');
+    if (!sel.value) { fs3Alert('请先在下拉框选择要编辑的片段'); return; }
+    openSnippetEditor(parseInt(sel.value, 10));
 }
 
 async function delSnippet() {

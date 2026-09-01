@@ -229,10 +229,11 @@ class ModuleLoader:
                 else f"result = {func_name}()")
         code = (
             f"# --- module: {mod.name} ({func_name}) ---\n"
-            f"{strip_py_comments(mod.code)}\n\n"
+            f"{mod.code}\n\n"
             f"{call}\n"
             f"print(result)\n"
         )
+        code = strip_py_comments(code)  # 整体一次剥离(模块注释+包装注释, 下发代码零注释)
         self._check_size(code)
         return code
 
@@ -335,6 +336,7 @@ class ModuleLoader:
         lines.append("output = '\\n'.join(results)")
         lines.append("print(output)")
         code = "\n".join(lines)
+        code = strip_py_comments(code)  # 统一剥离(含 step 模块与包装注释)
         self._check_size(code)
         return code
 
