@@ -1655,6 +1655,9 @@ hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
     transition: all 0.14s;
 }
 .beacon-card:hover { border-color: rgba(34, 211, 238, 0.4); background: rgba(34, 211, 238, 0.05); }
+.beacon-card.dragging { opacity: 0.45; border-style: dashed; cursor: grabbing; }
+.beacon-card.drag-before { border-top: 2px solid #22d3ee !important; margin-top: 1px; }
+.beacon-card.drag-after { border-bottom: 2px solid #22d3ee !important; }
 .beacon-card.selected {
     border-color: var(--success);
     background: rgba(52, 211, 153, 0.07);

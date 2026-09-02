@@ -1497,6 +1497,18 @@ function renderBeaconList() {
         updateSelInfo();
         return;
     }
+    // 用户拖拽自定义顺序(localStorage)优先;未排序过的按默认顺序追加
+    const userOrder = getBeaconOrder();
+    if (userOrder.length) {
+        const pos = {};
+        userOrder.forEach(function(id, i) { pos[id] = i; });
+        filtered.sort(function(a, b) {
+            const pa = pos[a.client_id], pb = pos[b.client_id];
+            if (pa !== undefined && pb !== undefined) return pa - pb;
+            if (pa === undefined && pb === undefined) return 0;
+            return pa === undefined ? 1 : -1;
+        });
+    }
     let html = '';
     for (const b of filtered) {
         beaconIds.push(b.client_id);
@@ -1505,7 +1517,9 @@ function renderBeaconList() {
         const online = '在线';
         const since = fmtAgo(b.first_seen);
         const last = fmtAgo(b.last_seen);
-        html += '<div class="beacon-card ' + sel + '" onclick="selectBeacon(\'' + b.client_id + '\')">' +
+        // 搜索/过滤态禁拖(拖拽排序只作用于完整列表)
+        const dragAttr = q ? '' : ' draggable="true" data-bid="' + b.client_id + '" title="拖动排序';
+        html += '<div class="beacon-card ' + sel + '"' + dragAttr + '" onclick="selectBeacon(\'' + b.client_id + '\')">' +
             '<div class="bc-head">' +
             '<input type="checkbox" class="bc-check" ' + checked + ' onclick="event.stopPropagation();toggleBeaconSel(\'' + b.client_id + '\')" aria-label="选择 beacon" title="多选">' +
             '<span class="li-title" style="cursor:pointer;" title="点击查看详情" onclick="event.stopPropagation();openBeaconDetail(\'' + b.client_id + '\')">' + escapeHtml(b.client_id) + '</span>' +
@@ -1530,6 +1544,74 @@ function updateSelInfo() {
     document.getElementById('beacon-sel-info').textContent = '已选 ' + n;
     document.getElementById('beacon-batch-bar').style.display = n ? 'flex' : 'none';
 }
+
+// ── Beacon 拖拽排序(上下拖动改变列表顺序, localStorage 持久化)──
+let beaconDragBid = null;
+
+function getBeaconOrder() {
+    try { const o = JSON.parse(localStorage.getItem('fs3_c2_beacon_order') || '[]');
+        return Array.isArray(o) ? o : []; } catch (e) { return []; }
+}
+
+function setBeaconOrder(order) {
+    localStorage.setItem('fs3_c2_beacon_order', JSON.stringify(order));
+}
+
+function beaconDragClearMarkers() {
+    document.querySelectorAll('.beacon-card.drag-before,.beacon-card.drag-after,.beacon-card.dragging')
+        .forEach(function(c) { c.classList.remove('drag-before', 'drag-after', 'dragging'); });
+}
+
+function beaconDragMove(srcId, dstId, before) {
+    const order = getBeaconOrder();
+    // 若被拖项不在自定义序(新 beacon 或从未拖过), 先按当前完整可见顺序重建
+    let base = (order.length && order.includes(srcId) && order.includes(dstId)) ? order.slice() : beaconIds.slice();
+    base = base.filter(function(id) { return id !== srcId; });
+    const idx = base.indexOf(dstId);
+    base.splice(idx === -1 ? base.length : (before ? idx : idx + 1), 0, srcId);
+    setBeaconOrder(base);
+}
+
+function initBeaconDrag() {
+    const bl = document.getElementById('beacon-list');
+    if (!bl || bl.dataset.dragInit) return;
+    bl.dataset.dragInit = '1';
+    bl.addEventListener('dragstart', function(e) {
+        const card = e.target.closest ? e.target.closest('.beacon-card') : null;
+        if (!card || !card.dataset.bid) return;
+        beaconDragBid = card.dataset.bid;
+        card.classList.add('dragging');
+        try { e.dataTransfer.setData('text/plain', beaconDragBid); e.dataTransfer.effectAllowed = 'move'; } catch (err) {}
+    });
+    bl.addEventListener('dragover', function(e) {
+        if (!beaconDragBid) return;
+        const card = e.target.closest ? e.target.closest('.beacon-card') : null;
+        if (!card || card.dataset.bid === beaconDragBid) return;
+        e.preventDefault();
+        try { e.dataTransfer.dropEffect = 'move'; } catch (err) {}
+        beaconDragClearMarkers();
+        const rect = card.getBoundingClientRect();
+        const before = e.clientY < rect.top + rect.height / 2;
+        card.classList.add(before ? 'drag-before' : 'drag-after');
+    });
+    bl.addEventListener('drop', function(e) {
+        if (!beaconDragBid) return;
+        const card = e.target.closest ? e.target.closest('.beacon-card') : null;
+        e.preventDefault();
+        if (card && card.dataset.bid && card.dataset.bid !== beaconDragBid) {
+            const rect = card.getBoundingClientRect();
+            beaconDragMove(beaconDragBid, card.dataset.bid, e.clientY < rect.top + rect.height / 2);
+        }
+        beaconDragClearMarkers();
+        beaconDragBid = null;
+        renderBeaconList();
+    });
+    bl.addEventListener('dragend', function() {
+        beaconDragBid = null;
+        beaconDragClearMarkers();
+    });
+}
+initBeaconDrag();
 
 function toggleBeaconSel(bid) {
     if (selectedBeacons[bid]) delete selectedBeacons[bid];
