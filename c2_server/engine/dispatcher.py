@@ -195,10 +195,6 @@ class Dispatcher:
                     f"module '{name}': 缺少必需参数 "
                     f"{', '.join(required[len(args):])}")
             kwargs = dict(zip(param_names, args)) if param_names else {}
-        # exec 模块：timeout 从 config.exec_timeout 注入（默认 300s，可配置）
-        if name == "exec":
-            kwargs.setdefault("timeout",
-                              getattr(self.config, "exec_timeout", 300))
         code = self.modules.build_task(name, platform=platform, **kwargs)
         task = Task(code=code)
         rp = mod.get("result_processor", "")

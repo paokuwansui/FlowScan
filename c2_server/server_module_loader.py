@@ -68,6 +68,43 @@ class ServerModuleLoader:
             ValueError: 模块不存在
             ImportError: 模块加载失败
         """
+        result = self._run_module(name, args)
+        if isinstance(result, str):
+            return result  # 模块自身已返回文本(错误/usage)
+
+        if isinstance(result, dict):
+            import json
+            # deploy 字段是 shell 部署命令,JSON 转义（\"）后无法直接复制
+            # 使用——移出 JSON 结构,原样追加在末尾供复制。
+            deploy = result.get("deploy")
+            if deploy is None and isinstance(result.get("command"), str):
+                # socks_server / file_server / protfwd_server 等用顶层 command
+                # 承载部署命令:同样移出并在末尾追加可复制段落(与 beacon 生成一致)
+                deploy = result.pop("command")
+            body = {k: v for k, v in result.items() if k != "deploy"}
+            text = json.dumps(body, indent=2, ensure_ascii=False)
+            if deploy is not None:
+                text += "\n\n部署命令（可直接复制）:\n" + str(deploy)
+            return text
+        return str(result) if result is not None else ""
+
+    def run_structured(self, name: str, args: list):
+        """执行模块 run(*args) 并原样返回结果（dict 不序列化）。
+
+        供桥接层(c2_bridge.build_deploy 等)结构化消费 dict 结果——
+        run() 会把 dict JSON 序列化成文本,结构化调用方无法还原字段。
+
+        Raises:
+            ValueError: 模块不存在
+            ImportError: 模块加载失败
+        """
+        result = self._run_module(name, args)
+        if isinstance(result, str):
+            return {"status": "error", "message": result}
+        return result
+
+    def _run_module(self, name: str, args: list):
+        """加载并执行模块 run(*args)，返回原始结果（run/run_structured 共用）。"""
         path = self._dir / f"{name}.py"
         if not path.is_file():
             raise ValueError(f"server module not found: {name}")
@@ -82,7 +119,7 @@ class ServerModuleLoader:
             return f"[!] module '{name}' has no run() function"
 
         try:
-            result = mod.run(*args)
+            return mod.run(*args)
         except TypeError as e:
             logger.warning("server module %s run TypeError: %s", name, e)
             return f"[!] {name}: {e}"
@@ -91,18 +128,6 @@ class ServerModuleLoader:
             tb = traceback.format_exc()
             logger.error("server module %s run failed:\n%s", name, tb)
             return tb
-
-        if isinstance(result, dict):
-            import json
-            # deploy 字段是 shell 部署命令，JSON 转义（\"）后无法直接复制
-            # 使用——移出 JSON 结构，原样追加在末尾供复制。
-            deploy = result.get("deploy")
-            body = {k: v for k, v in result.items() if k != "deploy"}
-            text = json.dumps(body, indent=2, ensure_ascii=False)
-            if deploy is not None:
-                text += "\n\n部署命令（可直接复制）:\n" + str(deploy)
-            return text
-        return str(result) if result is not None else ""
 
     # ── 内部 ──
 

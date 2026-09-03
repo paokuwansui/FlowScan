@@ -88,10 +88,11 @@ class BeaconSession:
             self._sock.close()
         except OSError:
             pass
-        # 会话结束：清活跃标记（cleanup 竞态防护，S9）
+        # 会话结束：活跃会话计数 -1(cleanup 竞态防护, B15——重叠会话的
+        # close 只减自己的计数, 不再可能清掉其它活跃会话的标记)
         rec = self._mgr.get_client(self._client_id)
         if rec:
-            rec.active = False
+            rec.active = max(0, rec.active - 1)
 
     # ── 主流程 ──
 
@@ -168,7 +169,7 @@ class BeaconSession:
         tasks = take_task_batch(client_id, self._tq, budget)
         if tasks:
             for t in tasks:
-                self._inflight.track(t)  # 用原 Task 对象登记处理器(含 proc_arg)
+                self._inflight.track(t, client_id)  # 用原 Task 对象登记处理器(含 proc_arg)
             frame = batch_response(acked, tasks, budget)[0]  # 单批 → 单帧
             try:
                 send_frame(self._sock,
@@ -176,9 +177,24 @@ class BeaconSession:
                            self._key)
             except Exception:
                 # 断线: 本批逆序 push_front 回放原 Task(保留 result_processor/
-                # proc_arg/is_init/record 标记),下次回连重发
+                # proc_arg/is_init/record 标记),下次回连重发。
+                # B15 防御: 单任务超过帧上限(用户调小 max_frame_size 且任务
+                # code 超限)时回放只会反复取-发-断死循环——丢弃并记 error;
+                # push_front 返回 False(队列满)同样不能静默丢
                 for t in reversed(tasks):
-                    self._tq.push_front(client_id, t)
+                    approx = (len(getattr(t, "task_id", ""))
+                              + len(getattr(t, "code", "")) + 64)
+                    if approx > budget:
+                        logger.error(
+                            "task %s (~%dB) 超过帧预算 %dB, 无法传输, 丢弃"
+                            "(请调大 max_frame_size 或减小任务体积)",
+                            getattr(t, "task_id", "?")[:8], approx, budget)
+                        continue
+                    if not self._tq.push_front(client_id, t):
+                        logger.error(
+                            "task %s 回放入队失败(队列满), 任务将丢失——"
+                            "请等待 beacon 消化后重新下发", 
+                            getattr(t, "task_id", "?")[:8])
                 return
             for t in tasks:
                 self._events.emit(EVT_TASK_SENT, client_id, task_id=t.task_id)

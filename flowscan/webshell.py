@@ -166,6 +166,16 @@ def build_file_command(conn: dict, action: str, path: str, content: str = "", ta
         if not path:
             return ""
         return ("type " + _quote_cmd(path.replace("/", "\\"))) if os_tag == "windows" else ("cat " + _quote_posix(path))
+    if action == "read_base64":
+        # 二进制下载: 直接 cat/type 会走文本解码,二进制被改写损坏——
+        # 统一走 base64(输出纯 ASCII,不受编码/换行影响; 2026-09-04 B9)
+        if not path:
+            return ""
+        if os_tag == "windows":
+            return ("powershell -NoProfile -NonInteractive -Command \""
+                    "[Convert]::ToBase64String([IO.File]::ReadAllBytes('"
+                    + path.replace("/", "\\") + "'))\"")
+        return "base64 " + _quote_posix(path)
     if action == "delete":
         if not path:
             return ""
@@ -325,7 +335,7 @@ def exec_command(conn: dict, command: str, timeout: int = 30):
 
 
 def file_op(conn: dict, action: str, path: str, content: str = "", target_path: str = "", timeout: int = 30):
-    """文件操作:list/read/write/delete/mkdir/rename,返回 (output, ok, error)。"""
+    """文件操作:list/read/read_base64/write/delete/mkdir/rename,返回 (output, ok, error)。"""
     cmd = build_file_command(conn, action, path, content, target_path)
     if not cmd:
         return "", False, f"unsupported action or missing path: {action}"

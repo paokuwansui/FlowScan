@@ -13,7 +13,9 @@ from server.transports.transport_base import build_upgrade_task
 from server.core.events import EVT_UPLEVEL
 
 # 各协议在 host/port/key 之外的额外传输参数个数(透传给 transport_* 的 run())
-_EXTRA = {"dns": 0, "http": 0, "https": 0, "tcp": 0, "tls": 1, "mtls": 4}
+# dns=1: 域名参数(agent_dns 的 uplevel_hint 明确提示可带 domain——此前=0,
+# 带 domain 会被当作 retry 解析 int() 报错, 功能支线不可达; 2026-09-04 B13)
+_EXTRA = {"dns": 1, "http": 0, "https": 0, "tcp": 0, "tls": 1, "mtls": 4}
 
 
 def run(disp, args, protocol: str):
@@ -33,6 +35,9 @@ def run(disp, args, protocol: str):
 
     n_extra = _EXTRA.get(protocol, 0)
     transport_args = rest[3:3 + n_extra]
+    if protocol == "dns" and len(rest) == 3 + n_extra - 1:
+        # 4 参简写(不带 domain): transport 内回退 host
+        transport_args = [""]
     if len(transport_args) < n_extra:
         return f"[!] {protocol} 需要 {n_extra} 个额外参数(见 s_exec transport_{protocol})"
     tail = rest[3 + n_extra:]

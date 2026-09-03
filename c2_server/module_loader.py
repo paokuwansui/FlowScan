@@ -17,6 +17,7 @@ import io
 import json
 import logging
 import os
+import threading
 import tokenize
 from dataclasses import dataclass, field
 from typing import Optional
@@ -69,60 +70,67 @@ class ModuleLoader:
                  max_task_code_size: int = 262144):
         self._modules_dir = modules_dir
         self._max_task_code_size = max_task_code_size
+        # 2026-09-04 B15: reload/load 与并发的 list/get/build_task 共享
+        # _modules——热重载重建期间另一线程遍历会 RuntimeError, 加锁保护
+        self._lock = threading.RLock()
         self._modules: dict[str, ModuleInfo] = {}
 
     # ── 公开接口 ──
 
     def load(self) -> None:
         """扫描并加载全部模块。"""
-        self._modules.clear()
-        if not os.path.isdir(self._modules_dir):
-            logger.warning("modules dir not found: %s", self._modules_dir)
-            return
-        for filename in sorted(os.listdir(self._modules_dir)):
-            path = os.path.join(self._modules_dir, filename)
-            if not os.path.isfile(path):
-                continue
-            if filename.endswith(".py"):
-                self._load_py_module(filename, path)
-            elif filename.endswith(".json"):
-                self._load_json_module(filename, path)
-        self._validate_json_steps()
+        with self._lock:
+            self._modules.clear()
+            if not os.path.isdir(self._modules_dir):
+                logger.warning("modules dir not found: %s", self._modules_dir)
+                return
+            for filename in sorted(os.listdir(self._modules_dir)):
+                path = os.path.join(self._modules_dir, filename)
+                if not os.path.isfile(path):
+                    continue
+                if filename.endswith(".py"):
+                    self._load_py_module(filename, path)
+                elif filename.endswith(".json"):
+                    self._load_json_module(filename, path)
+            self._validate_json_steps()
 
     def list_modules(self) -> list:
         """列出模块摘要: [{name, desc, type, params?/steps?}]"""
-        result = []
-        for mod in self._modules.values():
-            item = {"name": mod.name, "desc": mod.desc, "type": mod.type}
-            if mod.type == "python":
-                item["params"] = mod.params
-            else:
-                item["steps"] = len(mod.steps)
-            result.append(item)
-        return result
+        with self._lock:
+            result = []
+            for mod in self._modules.values():
+                item = {"name": mod.name, "desc": mod.desc, "type": mod.type}
+                if mod.type == "python":
+                    item["params"] = mod.params
+                else:
+                    item["steps"] = len(mod.steps)
+                result.append(item)
+            return result
 
     def get_module(self, name: str) -> Optional[dict]:
         """获取模块完整元数据；不存在返回 None。"""
-        mod = self._modules.get(name)
-        if not mod:
-            return None
-        result = {"name": mod.name, "type": mod.type, "desc": mod.desc}
-        if mod.type == "python":
-            result["params"] = mod.params
-            result["result_processor"] = mod.result_processor
-            result["code"] = mod.code
-            result["funcs"] = sorted(mod.funcs)
-        else:
-            result["steps"] = mod.steps
-        return result
+        with self._lock:
+            mod = self._modules.get(name)
+            if not mod:
+                return None
+            result = {"name": mod.name, "type": mod.type, "desc": mod.desc}
+            if mod.type == "python":
+                result["params"] = mod.params
+                result["result_processor"] = mod.result_processor
+                result["code"] = mod.code
+                result["funcs"] = sorted(mod.funcs)
+            else:
+                result["steps"] = mod.steps
+            return result
 
     def param_names(self, name: str) -> list:
         """模块声明的参数名列表（结构化，替代字符串解析 S3②）。"""
-        mod = self._modules.get(name)
-        if not mod:
-            return []
-        return [p[0] for p in mod.params
-                if isinstance(p, (list, tuple)) and p and isinstance(p[0], str)]
+        with self._lock:
+            mod = self._modules.get(name)
+            if not mod:
+                return []
+            return [p[0] for p in mod.params
+                    if isinstance(p, (list, tuple)) and p and isinstance(p[0], str)]
 
     def build_task(self, name: str, platform: str = "", **kwargs) -> str:
         """构建下发给执行端的 Python 代码。
@@ -138,14 +146,15 @@ class ModuleLoader:
         Raises:
             ValueError: 模块不存在 / 无适用平台实现 / 未知参数 / 代码超限
         """
-        mod = self._modules.get(name)
-        if not mod:
-            raise ValueError(f"module '{name}' not found")
-        if mod.type == "python":
-            return self._build_py_task(mod, kwargs, platform)
-        if mod.type == "json":
-            return self._build_json_task(mod, platform)
-        raise ValueError(f"unknown module type: {mod.type}")
+        with self._lock:
+            mod = self._modules.get(name)
+            if not mod:
+                raise ValueError(f"module '{name}' not found")
+            if mod.type == "python":
+                return self._build_py_task(mod, kwargs, platform)
+            if mod.type == "json":
+                return self._build_json_task(mod, platform)
+            raise ValueError(f"unknown module type: {mod.type}")
 
     def reload(self) -> None:
         """热加载：重新扫描目录。"""

@@ -11,6 +11,15 @@ import json
 import os
 
 
+def _atomic_dump(cfg_path: str, raw: dict) -> None:
+    """原子写 config.json(2026-09-04 B15): 临时文件 + os.replace,
+    避免与并发写(web 通道配置/二阶段保存/build)撞出半截 JSON。"""
+    tmp = cfg_path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(raw, f, indent=2, ensure_ascii=False)
+    os.replace(tmp, cfg_path)
+
+
 def run(disp, args):
     if not args:
         cur = getattr(disp.config, "stage_code", "") or ""
@@ -24,8 +33,7 @@ def run(disp, args):
             try:
                 raw = json.load(open(cfg_path, encoding="utf-8"))
                 raw["stage_code"] = ""
-                json.dump(raw, open(cfg_path, "w", encoding="utf-8"),
-                          indent=2, ensure_ascii=False)
+                _atomic_dump(cfg_path, raw)
             except OSError:
                 pass
         return "[+] 第二段已清除(恢复单段部署)"
@@ -36,8 +44,7 @@ def run(disp, args):
         try:
             raw = json.load(open(cfg_path, encoding="utf-8"))
             raw["stage_code"] = code
-            json.dump(raw, open(cfg_path, "w", encoding="utf-8"),
-                      indent=2, ensure_ascii=False)
+            _atomic_dump(cfg_path, raw)
         except OSError:
             pass
     return f"[+] 第二段已设定 ({len(code)} 字节), 新 beacon 首次上线下发"

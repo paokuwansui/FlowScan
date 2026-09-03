@@ -262,7 +262,16 @@ def command(line: str) -> tuple:
             return False, "未连接远端 server（请先远程模式连接）"
         resp = c.send_command(line)
         if resp.get("type") == RESPONSE:
+            # 自动重连成功后恢复 connected(此前断线后 _state 恒 True 假连接,
+            # 或重连成功也不恢复——2026-09-04 B15)
+            if not _state.get("connected"):
+                _state.update({"connected": True, "error": ""})
             return True, resp.get("output", "")
+        # 网络层失败(send_command 内部已置 _sock=None, 下次自动重连):
+        # 同步状态, 前端徽标立即变灰, 不再维持假连接
+        if resp.get("status") == "error":
+            _state.update({"connected": False,
+                           "error": resp.get("error", "") or "连接已断开"})
         return False, resp.get("error") or "远端无响应"
 
 

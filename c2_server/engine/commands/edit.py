@@ -14,12 +14,17 @@ from server.task_queue import Task
 
 
 def run(disp, args):
-    if len(args) < 2:
-        return ("[!] usage: edit <beacon_id> <remote_path> "
+    if not args:
+        return ("[!] usage: edit [<beacon_id>] <remote_path> "
                 "[--raw | @local_file | 文本内容...]")
     bid, rest = disp.resolve_beacon(args)
     if not bid:
-        return "[!] 未指定 Beacon"
+        # 未选中 beacon 时 <bid> 为必填
+        return ("[!] 未选中 Beacon; 请先 use <bid> 或显式指定: "
+                "edit <beacon_id> <remote_path> ...")
+    if not rest:
+        return ("[!] usage: edit [<beacon_id>] <remote_path> "
+                "[--raw | @local_file | 文本内容...]")
     path = rest[0]
     try:
         if len(rest) >= 2:

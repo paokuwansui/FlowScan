@@ -10,7 +10,6 @@ def run(disp, args):
         f"Event file: {cfg.event_file}",
         f"Max frame: {cfg.max_frame_size // 1024}KB",
         f"Max tasks/beacon: {cfg.max_tasks_per_client}",
-        f"exec 超时: {cfg.exec_timeout}s",
         f"client TLS: {'开' if cfg.client_tls else '关'}",
     ]
     if cfg.auto_commands:

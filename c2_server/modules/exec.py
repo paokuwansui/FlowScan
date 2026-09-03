@@ -1,14 +1,60 @@
 """
 @module: exec
-@desc: 执行系统命令 (cmd 为 rest 参数，吸收剩余全部参数，命令可含空格)
+@desc: 执行系统命令，两种格式：
+  1) exec `命令` <超时>   — 反引号包裹命令，超时支持 300(秒) 300m(分) 3h(时)
+  2) exec 直接加命令      — 无超时，一直运行到自然结束
 """
+import re
 import subprocess
 
 MODULE = {
-    "desc": "执行系统命令（cmd 吸收剩余全部参数，命令可含空格）",
-    "params": [("cmd", "rest；完整命令，剩余参数自动拼接"),
-               ("timeout", "可选；默认 300 秒（config.exec_timeout）")],
+    "desc": "执行系统命令（`cmd` 超时 模式 或 直接命令 模式，无超时则一直运行）",
+    "params": [("cmd", "rest；`命令` 超时(300/300m/3h) 或 直接写命令")],
 }
+
+# 超时单位 → 秒
+_UNIT_SEC = {"s": 1, "m": 60, "h": 3600}
+
+
+def _parse_timeout(tok: str):
+    """解析超时 token: 300 / 300s / 300m / 3h → 秒; 非法返回 None。"""
+    m = re.match(r"^(\d+)([smh]?)$", tok.strip().lower())
+    if not m:
+        return None
+    n = int(m.group(1))
+    unit = m.group(2) or "s"
+    return n * _UNIT_SEC[unit]
+
+
+def _parse_cmd(s: str):
+    """解析命令串。支持:
+      `cmd` [timeout]  → (cmd, timeout秒 或 None, 错误或 "")
+      直接命令          → (原样, None, "")
+    反引号未闭合/超时非法时返回错误信息(不执行)。
+    """
+    s = s.strip()
+    if s.startswith("`"):
+        end = s.find("`", 1)
+        if end == -1:
+            return s, None, "(exec: 命令反引号未闭合, 应为 `命令` 超时 或 直接写命令)"
+        cmd = s[1:end].strip()
+        if not cmd:
+            return s, None, "(exec: 反引号内命令为空)"
+        rest = s[end + 1:].strip()
+        if rest:
+            tok = rest.split()[0]
+            secs = _parse_timeout(tok)
+            if secs is None:
+                return s, None, \
+                    f"(exec: 超时格式无效: {tok!r}, 支持 300/300s/300m/3h)"
+            # 反引号后多余 token(超出超时)不允许,防误把命令追加进超时
+            if rest.split()[1:]:
+                return s, None, \
+                    "(exec: 超时后不能跟额外参数," \
+                    " 命令需整体放在反引号内)"
+            return cmd, secs, ""
+        return cmd, None, ""
+    return s, None, ""
 
 
 def _hb_start():
@@ -69,45 +115,59 @@ def _hb_stop():
 _hb_go = False
 
 
-def _run(argv, cmd, timeout):
+def _run(argv, cmd, timeout=None):
     _hb_start()
+    proc = None
     try:
         proc = subprocess.Popen(
             argv,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
         )
-        out, _ = proc.communicate(timeout=int(timeout))
+        if timeout:
+            try:
+                out, _ = proc.communicate(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                return f"(timeout after {timeout}s)"
+        else:
+            # 无超时: 命令一直跑到自然结束
+            out, _ = proc.communicate()
         return out.strip() or "(no output)"
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        return f"(timeout after {timeout}s)"
     except FileNotFoundError:
         return "(shell not found)"
     except Exception as e:
         return f"(error: {e})"
     finally:
+        if proc is not None and proc.poll() is None:
+            try:
+                proc.kill()
+            except OSError:
+                pass
         _hb_stop()
 
 
-def run(cmd, timeout=10):
+def run(cmd):
     """通用入口（平台未知时自动判定）。"""
+    cmd2, secs, err = _parse_cmd(cmd)
+    if err:
+        return err
     import os
     if os.name == "nt":
-        return run_windows(cmd, timeout)
-    return run_linux(cmd, timeout)
+        return run_windows(cmd2, secs)
+    return run_linux(cmd2, secs)
 
 
-def run_linux(cmd, timeout=10):
+def run_linux(cmd, timeout=None):
     """通过 /bin/sh 执行命令"""
     return _run(["/bin/sh", "-c", cmd], cmd, timeout)
 
 
-def run_windows(cmd, timeout=10):
+def run_windows(cmd, timeout=None):
     """通过 cmd.exe 执行命令"""
     return _run(["cmd.exe", "/c", cmd], cmd, timeout)
 
 
-def run_mac(cmd, timeout=10):
+def run_mac(cmd, timeout=None):
     """通过 /bin/sh 执行命令 (macOS)"""
     return _run(["/bin/sh", "-c", cmd], cmd, timeout)
 
@@ -115,8 +175,7 @@ def run_mac(cmd, timeout=10):
 if __name__ == "__main__":
     import sys
     if len(sys.argv) < 2:
-        print("usage: exec <command> [timeout]")
+        print("usage: exec <command> | exec `command` [timeout]")
         sys.exit(1)
-    t = int(sys.argv[2]) if len(sys.argv) > 2 else 10
     print(f"$ {sys.argv[1]}")
-    print(run_linux(sys.argv[1], t))
+    print(run(sys.argv[1]))

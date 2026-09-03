@@ -63,7 +63,10 @@ def run(server_ip, server_port):
     import threading as _t
     try:
         c = _s.create_connection((server_ip, int(server_port)), timeout=15)
-        c.settimeout(120)
+        # 控制连接保活周期 30s: 断开感知/任务停止响应更快(120s 时半开断连
+        # 或 stop 取消最长要 120s 才醒, 体感 beacon 卡死)。长驻语义不变:
+        # timeout 只是保活醒来, 服务端未断开就继续等指令。
+        c.settimeout(30)
         c.sendall(("REG %s\n" % _D).encode())
     except Exception as e:
         return "(socks error: 连 socks_server 失败 %s)" % e

@@ -48,7 +48,10 @@ class ClientRecord:
         self.is_fork = False
         self.is_shell = False
         self.running_tasks: list = []  # 植入物 register 上报的运行中任务(task_id 列表)
-        self.active = False      # 当前是否有活跃会话（cleanup 跳过，S9）
+        # 活跃会话计数(2026-09-04 B15): 同一 bid 的重叠会话各 +1, 会话结束
+        # 各自 -1——原单布尔 active 在 A/B 会话重叠时 A 的 close 会清掉 B 的
+        # 标记, cleanup 可能误清仍在线的 beacon; 计数在 cleanup 锁内校验
+        self.active = 0
         self.tags: list = []     # 标签/分组（tag 命令设置，22）
         now = datetime.now()
         self.first_seen = now
@@ -135,6 +138,25 @@ class ClientManager:
         with self._lock:
             self._clients.pop(client_id, None)
 
+    def remove_if_offline(self, client_id: str,
+                          expire_seconds: int = 300) -> bool:
+        """超时清理(2026-09-04 B15): 判断与删除在锁内原子完成。
+
+        旧流程 cleanup 先 get_offline_clients 快照、再逐个 remove_client——
+        两步之间 beacon 可能刚重连注册(刷新 last_seen/active), 照删不误;
+        锁内重校验 last_seen 与 active 计数后删除, 消除该 TOCTOU 窗口。
+        返回 True=已删除。
+        """
+        cutoff = datetime.now() - timedelta(seconds=expire_seconds)
+        with self._lock:
+            rec = self._clients.get(client_id)
+            if rec is None:
+                return False
+            if rec.active > 0 or rec.last_seen >= cutoff:
+                return False  # 活跃会话中或刚回连: 不清理
+            del self._clients[client_id]
+            return True
+
     def mark_init_done(self, client_id: str) -> None:
         """标记首次初始化完成。"""
         with self._lock:
@@ -164,8 +186,12 @@ class ClientManager:
             if rec and platform in ("linux", "windows", "macos"):
                 rec.sys_platform = platform
 
-    # Q7 结果处理器回填白名单（sysinfo_parse 等 server 模块返回的字段）
-    _METADATA_FIELDS = ("sys_user", "sys_os", "sys_platform")
+    # Q7 结果处理器回填白名单(sysinfo_parse 等 server 模块返回的字段)。
+    # 2026-09-04 B12: 扩充 priv_esc_parse 回填字段(此前不在白名单, 提权
+    # 检测结论全部被丢弃, 详情页永不显示)
+    _METADATA_FIELDS = ("sys_user", "sys_os", "sys_platform",
+                        "priv_suid_n", "priv_suid_gtfobins_n", "priv_cve_list",
+                        "kernel_version", "sys_distro")
 
     def update_metadata(self, client_id: str, fields: dict) -> None:
         """按白名单回填元数据字段（Q7 结果处理器）。未知键丢弃。"""
@@ -174,8 +200,10 @@ class ClientManager:
             if not rec:
                 return
             for k, v in fields.items():
-                if k in self._METADATA_FIELDS and isinstance(v, str) and v:
-                    setattr(rec, k, v)
+                # 支持 str/int/list(priv_esc 回填含计数 int 与 CVE 摘要 str)
+                if k in self._METADATA_FIELDS and v not in (None, ""):
+                    if isinstance(v, (str, int, list, dict)):
+                        setattr(rec, k, v)
 
     def get_offline_clients(self, timeout: int = 300) -> list[ClientRecord]:
         """获取超时未回连的客户端列表。"""

@@ -85,6 +85,13 @@ class ClientSession:
                 break  # 远程 exit：仅断开本连接
 
             output = self._dispatcher.execute(line)
+            # 响应截断(2026-09-04 B11): 超帧上限的大输出(result <bid> 全量
+            # 等)会让 send_frame 长度头超过对端 max_frame_size, 被对端
+            # recv_frame 拒收并断开——截断到安全余量并标注
+            lim = int(getattr(self._config, "max_frame_size", 512 * 1024) * 0.6)
+            if len(output) > lim:
+                output = (output[:lim]
+                          + f"\n... (truncated, {len(output)} bytes total)")
             resp = {"type": RESPONSE, "status": "ok", "output": output}
             try:
                 send_frame(self._sock, json.dumps(resp).encode("utf-8"),

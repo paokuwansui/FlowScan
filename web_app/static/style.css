@@ -1566,6 +1566,27 @@ hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
 .wb-col .card { margin-bottom: 0; }
 /* 三栏高度恒等于中栏:左右栏内容超高时栏内滚动,不撑高整行 */
 .wb-left, .wb-right { overflow-y: auto; }
+/* 三栏底部对齐:左/中栏卡片吸收剩余高度, 列表/编辑器区内部滚动或填满 */
+.wb-left .panel-beacons {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+.wb-left .panel-beacons > #beacon-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;   /* 替代固定 46vh: 高度由卡片拉伸决定, 超高时自身滚动 */
+}
+.wb-left .panel-auto { flex: 0 0 auto; }
+.wb-main .panel-editor {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+.wb-main .panel-editor > #py-code { flex: 1 1 auto; min-height: 60px; }
+.wb-main .panel-editor > p { flex-shrink: 0; }
 .wb-main .c2-term {
     flex: none;
     height: 54vh;
@@ -1579,6 +1600,10 @@ hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
     .c2-workbench { grid-template-columns: 1fr; height: auto; min-height: 0; max-height: none; }
     .wb-main .c2-term { height: 46vh; min-height: 300px; }
     .wb-left, .wb-right { overflow-y: visible; }
+    /* 单列堆叠: 取消拉伸, beacon 列表恢复高度上限(内部滚动) */
+    .wb-left .panel-beacons, .wb-main .panel-editor { flex: none; }
+    .wb-left .panel-beacons > #beacon-list { flex: none; max-height: 46vh; }
+    .wb-main .panel-editor > #py-code { flex: none; min-height: 0; }
 }
 
 /* 终端输出行 */
@@ -1664,7 +1689,12 @@ hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
     box-shadow: 0 0 12px rgba(52, 211, 153, 0.14);
 }
 .bc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.bc-head .li-title { font-family: var(--font-mono); font-size: 0.78rem; }
+.bc-head .li-title {
+    font-family: var(--font-mono); font-size: 0.78rem;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    min-width: 0;   /* 允许收缩显示省略号, 避免长 id 撑爆布局挤压状态点 */
+    flex: 1 1 auto;
+}
 .bc-meta { font-size: 0.7rem; color: var(--text-faint); margin-top: 3px; line-height: 1.5; font-family: var(--font-mono); }
 .bc-tags { margin-top: 5px; display: flex; gap: 4px; flex-wrap: wrap; }
 
@@ -1679,7 +1709,21 @@ hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
     overflow: hidden;
 }
 .wb-right .panel-modules > .tabs { flex-shrink: 0; }
-.wb-right .panel-modules > div { flex: 1; min-height: 0; overflow-y: auto; }
+/* mtab 面板区纵向布局: 顶部控件固定, 模块列表占满剩余高度触底 */
+.wb-right .panel-modules > div {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+/* 列表取消 52vh 上限: 高度由面板剩余决定, 超高时列表自身滚动 */
+.wb-right .panel-modules .mod-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+}
 .mod-item {
     padding: 7px 9px;
     border: 1px solid transparent;
@@ -1738,6 +1782,8 @@ hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
     display: inline-block;
     width: 10px;
     height: 10px;
+    flex: 0 0 auto;   /* flex 容器内不伸缩: 防被压扁(内容溢出时挤压绿点) */
+    min-width: 10px;
     border-radius: 50%;
     margin-right: 10px;
     vertical-align: 6px;
@@ -2156,14 +2202,21 @@ tr:has(.pending-num) {
     to   { opacity: 1; transform: translateY(0); }
 }
 
-/* 提示符光标闪烁块 */
-.term-prompt::after {
-    content: "▍";
-    margin-left: 2px;
+/* 输入位闪烁光标: 独立元素经 JS 对齐 textarea 空态 caret 同 x; 聚焦时隐藏,
+   由 textarea 系统光标接管(闪烁/移动), 避免双光标错位不同频 */
+.c2-caret {
+    position: absolute;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    line-height: 1;
     color: var(--accent);
-    animation: fs3-cursor-blink 1.1s steps(1) infinite;
     text-shadow: 0 0 8px rgba(34, 211, 238, 0.7);
+    animation: fs3-cursor-blink 1.1s steps(1) infinite;
+    pointer-events: none;
+    z-index: 2;
+    transform: translateY(-50%);
 }
+.term-input-bar:focus-within .c2-caret { opacity: 0; animation: none; }
 @keyframes fs3-cursor-blink {
     0%, 49%  { opacity: 1; }
     50%, 100% { opacity: 0; }

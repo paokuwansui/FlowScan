@@ -43,6 +43,16 @@ def run(disp, args):
     lines = ["[+] 配置已重载，模块已重扫"]
     if changed:
         lines.append("    变更: " + ", ".join(sorted(changed)))
-    lines.append("    注意: server_port/client_port/密钥/event_file/log_file"
-                 " 变更需重启生效，其余已热生效")
+    # 启动期注入的基础设施(端口/密钥/证书/日志路径)热重载不生效:
+    # config 命令会显示新值而实际握手/监听仍旧值,生成载荷也用旧密钥——
+    # 明确列出需重启项,防"看着新值实际旧值"的误导(2026-09-04 B14)
+    restart_keys = {"server_host", "server_port", "client_port", "implant_key",
+                    "client_key", "client_tls", "event_file", "log_file",
+                    "udp_heartbeat"}
+    restart_changed = sorted(k for k in changed if k in restart_keys)
+    if restart_changed:
+        lines.append("    ⚠️ 需重启生效(运行中仍用旧值, 载荷/握手以旧密钥为准): "
+                     + ", ".join(restart_changed))
+        lines.append("      请在确认后重启 C2——重启前生成的任何载荷都连不上本 server")
+    lines.append("    其余变更已热生效")
     return "\n".join(lines)

