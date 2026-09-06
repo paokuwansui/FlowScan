@@ -1579,6 +1579,9 @@ hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
     max-height: none;   /* 替代固定 46vh: 高度由卡片拉伸决定, 超高时自身滚动 */
 }
 .wb-left .panel-auto { flex: 0 0 auto; }
+.wb-right .panel-history { flex: 0 0 auto; display: flex; flex-direction: column; }
+/* 历史命令列表在卡片内弹性填充(卡片与自动执行栏目等高时列表占满剩余滚动) */
+.wb-right .panel-history .auto-list { flex: 1 1 auto; min-height: 0; max-height: none; }
 .wb-main .panel-editor {
     flex: 1 1 auto;
     min-height: 0;
@@ -1621,7 +1624,10 @@ hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
 .term-line.terr  { color: #fda4af; }
 .term-line.tinfo { color: #7dd3fc; }
 .term-line.techo { color: var(--accent); text-shadow: 0 0 8px rgba(34, 211, 238, 0.35); }
+.term-line.tnote { color: #fcd34d; font-style: italic; }
 .term-line.tplain { color: #b9d4f5; }
+/* 纯空行分隔(无时间戳) */
+.term-gap { height: 0.55em; }
 
 /* Tab 补全弹窗 */
 .c2-comp {
@@ -1709,6 +1715,8 @@ hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
     overflow: hidden;
 }
 .wb-right .panel-modules > .tabs { flex-shrink: 0; }
+/* 模块面板 tab 均分占满整行(植入模块/Server 模块) */
+.wb-right .panel-modules > .tabs .tab { flex: 1 1 0; text-align: center; }
 /* mtab 面板区纵向布局: 顶部控件固定, 模块列表占满剩余高度触底 */
 .wb-right .panel-modules > div {
     flex: 1;
@@ -2214,7 +2222,8 @@ tr:has(.pending-num) {
     animation: fs3-cursor-blink 1.1s steps(1) infinite;
     pointer-events: none;
     z-index: 2;
-    transform: translateY(-50%);
+    /* top 由 JS 按 textarea 文字行中心精确对齐(2026-09-05 修: 原 translateY(-50%)
+       基于静态位置偏上——闪烁光标悬在提示符上方) */
 }
 .term-input-bar:focus-within .c2-caret { opacity: 0; animation: none; }
 @keyframes fs3-cursor-blink {

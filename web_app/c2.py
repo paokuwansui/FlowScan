@@ -491,6 +491,34 @@ def register(app):
             return jsonify({"ok": False, "error": "模块不存在"}), 404
         return jsonify({"ok": True, "module": mod})
 
+    @app.route("/api/c2/smodule/<name>")
+    @login_required
+    def c2_smodule_detail(name: str):
+        """server 端模块完整元数据(含 code 源码, 源码查看/编辑用)。"""
+        config = load_yaml(app.config["CONFIG_PATH"])
+        c2cfg = _c2_config(config)
+        if not c2cfg["enabled"]:
+            return jsonify({"ok": False, "error": "C2 未启用"}), 400
+        c2_bridge.init_c2(c2cfg["project_root"], c2cfg["config_file"])
+        mod = c2_bridge.get_smodule(name)
+        if not mod:
+            return jsonify({"ok": False, "error": "server 模块不存在"}), 404
+        return jsonify({"ok": True, "module": mod})
+
+    @app.route("/api/c2/smodule/save", methods=["POST"])
+    @login_required
+    def c2_smodule_save():
+        """保存 server 端模块源码(写 s_modules/<name>.py, 运行即热生效)。"""
+        config = load_yaml(app.config["CONFIG_PATH"])
+        c2cfg = _c2_config(config)
+        if not c2cfg["enabled"]:
+            return jsonify({"ok": False, "error": "C2 未启用"}), 400
+        c2_bridge.init_c2(c2cfg["project_root"], c2cfg["config_file"])
+        data = request.get_json(silent=True) or {}
+        ok, msg = c2_bridge.save_smodule(
+            str(data.get("name", "") or ""), str(data.get("content", "") or ""))
+        return jsonify({"ok": ok, "message": msg})
+
     @app.route("/api/c2/module/build", methods=["POST"])
     @login_required
     def c2_module_build():
@@ -727,11 +755,12 @@ def register(app):
             port = int(data.get("port", 0) or 0)
             interval = int(data.get("interval", 60) or 60)
             jitter = float(data.get("jitter", 0.2) or 0.2)
+            single = str(data.get("single", "") or "").lower() in ("1", "true", "yes", "single")
         except (TypeError, ValueError):
             return jsonify({"ok": False, "error": "端口/间隔/抖动需为数字"}), 400
         if not host or port <= 0:
             return jsonify({"ok": False, "error": "host/port 必填"}), 400
-        res = c2_bridge.build_deploy(host, port, interval, jitter)
+        res = c2_bridge.build_deploy(host, port, interval, jitter, single=single)
         if not res.get("ok"):
             return jsonify({"ok": False, "error": res.get("error", "生成失败")}), 400
         _c2_audit(app.config["get_redis"](), f"build deploy {host}:{port}", "ok")

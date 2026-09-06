@@ -11,7 +11,8 @@ def project_root() -> str:
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def run_cmd(cmd: str, timeout: int | None = None, cwd: str | None = None) -> Tuple[bool, str, int]:
+def run_cmd(cmd: str, timeout: "int | None" = None,
+            cwd: "str | None" = None) -> Tuple[bool, str, int]:
     # timeout=None 表示不限时:模块命令跑多久都不杀,直到自然退出。
     # 用 bash + pipefail 执行:管道命令(httpx | parse / echo | dnsx | cdncheck)中
     # 任一环节失败(exit≠0)都会让整条命令返回非零,worker 才能感知工具崩溃并走

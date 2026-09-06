@@ -24,7 +24,10 @@ console 用法（shell 激活后）：
   - sudo 卡住等待密码时，直接输入密码（同样作为 shell 任务下发写入 PTY）
   - exit / break → 退出 shell（不退出 console）
 
-依赖 beacon 全局（D2 短名契约）: _T/_D/g/p/q/s/f/_BS/_IN_SHELL/_SH
+依赖 beacon 全局（D2 短名契约）: _T/_D/g/p/q/s/f/_BS/_WAIT/_SH
+(注: _WAIT 为通用"暂停主循环回连"标志——长驻会话类模块置
+globals()["_WAIT"]=True 即可独占回连, 会话结束置 False 恢复;
+shell 模块即此机制的使用者之一, 2026-09-05 _IN_SHELL 泛化)
 """
 
 import os as _os
@@ -117,7 +120,7 @@ def _route_line(line):
         if not active:
             return
         cur = active[-1]
-        cur["out"].append(line)
+        cur["out"].append(line.rstrip("\r") + "\n")  # 行间保证 \n 分隔(join 空串拼接)
         cur["ts"] = _tm.time()
 
 
@@ -168,6 +171,7 @@ def _ensure_reader(sh):
                 buf += chunk
                 while b"\n" in buf:
                     line, buf = buf.split(b"\n", 1)
+                    line = line.rstrip(b"\r")  # PTY \r\n: 剥 \r(残留会致渲染黏连)
                     G["_READER_SEQ"] += 1
                     G["_LINES_Q"].put((G["_READER_SEQ"],
                                        line.decode("utf-8", "replace")))
@@ -176,7 +180,7 @@ def _ensure_reader(sh):
                 if buf and _tm.time() - last_flush > 0.3:
                     G["_READER_SEQ"] += 1
                     G["_LINES_Q"].put((G["_READER_SEQ"],
-                                       buf.decode("utf-8", "replace")))
+                                       buf.decode("utf-8", "replace").rstrip("\r")))
                     buf = b""
                     last_flush = _tm.time()
         # reader 退出: 把缓冲尾部行也路由掉
@@ -232,7 +236,7 @@ def run():
     """
     G = globals()
     G["_BS"] = False
-    G["_IN_SHELL"] = True
+    G["_WAIT"] = True  # 暂停主循环回连(本模块线程自行 register(shell=True))
     G.setdefault("_SH_PENDING", {})            # task_id -> {out, done, err}
     G.setdefault("_SH_PENDING_LOCK", _th.Lock())
     lock = G["_SH_PENDING_LOCK"]
@@ -326,7 +330,7 @@ def run():
             if not G["_BS"]:
                 tm.sleep(sleep_jitter())
     finally:
-        G["_IN_SHELL"] = False
+        G["_WAIT"] = False  # 清独占标志 → 主循环恢复普通回连
         sh = G.get("_SH")
         if sh is not None:
             try:

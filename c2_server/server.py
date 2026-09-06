@@ -135,8 +135,8 @@ class PyExec2Server:
         self._dispatcher = Dispatcher(self._ctx)
         self._console = Console(self._dispatcher)
 
-        self._listener: Listener | None = None
-        self._cleanup_thread: threading.Thread | None = None
+        self._listener: "Listener | None" = None
+        self._cleanup_thread: "threading.Thread | None" = None
 
     # ── 生命周期 ──
 

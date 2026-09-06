@@ -3,7 +3,7 @@
   "server_port": 9001,
   "client_port": 9002,
   "socket_timeout": 30,
-  "implant_key": "",
+  "implant_key": "26a22e3b4d6a56e0d9bd5d0011a4927f9ac1dd56407156af30b6d5bdc29828d6",
   "client_key": "",
   "modules_dir": "modules",
   "server_modules_dir": "s_modules",

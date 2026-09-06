@@ -1,7 +1,7 @@
 """chmod — 修改文件/目录权限位。
 
 用法(console 或页面模块执行):
-  chmod <path> <mode>
+  chmod <mode> <path>
   mode 支持八进制写法: "0777" / "777" / "0o777"(统一按 8 进制解析)
 返回: 改前/改后权限(八进制显示),便于确认。
 """
@@ -10,8 +10,8 @@ import os
 
 MODULE = {
     "desc": "修改文件/目录权限位(八进制 mode)",
-    "params": [("path", "必填；文件/目录路径"),
-               ("mode", "必填；八进制权限,如 0777 / 777 / 0o777")],
+    "params": [("mode", "必填；八进制权限,如 0777 / 777 / 0o777"),
+               ("path", "必填；文件/目录路径")],
 }
 
 
@@ -32,7 +32,7 @@ def _parse_mode(s):
     return m
 
 
-def run(path, mode):
+def run(mode, path):
     try:
         old = os.stat(path).st_mode & 0o7777
     except OSError as e:
@@ -50,4 +50,4 @@ def run(path, mode):
 
 
 if __name__ == "__main__":
-    print("usage: chmod <path> <mode>")
+    print("usage: chmod <mode> <path>")

@@ -28,7 +28,7 @@ except Exception:  # pragma: no cover - 依赖缺失时工具返回明确错误
 
 # ── 全局浏览器单例(后台 asyncio loop) ──
 _loop: Any = None
-_loop_thread: threading.Thread | None = None
+_loop_thread: "threading.Thread | None" = None
 _browser: Any = None
 _browser_lock = threading.Lock()
 

@@ -113,7 +113,8 @@ class ModuleLoader:
             mod = self._modules.get(name)
             if not mod:
                 return None
-            result = {"name": mod.name, "type": mod.type, "desc": mod.desc}
+            result = {"name": mod.name, "type": mod.type, "desc": mod.desc,
+                      "filename": str(mod.path).rsplit("/", 1)[-1].rsplit("\\", 1)[-1]}
             if mod.type == "python":
                 result["params"] = mod.params
                 result["result_processor"] = mod.result_processor

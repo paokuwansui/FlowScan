@@ -32,7 +32,8 @@ def get_config_value(config: Dict[str, Any], dotted_path: str, default: Any = ""
 _PLACEHOLDER_RE = re.compile(r"\{\{\s*([^{}]+?)\s*\}\}")
 
 
-def render_template(template: str, context: Dict[str, Any], config: Dict[str, Any] | None = None) -> str:
+def render_template(template: str, context: Dict[str, Any],
+                    config: "Dict[str, Any] | None" = None) -> str:
     if not isinstance(template, str):
         return str(template)
     config = config or {}

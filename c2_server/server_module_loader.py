@@ -45,13 +45,18 @@ class ServerModuleLoader:
         return result
 
     def get_module(self, name: str) -> Optional[dict]:
-        """获取模块元信息；不存在返回 None。"""
+        """获取模块元信息；不存在返回 None。含 code 全文(源码查看/编辑用)。"""
         path = self._dir / f"{name}.py"
         if not path.is_file():
             return None
         meta = self._read_meta(path)
-        return {"name": name, "desc": meta.get("desc", ""),
-                "params": meta.get("params", [])}
+        result = {"name": name, "desc": meta.get("desc", ""),
+                  "params": meta.get("params", [])}
+        try:
+            result["code"] = path.read_text(encoding="utf-8")
+        except OSError:
+            result["code"] = ""
+        return result
 
     def reconfigure(self, modules_dir: str = None) -> None:
         """更新模块目录（reload 命令热重载配置用）。"""

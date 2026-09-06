@@ -19,7 +19,7 @@ def run():
     if G.get("_IN_FORK"):
         G["_FORK_BREAK"] = True
         return "(break: 分裂线程已退出，主 beacon 继续)"
-    if G.get("_IN_SHELL"):
+    if G.get("_WAIT"):   # 活跃 _WAIT 会话(当前仅 shell)内 → 退出该层会话
         G["_BS"] = True
         return "(break: 已退出交互式 shell，退回基础循环)"
     return "(break: 主载荷不支持 break，如需退出请用 kill 模块)"
