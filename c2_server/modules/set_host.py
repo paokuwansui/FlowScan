@@ -24,11 +24,22 @@ def run(host, port=None, key_hex=None):
     _sp["host"] = host
     _msg = f"host={host}"
     if port is not None and str(port).strip() != "":
-        _p = int(port)
+        try:
+            _p = int(port)
+        except (TypeError, ValueError):
+            return "(set_host: port 必须是 1~65535 的整数)"
+        if not (1 <= _p <= 65535):
+            return "(set_host: port 必须在 1~65535 之间)"
         _sp["port"] = _p
         _msg += f" port={_p}"
     if key_hex is not None and str(key_hex).strip() != "":
-        _k = bytes.fromhex(str(key_hex).strip())
+        _kh = str(key_hex).strip()
+        try:
+            _k = bytes.fromhex(_kh)
+        except ValueError:
+            return "(set_host: key_hex 必须是合法的十六进制字符串(64 字符 = 32 字节密钥))"
+        if len(_kh) != 64:
+            return "(set_host: key_hex 必须是 64 字符十六进制(32 字节密钥))"
         _sp["key"] = _k
         _msg += f" key {len(_k)}B"
     globals()["_SET_PENDING"] = _sp

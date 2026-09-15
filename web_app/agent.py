@@ -120,6 +120,7 @@ AGENT_TOOLS = [
         "text": {"type": "string", "description": "要输入的文本"}}, "required": ["index", "text"]}}},
     {"type": "function", "function": {"name": "browser_screenshot", "description": "对浏览器当前页面截图,返回截图文件路径(Web 端可查看)。", "parameters": {"type": "object", "properties": {
         "path": {"type": "string", "description": "截图保存路径,可选(默认 /tmp/fs3-browser-<时间戳>.png)"}}}}},
+    {"type": "function", "function": {"name": "browser_close", "description": "关闭无头浏览器,释放其占用的内存/进程。读完页面、截完图后应主动调用,避免浏览器长期驻留(下次需要时浏览其他工具会自动重开)。", "parameters": {"type": "object", "properties": {}}}},
     {"type": "function", "function": {"name": "xray_report", "description": "读取 xray 被动扫描 JSON 报告(reports/xray_out.json),返回漏洞发现列表(严重等级/插件/URL/payload),可搜索、限量。", "parameters": {"type": "object", "properties": {
         "limit": {"type": "integer", "description": "返回条数上限,默认 20"},
         "search": {"type": "string", "description": "按插件名/漏洞类别/URL/payload 模糊搜索关键字,可选"}}}}},
@@ -155,7 +156,7 @@ _TOOL_GROUP_NAMES = {
     "mcp": ["mcp_tools", "mcp_call"],
     "exec": ["http_request", "run_python", "run_shell"],
     "web": ["web_search", "web_browse", "browser_navigate", "browser_state",
-            "browser_click", "browser_type", "browser_screenshot"],
+            "browser_click", "browser_type", "browser_screenshot", "browser_close"],
     "phishing": ["phishing_build", "phishing_reports"],
 }
 
@@ -756,6 +757,9 @@ def _dispatch_agent_tool(name: str, args: Dict[str, Any], redis: FlowScanRedis,
         result = browser_tools.browser_type(index, str(args.get("text") or ""))
     elif name == "browser_screenshot":
         result = browser_tools.browser_screenshot(str(args.get("path") or ""))
+    elif name == "browser_close":
+        # 2026-09-15:此前 browser_close 写了但没给 Agent 当工具 → 开完浏览器关不掉
+        result = browser_tools.browser_close()
     elif name == "xray_report":
         limit = min(int(args.get("limit") or 20), 100)
         search = (args.get("search") or "").strip().lower()
@@ -1411,10 +1415,24 @@ def _run_agent_loop(redis: FlowScanRedis, session_id: str, user_input: str, ai_c
         did_inject = False
         hitl_hit = False
         round_results: List[str] = []
-        for call in tool_calls:
+        for idx, call in enumerate(tool_calls):
             if _consume_interrupt(session_id):
                 interrupted = True
                 _append_agent_message(redis, session_id, {"role": "system", "content": "[已打断] 剩余工具调用被跳过,接入新指令。"})
+                # 为剩余未执行的 tool_call 补空 tool 消息——否则 assistant 带 tool_calls
+                # 但缺对应 tool 消息,下一轮重建消息时 LLM API 400
+                # (insufficient tool messages following tool_calls)。
+                for rc in tool_calls[idx:]:
+                    _rname = (rc.get("function") or {}).get("name", "")
+                    _rid = rc.get("id", "")
+                    _rresult = json.dumps({"ok": False, "interrupted": True,
+                                           "message": "用户打断,未执行"}, ensure_ascii=False)
+                    _append_agent_message(redis, session_id, {"role": "tool",
+                                                              "tool_call_id": _rid,
+                                                              "name": _rname,
+                                                              "content": _rresult})
+                    messages.append({"role": "tool", "tool_call_id": _rid,
+                                     "content": _rresult})
                 break
             fn = call.get("function", {})
             name = fn.get("name", "")
@@ -1600,15 +1618,34 @@ def _run_subagent_loop(redis: FlowScanRedis, sub_id: str, task: str, ai_cfg: Dic
                                   "rounds": _SUB_MAX_ITERATIONS, "finished_at": time.time()})
 
 
+def _claim_agent_slot(session_id: str) -> bool:
+    """原子占用会话运行槽:已有任务在跑返回 False(2026-09-15 R9)。
+
+    此前 `_AGENT_TASKS[session_id]` 是在**新线程内部**登记的,而查重在路由里 ——
+    两步之间隔着 Thread.start(),并发两次「运行」都能通过查重 → 两条 agent 循环
+    并发跑同一会话(工具重复执行、消息错序)。现在查重与登记在同一临界区完成。
+    """
+    with _AGENT_TASKS_LOCK:
+        if session_id in _AGENT_TASKS:
+            return False
+        _AGENT_TASKS[session_id] = {"status": "running"}
+        return True
+
+
+def _release_agent_slot(session_id: str) -> None:
+    with _AGENT_TASKS_LOCK:
+        _AGENT_TASKS.pop(session_id, None)
+
+
 def _start_agent_task(redis: FlowScanRedis, session_id: str, user_input: str, ai_cfg: Dict[str, Any],
-                      config: Optional[Dict[str, Any]] = None, resume: bool = False) -> None:
-    """后台异步跑 agent 循环。"""
+                      config: Optional[Dict[str, Any]] = None, resume: bool = False) -> bool:
+    """后台异步跑 agent 循环。返回是否真的启动(False = 该会话已在运行,调用方据此排队/幂等处理)。"""
+    if not _claim_agent_slot(session_id):
+        return False
     max_iterations = int(ai_cfg.get("agent_max_iterations", 50) or 50)
     scan_gap_seconds = int(ai_cfg.get("agent_scan_gap_seconds", 5) or 5)
 
     def worker():
-        with _AGENT_TASKS_LOCK:
-            _AGENT_TASKS[session_id] = {"status": "running"}
         try:
             _run_agent_loop(redis, session_id, user_input, ai_cfg, config,
                             max_iterations=max_iterations, scan_gap_seconds=scan_gap_seconds, resume=resume)
@@ -1616,10 +1653,14 @@ def _start_agent_task(redis: FlowScanRedis, session_id: str, user_input: str, ai
             _set_agent_state(redis, session_id, {"status": "error", "error": str(exc)})
             _append_agent_message(redis, session_id, {"role": "error", "content": str(exc)})
         finally:
-            with _AGENT_TASKS_LOCK:
-                _AGENT_TASKS.pop(session_id, None)
+            _release_agent_slot(session_id)
 
-    threading.Thread(target=worker, daemon=True).start()
+    try:
+        threading.Thread(target=worker, daemon=True).start()
+    except Exception:
+        _release_agent_slot(session_id)   # 起线程失败也要还槽,否则会话永久卡死
+        raise
+    return True
 
 
 def register(app):
@@ -1668,7 +1709,7 @@ def register(app):
         state_status = _get_agent_state(redis, session_id).get("status")
         with _AGENT_TASKS_LOCK:
             task_running = session_id in _AGENT_TASKS
-        if task_running or state_status == "running":
+        if task_running:
             # 运行中:interrupt=打断并注入新指令;normal/queue=排队(回车=队列发送)。
             # 先入队再置打断标志:循环消费标志后总能取到该消息。
             # interrupt 且消息为空 = 纯打断,不入队(避免 curl 打断被迫携带旧消息重复执行)。
@@ -1691,10 +1732,21 @@ def register(app):
                                 "interrupted": mode == "interrupt",
                                 "queue_length": _agent_queue_len(redis, session_id)})
             return jsonify({"ok": False, "error": "存在待人工批准的危险操作,请先在界面批准/拒绝后再继续"}), 400
-        # 空闲/完成/被打断/出错 → 开新任务(清掉残留打断标记)
+        # 空闲/完成/被打断/出错/僵尸 → 开新任务(清掉残留打断标记)
         with _AGENT_INTERRUPT_LOCK:
             _AGENT_INTERRUPT.pop(session_id, None)
-        _start_agent_task(redis, session_id, user_input, ai_cfg, config)
+        if state_status == "running":
+            # 僵尸会话:state 说在跑,但进程内已无对应线程(线程异常退出前没落
+            # state、或历史残留)——直接接管重起,否则消息只会躺进队列没人消费
+            # (2026-09-15 R9)
+            print(f"[AGENT] {session_id[:8]} state=running 但无运行线程,接管重起")
+        if not _start_agent_task(redis, session_id, user_input, ai_cfg, config):
+            # 与并发请求抢槽失败(双击/多标签页):按「运行中」语义排队,输入不丢
+            if user_input:
+                _agent_queue_push(redis, session_id, user_input)
+            return jsonify({"ok": True, "queued": bool(user_input),
+                            "reason": "already_running",
+                            "queue_length": _agent_queue_len(redis, session_id)})
         return jsonify({"ok": True, "session_id": session_id})
 
     @app.route("/api/agent/session/<session_id>/state")
@@ -1707,15 +1759,20 @@ def register(app):
     @login_required
     def agent_session_messages(session_id: str):
         redis = app.config["get_redis"]()
+        state = _get_agent_state(redis, session_id)
         messages = _get_agent_messages(redis, session_id, limit=200)
         after = request.args.get("after", "")
-        if after:
+        # 终态(done/error/interrupted)时忽略 after,返回全量——否则存在竞态:
+        # 消息与状态分两次读,若报告恰在两次读之间落库,前端拿到 done 即停轮询,
+        # 最后一条报告会永远漏显(直到用户下次发消息才补上)。终态返回全量 +
+        # 前端按 ts 去重渲染,兜底保证终态时报告一定可见。
+        if after and state.get("status") not in ("done", "error", "interrupted"):
             try:
                 after_ts = float(after)
                 messages = [m for m in messages if float(m.get("ts", 0)) > after_ts]
             except ValueError:
                 pass
-        return jsonify({"messages": messages, "state": _get_agent_state(redis, session_id)})
+        return jsonify({"messages": messages, "state": state})
 
     @app.route("/api/agent/session/<session_id>/audit")
     @login_required
@@ -1778,7 +1835,10 @@ def register(app):
             note = f"已拒绝 {name}"
         _append_agent_message(redis, session_id, {"role": "system", "content": note + ",继续。"})
         _set_agent_state(redis, session_id, {"status": "running"})
-        _start_agent_task(redis, session_id, "", ai_cfg, config, resume=True)
+        if not _start_agent_task(redis, session_id, "", ai_cfg, config, resume=True):
+            # 已有循环在跑(连点两次「批准」/ 批准与运行同时来):幂等返回,不重复起
+            return jsonify({"ok": True, "action": action, "tool": name,
+                            "already_running": True})
         return jsonify({"ok": True, "action": action, "tool": name})
 
     @app.route("/api/agent/session/<session_id>/delete", methods=["POST"])

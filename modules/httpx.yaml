@@ -1,11 +1,13 @@
 name: httpx_module
-description: httpx HTTP 探活 — 探测 URL/端口存活，提取标题/技术栈/状态码/图标/证书等汇总为 URL_INFO
+description: httpx HTTP 探活 — 探测存活并产出 DNS_NAME/URL/ICON_PATH；同时把标题/状态码/技术栈/证书汇总成 FINDING(JSON)
 runtime:
   max_concurrency: 8
 allowed_output_events:
   - DNS_NAME
   - URL
   - ICON_PATH
+  # R26:标题/状态码/技术栈/证书汇总为一条 FINDING(JSON 字符串,与 nmap 模块同风格)
+  - FINDING
 io_contract:
   input_events:
   - URL

@@ -46,9 +46,13 @@ def _parse_ips(s):
             except ValueError:
                 return None
             last = int(head.rsplit(".", 1)[1])
-            if int(tail) <= last:
+            tail_n = int(tail)
+            if tail_n <= last:
                 return None
-            for i in range(last, int(tail) + 1):
+            if tail_n > 255:
+                # 末段范围最多到 255,超界会 int 进位到相邻网段(误扫),判非法报错
+                return None
+            for i in range(last, tail_n + 1):
                 out.append(str(ipaddress.ip_address(int(base) + (i - last))))
         else:
             try:

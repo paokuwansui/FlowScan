@@ -7,7 +7,7 @@ core/config.py — 配置加载 (ServerConfig / ClientConfig)
   socket_timeout, modules_dir, event_file, log_file,
   max_frame_size, max_result_size, max_task_code_size,
   max_tasks_per_client, max_results_per_beacon, max_connections,
-  client_timeout, auto_commands
+  beacon_expire_seconds, auto_commands
 
   客户端配置 (client/config.json):
   server_host, client_port, client_key
@@ -38,8 +38,8 @@ class ServerConfig:
     """Server 配置。JSON 缺失字段用默认值。"""
 
     server_host: str = "0.0.0.0"
-    server_port: int = 9001          # implant 监听端口
-    client_port: int = 9002          # client 监听端口（10.1 端口分离）
+    server_port: int = 65503         # implant 监听端口(与 config.yaml c2.server_port / 段映射一致)
+    client_port: int = 65504         # client 监听端口（10.1 端口分离）
     socket_timeout: int = 30
     implant_key: str = ""            # beacon ↔ server 密钥（原 xor_key）
     client_key: str = ""             # client ↔ server 密钥
@@ -53,7 +53,6 @@ class ServerConfig:
     max_tasks_per_client: int = 100
     max_results_per_beacon: int = 200
     max_connections: int = 256
-    client_timeout: int = 300
     beacon_expire_seconds: int = 86400  # beacon 过期清理时限（秒，默认 1 天；超时未回连即移除）
     client_tls: bool = False         # client 远程通道启用 TLS（防嗅探）
     auto_commands: list = field(default_factory=list)
@@ -78,7 +77,6 @@ class ServerConfig:
             ("max_tasks_per_client", self.max_tasks_per_client),
             ("max_results_per_beacon", self.max_results_per_beacon),
             ("max_connections", self.max_connections),
-            ("client_timeout", self.client_timeout),
             ("beacon_expire_seconds", self.beacon_expire_seconds),
         ):
             if not isinstance(val, int) or val <= 0:
@@ -105,7 +103,7 @@ class ClientConfig:
     """Client 配置（操作员端）。"""
 
     server_host: str = "127.0.0.1"
-    client_port: int = 9002
+    client_port: int = 65504
     client_key: str = ""
     client_tls: bool = False         # 与 server client_tls 保持一致
 

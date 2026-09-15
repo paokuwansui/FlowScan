@@ -3,7 +3,7 @@ from flask import jsonify, redirect, render_template, request, url_for
 
 from flowscan.config import load_yaml
 
-from ._common import login_required
+from ._common import login_required, _json_or_raw
 from ._helpers import _event_types
 from .ai_config import _ai_config
 from .ai_core import (
@@ -38,6 +38,14 @@ def register(app):
 
             sess = _create_agent_session(redis, "新会话", ai_cfg.get("model", ""))
             return redirect(url_for("ai_analysis", tab="agent", session=sess["session_id"]))
+        # 事件日记 tab:读 AI 分析日志(与 ai_logs.event_logs 一致),否则该 tab 恒为空态
+        # (agent 用 log 工具 / 执行 log 动作沉淀的日志,在这里才能显示)
+        log_ids = redis.conn.zrevrange("fs3:ai:logs", 0, 500)
+        ai_logs_list = []
+        for lid in log_ids:
+            raw = redis.conn.hgetall(f"fs3:ai:log:{lid}")
+            if raw:
+                ai_logs_list.append({k: _json_or_raw(v) for k, v in raw.items()})
         return render_template(
             "ai_analysis.html",
             tab=tab,
@@ -52,6 +60,9 @@ def register(app):
             action_results=[],
             parsed_actions=[],
             schedules=schedules,
+            logs=ai_logs_list,
+            count=len(ai_logs_list),
+            log_tab="ai",
             log_api_key=ai_cfg.get("log_api_key", ""),
         )
 

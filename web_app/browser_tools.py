@@ -49,10 +49,16 @@ def _ensure_loop() -> Any:
 
 
 def _submit(coro_factory: Callable[[], Any], timeout: float = _OP_TIMEOUT) -> Any:
-    """在全局 loop 上执行异步浏览器操作(线程安全,跨调用保持浏览器状态)。"""
-    loop = _ensure_loop()
-    fut = asyncio.run_coroutine_threadsafe(coro_factory(), loop)
-    return fut.result(timeout=timeout)
+    """在全局 loop 上执行异步浏览器操作(线程安全,跨调用保持浏览器状态)。
+
+    2026-09-15:_browser_lock 此前闲置 —— 并发调用(_get_browser 里两处 await
+    之间被打断)会各起一个 chromium,且点击/输入会互相插队。这里在**调用线程**
+    上串行化(持锁等 future,不是持锁 await,故不会卡死事件循环)。
+    """
+    with _browser_lock:
+        loop = _ensure_loop()
+        fut = asyncio.run_coroutine_threadsafe(coro_factory(), loop)
+        return fut.result(timeout=timeout)
 
 
 async def _get_browser() -> Any:
@@ -64,6 +70,7 @@ async def _get_browser() -> Any:
             chromium_sandbox=False,       # 容器/root 下必须禁沙箱
             enable_default_extensions=False,   # 跳过 uBlock 扩展下载
             minimum_wait_page_load_time=0.3,
+            timeout=90,   # 导航/操作 watchdog 超时(默认 30s,JS 重页面/慢站易超时)
         )
         await _browser.start()
     return _browser
@@ -242,7 +249,7 @@ def _search_ddg(query: str, limit: int) -> list[dict]:
         href = a.get("href") or ""
         # DDG 结果链接是重定向包装:解析 uddg 参数
         if "uddg=" in href:
-            from urllib.parse import unquote, urlparse, parse_qs
+            from urllib.parse import urlparse, parse_qs
             try:
                 href = parse_qs(urlparse(href).query).get("uddg", [href])[0]
             except Exception:

@@ -8,6 +8,8 @@ import socket
 MODULE = {
     "desc": "列出网络连接",
     "params": [],
+    # run() 自派发(run_linux/run_windows);POSIX 平台走 run_linux
+    "cross_platform": True,
 }
 
 

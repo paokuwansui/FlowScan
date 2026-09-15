@@ -8,7 +8,6 @@
 """
 import base64
 import json
-import os
 
 MODULE = {
     "desc": "download 结果处理器（写块+自动续传）",
@@ -39,6 +38,10 @@ def run(output, error="", arg="", disp=None, bid=""):
                 f.write(raw)
     except Exception as e:
         return json.dumps({"dl_error": str(e)})
+
+    if chunk + 1 >= total:
+        # R11:本次下载完成 → 清掉上一次的失败原因(避免旧错误一直挂着误导)
+        return json.dumps({"dl_error": ""})
 
     if chunk + 1 < total and disp is not None and bid:
         try:

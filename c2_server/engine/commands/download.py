@@ -8,7 +8,6 @@ download [<beacon_id>] <remote_path> [<local_path>]
 import os
 import re as _re
 
-from server.task_queue import Task
 
 
 def run(disp, args):

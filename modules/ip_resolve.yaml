@@ -1,5 +1,5 @@
 name: dns_name_resolve_module
-description: 子域名DNS解析模块。整合dnsx与cdncheck，将子域名转化为IP/CNAME并识别CDN，为资产探测流水线提供基础数据
+description: 子域名DNS解析模块。dnsx 解析 A 记录得到 IP，再用 cdncheck -e **剔除** CDN/云厂商/WAF 地址，只把业务 IP 作为 IP_ADDRESS 产出(注意:不是"识别 CDN")
 runtime:
   max_concurrency: 8
 allowed_output_events:
@@ -16,10 +16,20 @@ io_contract:
 execution:
   command: echo "{{subdomain_q}}" | dnsx -a -silent -ro | cdncheck -e -silent
   output_parse_code: |
+    import ipaddress
     lines = [line.strip() for line in data["stdout"].splitlines() if line.strip()]
-    # 每行一个 IP(dnsx -a 对多 A 记录/负载均衡会输出多个 IP,逐个产出不遗漏);
-    # 上限 20 防泛解析域名输出几十个 IP 全量入队爆炸
+    # 每行一个 IP(dnsx -a 对多 A 记录/负载均衡会输出多个 IP,逐个产出不遗漏)。
+    # 2026-09-15(R25):先校验是否合法 IP —— cdncheck/异常输出里的杂行(提示文本、
+    # 域名、IPv6 前缀形式)此前会被当成 IP_ADDRESS 事件发出去污染链路;
+    # 上限 20 防泛解析域名输出几十个 IP 全量入队爆炸(过滤后再计数)
     results = []
-    for ip in lines[:20]:
+    for line in lines:
+        ip = line.strip()
+        try:
+            ipaddress.ip_address(ip)
+        except ValueError:
+            continue
         results.append({"IP_ADDRESS": ip})
+        if len(results) >= 20:
+            break
     return results

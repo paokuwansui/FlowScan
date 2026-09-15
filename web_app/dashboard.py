@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 
 from flask import Response, flash, jsonify, redirect, render_template, request, url_for
 
-from ._common import _json_or_raw, _safe_ping, _to_int, login_required
+from ._common import _safe_ping, _to_int, login_required
 from ._helpers import (
     _active_nodes,
     _count_events,

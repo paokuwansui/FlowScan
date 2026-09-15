@@ -1244,7 +1244,6 @@ def register(app):
         client_key = srv_cfg.get("client_key") or ""
         client_port = srv_cfg.get("client_port") or 65504
         server_port = srv_cfg.get("server_port") or 65503
-        implant_key = srv_cfg.get("implant_key") or ""
         host = srv_cfg.get("server_host") or "0.0.0.0"
 
         readme = _export_readme(host, server_port, client_port, client_key)

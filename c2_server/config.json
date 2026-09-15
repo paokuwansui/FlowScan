@@ -1,7 +1,7 @@
 {
   "server_host": "0.0.0.0",
-  "server_port": 9001,
-  "client_port": 9002,
+  "server_port": 65503,
+  "client_port": 65504,
   "socket_timeout": 30,
   "implant_key": "26a22e3b4d6a56e0d9bd5d0011a4927f9ac1dd56407156af30b6d5bdc29828d6",
   "client_key": "",
@@ -15,7 +15,6 @@
   "max_tasks_per_client": 100,
   "max_results_per_beacon": 200,
   "max_connections": 256,
-  "client_timeout": 300,
   "beacon_expire_seconds": 86400,
   "client_tls": false,
   "auto_commands": [],

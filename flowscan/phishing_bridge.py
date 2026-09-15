@@ -360,6 +360,22 @@ def update_config(updates: dict):
 
 # ── 回传数据 ──
 
+def _report_max_items() -> int:
+    """回传保留条数:优先面板配置(phishing server 的 config.report_max)。
+
+    2026-09-15(R17):此前硬编码 _REPORT_MAX=500,面板上改 report_max 只影响
+    /api/phishing/status 的显示、裁剪却不读它 → 配置看着生效实则无效。
+    夹在 [10, 5000] 防配成 0/负数导致「刚收到就被裁掉」。
+    """
+    server = get_phishing()
+    raw = getattr(getattr(server, "_config", None), "report_max", None) if server else None
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        n = _REPORT_MAX
+    return max(10, min(n, 5000))
+
+
 def _report_callback(redis, payload: dict, ip: str, ua: str) -> None:
     """server 回传落库(由 web 层在 init 后注入)。payload 为 dict。"""
     try:
@@ -379,12 +395,22 @@ def _report_callback(redis, payload: dict, ip: str, ua: str) -> None:
             "url": str(payload.get("url") or "")[:300],
             "data": json.dumps(payload, ensure_ascii=False)[:4000],
         }
+        # B6:裁剪前先取出将被淘汰的记录 id,连同内容(hash)一起删 —— 此前只把
+        # 索引踢出 zset,记录本体永远留在 Redis 里变垃圾(用得越久越多)。
+        # 淘汰条数显式算(插入后总数为 cur+1,保留 max_items),不用负偏移:
+        # 恰好等于容量时 zrange(0, -max-1) 会算出空区间 → 索引删了内容却漏删。
+        max_items = _report_max_items()
+        cur = int(redis.conn.zcard(_REPORT_KEY) or 0)
+        evict_n = max(0, cur + 1 - max_items)
+        stale = list(redis.conn.zrange(_REPORT_KEY, 0, evict_n - 1) or []) if evict_n else []
         pipe = redis.conn.pipeline()
         pipe.hset(_REPORT_ITEM_KEY.format(rid),
                   mapping={k: json.dumps(v, ensure_ascii=False) if not isinstance(v, str) else v
                            for k, v in entry.items()})
         pipe.zadd(_REPORT_KEY, {rid: now})
-        pipe.zremrangebyrank(_REPORT_KEY, 0, -_REPORT_MAX - 1)
+        for old_id in stale:
+            pipe.delete(_REPORT_ITEM_KEY.format(old_id))
+        pipe.zremrangebyrank(_REPORT_KEY, 0, -max_items - 1)
         pipe.execute()
         redis.log(f"[PHISHING] report {rid} type={entry['type']} ip={ip}")
     except Exception:

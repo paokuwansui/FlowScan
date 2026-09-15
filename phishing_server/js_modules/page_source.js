@@ -1,4 +1,4 @@
-// MODULE = {"desc": "页面源码抓取:回传当前页面 HTML/链接(截断)", "category": "信息收集", "params": [["maxlen", "HTML 最大字节,默认 8000"]]}
+// MODULE = {"desc": "页面源码抓取:回传当前页面 HTML/链接(截断)", "category": "信息收集", "params": [["maxlen", "HTML 最大字节,默认 8000", "8000"]]}
 (function () {
   var maxlen = parseInt(_q("maxlen", "{{maxlen}}"), 10) || 8000;
   var html = '';

@@ -28,13 +28,13 @@ install_from_zip() {
     mkdir -p "$BIN_DIR"
     find pkg -type f -name "$glob" -perm /111 -print -quit | xargs -I{} install -m 0755 {} "$BIN_DIR/$name"
     rm -rf "$tmp"
-    command -v "$name" >/dev/null 2>&1
+    [ -x "$BIN_DIR/$name" ] || command -v "$name" >/dev/null 2>&1
     echo "[install] $name 安装完成"
 }
 
 install_from_zip dnsx "https://github.com/projectdiscovery/dnsx/releases/download/v1.2.2/dnsx_1.2.2_linux_amd64.zip" "dnsx"
 install_from_zip cdncheck "https://github.com/projectdiscovery/cdncheck/releases/download/v1.2.48/cdncheck_1.2.48_linux_amd64.zip" "cdncheck"
 
-command -v dnsx >/dev/null 2>&1
-command -v cdncheck >/dev/null 2>&1
+[ -x "$BIN_DIR/dnsx" ] || command -v dnsx >/dev/null 2>&1
+[ -x "$BIN_DIR/cdncheck" ] || command -v cdncheck >/dev/null 2>&1
 echo "[install] ip_resolve 依赖安装完成"

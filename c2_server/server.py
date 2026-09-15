@@ -94,6 +94,7 @@ class PyExec2Server:
         self._running = False
         self._udp_sock = None        # UDP 心跳监听（21）
         self._udp_thread = None
+        self._listener_error = ""    # 端口绑定失败信息(R12:面板据此显示)
 
         self._key_implant = _ensure_implant_key(config)
         if _is_hex64(config.client_key):
@@ -143,6 +144,15 @@ class PyExec2Server:
     @property
     def running(self) -> bool:
         return self._running
+
+    @property
+    def listener_error(self) -> str:
+        """监听端口绑定失败信息(空串 = 全部正常)。web/面板据此显示未启动原因。
+
+        2026-09-15(R12):属性名此前只在内部 _listener_error 上,对外读取恒为空
+        ——补一个公开属性,避免「状态标未启动但看不到原因」。
+        """
+        return self._listener_error
 
     def start(self) -> None:
         """启动 Server（阻塞：交互模式跑 console，headless 等待 stop）。"""
@@ -204,7 +214,19 @@ class PyExec2Server:
             session_factory=self._make_session,
             max_connections=self._config.max_connections,
         )
-        self._listener.start()
+        bound = self._listener.start()
+        # 2026-09-15(R12):bind 失败(端口被占用/无权限)不再让异常打死启动线程
+        # ——记录错误、状态标未启动,并通过 /api/c2/status 暴露给面板;部分通道
+        # 失败时保留其余通道继续服务。
+        errs = self._listener.errors
+        self._listener_error = "; ".join(f"{k}: {v}" for k, v in errs.items())
+        if errs and bound == 0 and ports:
+            logger.error("所有监听端口绑定失败, server 未启动: %s",
+                         self._listener_error)
+            self._running = False
+        elif errs:
+            logger.warning("部分监听端口绑定失败(其余通道正常): %s",
+                           self._listener_error)
 
     def _start_udp_heartbeat(self) -> None:
         """UDP 心跳监听（21）：与 beacon 端口同端口的 UDP socket。

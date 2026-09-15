@@ -6,7 +6,6 @@
 连目标 → 双向转发。
 @params: tunnel_port [socks_port] [out_dir]
 """
-import json
 import os
 
 from server.core.bootstrap import deploy_command

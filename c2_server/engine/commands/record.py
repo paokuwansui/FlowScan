@@ -7,7 +7,6 @@ record <beacon_id> clear             清空记录
 下发"只记录不上报"的任务用: record_exec <beacon_id> <代码...>
 """
 
-from server.task_queue import Task
 
 
 def run(disp, args):

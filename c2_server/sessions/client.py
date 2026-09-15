@@ -13,7 +13,7 @@ server/sessions/client.py — Client 会话（T4.4）
 import json
 
 from server.core.protocol import (
-    send_frame, recv_frame, COMMAND, RESPONSE, ERROR, UNKNOWN_TYPE,
+    send_frame, recv_frame, COMMAND, RESPONSE, UNKNOWN_TYPE,
 )
 from server.core.log import get_logger
 from server.engine.dispatcher import Dispatcher, CommandContext

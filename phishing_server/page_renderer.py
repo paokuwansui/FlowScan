@@ -18,7 +18,7 @@ import logging
 import mimetypes
 import os
 import re
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 logger = logging.getLogger("phishing.page_renderer")
 
@@ -245,8 +245,17 @@ class PageRenderer:
         return True, f"已删除 {name}/{file}"
 
     def delete_page(self, name: str) -> tuple:
-        """删除页面文件夹(必须非当前活动页面)。返回 (ok, message)。"""
-        d = os.path.join(self._pages_dir, name)
+        """删除页面文件夹(必须非当前活动页面)。返回 (ok, message)。
+
+        页面名严格校验(与 create_page/write_page_file 同一套):只允许
+        字母/数字/下划线/短横线 —— 否则 name=".." 会让 shutil.rmtree 删掉
+        pages/ 的父目录(整个 phishing_server),2026-09-15 修复。
+        """
+        if not name or not re.match(r"^[A-Za-z0-9_-]+$", str(name)):
+            return False, "页面名只允许字母/数字/下划线/短横线"
+        d = os.path.normpath(os.path.join(self._pages_dir, name))
+        if not d.startswith(os.path.normpath(self._pages_dir) + os.sep):
+            return False, "页面名非法"
         if not os.path.isdir(d):
             return False, f"页面 {name} 不存在"
         try:

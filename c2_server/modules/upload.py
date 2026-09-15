@@ -3,7 +3,6 @@
 @desc: 写入文件分块（append 模式），由 server 端 upload 命令推送
 """
 import base64
-import os
 
 MODULE = {
     "desc": "写入文件分块（append），upload 命令推送",

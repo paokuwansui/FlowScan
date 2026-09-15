@@ -10,7 +10,6 @@ minify() 只重命名标识符（tokenize 识别 NAME token），字符串/注�
 
 import ast
 import builtins
-import io
 import keyword
 import string
 

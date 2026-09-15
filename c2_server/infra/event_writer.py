@@ -17,7 +17,6 @@ import threading
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
-from server.core.events import ALL_EVENTS
 
 
 class EventWriter:

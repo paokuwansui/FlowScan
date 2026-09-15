@@ -27,7 +27,7 @@ mkdir -p pkg
 unzip -o dl.zip -d pkg
 mkdir -p "$BIN_DIR"
 find pkg -type f -name "katana" -perm /111 -print -quit | xargs -I{} install -m 0755 {} "$BIN"
-command -v katana >/dev/null 2>&1
+[ -x "$BIN_DIR/katana" ] || command -v katana >/dev/null 2>&1
 echo "[install] katana 安装完成"
 
 # ── 预下载 rod Chromium ──

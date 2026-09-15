@@ -12,8 +12,20 @@ MODULE = {
 
 
 def run(interval, jitter=0.2):
-    globals()["_I"] = int(interval)
-    globals()["_J"] = float(jitter)
+    try:
+        _i = int(interval)
+    except (TypeError, ValueError):
+        return "(set_interval: interval 必须是数字(秒), 如 10)"
+    try:
+        _j = float(jitter)
+    except (TypeError, ValueError):
+        return "(set_interval: jitter 必须是数字, 如 0.2)"
+    if _i <= 0:
+        return "(set_interval: interval 必须为正数(秒), 不能为 0 或负数)"
+    if not (0 <= _j <= 1):
+        return "(set_interval: jitter 必须在 0~1 之间)"
+    globals()["_I"] = _i
+    globals()["_J"] = _j
     return "interval=%ds, jitter=%s" % (globals().get("_I", 0),
                                         globals().get("_J", 0))
 

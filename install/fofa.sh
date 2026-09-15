@@ -27,5 +27,5 @@ mkdir -p pkg
 tar -xzf dl.tgz -C pkg
 mkdir -p "$BIN_DIR"
 find pkg -type f -name "fofax*" -perm /111 -print -quit | xargs -I{} install -m 0755 {} "$BIN"
-command -v fofax >/dev/null 2>&1
+[ -x "$BIN_DIR/fofax" ] || command -v fofax >/dev/null 2>&1
 echo "[install] fofax 安装完成"

@@ -15,7 +15,6 @@ Actions:
     4. Update /etc/fstab for persistence
 """
 
-import os
 import subprocess
 import sys
 

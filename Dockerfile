@@ -49,7 +49,8 @@ RUN pip3 install --break-system-packages --no-cache-dir \
         httpx \
         beautifulsoup4 \
         browser-use \
-    && ln -sf /usr/bin/python3 /usr/local/bin/flowscan-python
+    && ln -sf /usr/bin/python3 /usr/local/bin/flowscan-python \
+    && ln -sf /usr/bin/python3 /usr/bin/python
 
 # ────────────────────────────────────────────────────────────────────────────
 # 第 3 层:xray 被动代理(可选服务,由 compose profile 控制是否启动)

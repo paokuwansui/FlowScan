@@ -173,7 +173,8 @@ def clean_httpx_jsonl(text: str) -> str:
         obj.pop("timestamp", None)
         obj.pop("a", None)
         obj.pop("cname", None)
-        obj.pop("tech", None)
+        # R26:tech(技术栈)此前在这里被丢弃,而模块说明声称产出技术栈 ——
+        # 现在保留,由 build_findings() 汇总进 FINDING 事件
         obj.pop("resolvers", None)
         # 处理 302 重定向的 location 字段，拼回完整 URL 供后续抽取
         location = obj.pop("location", None)
@@ -194,17 +195,61 @@ def clean_httpx_jsonl(text: str) -> str:
     return "\n".join(lines)
 
 
+def build_findings(text: str) -> list:
+    """从清洗后的 httpx JSONL 提取「发现」:标题/状态码/技术栈/证书(2026-09-15 R26)。
+
+    返回 FINDING 事件的值列表(每条是一个 JSON 字符串,与 nmap 模块同风格,
+    前端事件页可直接读字段)。仅在有 url 且至少有一项信息时才产出,避免噪音。
+    """
+    out = []
+    seen = set()
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except Exception:
+            continue
+        if not isinstance(obj, dict):
+            continue
+        tech = obj.get("tech")
+        if isinstance(tech, list):
+            tech = [str(t) for t in tech if t]
+        elif tech:
+            tech = [str(tech)]
+        else:
+            tech = []
+        item = {
+            "url": str(obj.get("url") or obj.get("input") or ""),
+            "status": str(obj.get("status_code") or ""),
+            "title": str(obj.get("title") or ""),
+            "tech": tech,
+            "tls": str(obj.get("tls") or ""),
+        }
+        if not item["url"] or not (item["tech"] or item["title"] or item["tls"]):
+            continue
+        key = json.dumps(item, ensure_ascii=False, sort_keys=True)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(key)
+    return out
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Asset Extractor with URL and Domain Climb Support")
     parser.add_argument("input_string", nargs="?", default=None,
                         help="需要提取资产的输入字符串；省略则从 stdin 读取 httpx JSONL")
     args = parser.parse_args()
 
+    findings = []
     if args.input_string is not None:
         text = args.input_string
     else:
         raw = sys.stdin.read()
         text = clean_httpx_jsonl(raw)
+        findings = build_findings(text)      # R26:标题/状态码/技术栈/证书 → FINDING
 
     extracted_data = extract_assets_by_policy(text.replace("*.", ""))
 
@@ -212,6 +257,9 @@ def main() -> int:
         for asset in asset_list:
             output_line = {event_type: asset}
             print(json.dumps(output_line, ensure_ascii=False), flush=True)
+
+    for value in findings:
+        print(json.dumps({"FINDING": value}, ensure_ascii=False), flush=True)
 
     return 0
 

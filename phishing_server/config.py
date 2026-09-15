@@ -6,7 +6,7 @@ config.json 缺失字段用默认值;端口/路由等做基础校验。
 
 import json
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict
 
 

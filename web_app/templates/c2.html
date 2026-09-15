@@ -291,7 +291,7 @@
             </div>
             <div class="form-group" style="margin:0;">
                 <label for="dp-port">端口</label>
-                <input type="number" id="dp-port" class="form-control" style="width:90px;font-family:var(--font-mono);" value="9001">
+                <input type="number" id="dp-port" class="form-control" style="width:90px;font-family:var(--font-mono);" value="65503">
             </div>
             <div class="form-group" style="margin:0;">
                 <label for="dp-interval">回连间隔(s)</label>
@@ -3644,9 +3644,9 @@ function phSelectModule(name) {
     var pbox = document.getElementById('ph-params');
     params.forEach(function(p, i) {
         var pname = p[0], hint = p[1] || '';
-        var def = '';
-        var m = /默认\s*([^\s,;]+)/.exec(hint);
-        if (m) def = m[1];
+        // 默认值由后端解析(B8):接口给的 params 固定 [name, hint, default],
+        // 前端不再自己从提示文字里正则猜 —— 避免前后端两套规则改一边漏一边
+        var def = (p.length > 2 && p[2] !== null && p[2] !== undefined) ? String(p[2]) : '';
         var row = document.createElement('div');
         row.style.cssText = 'margin-bottom:8px;';
         var lab = document.createElement('label');

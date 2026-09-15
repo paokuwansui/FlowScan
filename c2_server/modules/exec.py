@@ -10,6 +10,9 @@ import subprocess
 MODULE = {
     "desc": "执行系统命令（`cmd` 超时 模式 或 直接命令 模式，无超时则一直运行）",
     "params": [("cmd", "rest；`命令` 超时(300/300m/3h) 或 直接写命令")],
+    # 通用 run() 按 os.name 自派发到 run_linux/run_windows/run_mac,
+    # 显式声明跨平台,避免 R13 平台校验把 mac 目标误拒
+    "cross_platform": True,
 }
 
 # 超时单位 → 秒

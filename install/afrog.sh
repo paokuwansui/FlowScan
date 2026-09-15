@@ -27,5 +27,5 @@ mkdir -p pkg
 unzip -o dl.zip -d pkg
 mkdir -p "$BIN_DIR"
 find pkg -type f -name "afrog" -perm /111 -print -quit | xargs -I{} install -m 0755 {} "$BIN"
-command -v afrog >/dev/null 2>&1
+[ -x "$BIN_DIR/afrog" ] || command -v afrog >/dev/null 2>&1
 echo "[install] afrog 安装完成"

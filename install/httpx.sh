@@ -22,5 +22,5 @@ BIN_DIR="/usr/local/bin"
 [ -w "$BIN_DIR" ] || BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bin"
 mkdir -p "$BIN_DIR"
 ln -sf "$(command -v httpx-toolkit)" "$BIN_DIR/httpx"
-command -v httpx >/dev/null 2>&1
+[ -x "$BIN_DIR/httpx" ] || command -v httpx >/dev/null 2>&1
 echo "[install] httpx 安装完成"

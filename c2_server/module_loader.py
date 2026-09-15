@@ -15,7 +15,6 @@ JSON 序列模块: steps 串联 python 模块；加载后统一校验引用存�
 
 import io
 import json
-import logging
 import os
 import threading
 import tokenize
@@ -61,6 +60,8 @@ class ModuleInfo:
     funcs: set = field(default_factory=set)      # 顶层函数名集合
     steps: list = field(default_factory=list)    # JSON 步骤
     errors: list = field(default_factory=list)   # 加载期问题（JSON 校验）
+    cross_platform: bool = False                 # MODULE["cross_platform"]:通用 run() 可跨平台(R13)
+    platforms: list = field(default_factory=list)  # MODULE["platforms"]:平台白名单(空=不限)(R13)
 
 
 class ModuleLoader:
@@ -217,16 +218,26 @@ class ModuleLoader:
             desc=str(meta.get("desc", "")), params=norm,
             result_processor=rp,
             code=module_meta.extract_code(content), funcs=funcs,
+            cross_platform=bool(meta.get("cross_platform", False)),
+            platforms=[str(p).lower() for p in (meta.get("platforms") or [])],
         )
 
     def _build_py_task(self, mod: ModuleInfo, kwargs: dict,
                        platform: str = "") -> str:
-        func_name = module_meta.select_entry(mod.funcs, platform)
+        if not module_meta.platform_allowed(mod.platforms, platform):
+            raise ValueError(
+                f"module '{mod.name}' 仅支持平台 {mod.platforms},"
+                f"不支持 '{platform}'")
+        func_name = module_meta.select_entry(mod.funcs, platform,
+                                            cross_platform=mod.cross_platform)
         if func_name is None:
+            # R13:已知平台且模块只有别的平台实现 → 直接拒绝下发(面板即时可见),
+            # 不再把 POSIX 实现发给 windows beacon 等运行期才失败
             plat = platform or "unknown"
             raise ValueError(
-                f"module '{mod.name}' has no implementation "
-                f"for platform '{plat}'")
+                f"module '{mod.name}' has no implementation for platform "
+                f"'{plat}'(现有实现: {', '.join(sorted(mod.funcs)) or '无'});"
+                f"如该模块确实跨平台,可在 MODULE 里声明 cross_platform=True")
         declared = [p[0] for p in mod.params
                     if isinstance(p, (list, tuple)) and p]
         unknown = set(kwargs) - set(declared)
@@ -318,7 +329,9 @@ class ModuleLoader:
             if not isinstance(args, dict):
                 args = {}
             if step_mod and step_mod.type == "python":
-                func_name = module_meta.select_entry(step_mod.funcs, platform)
+                func_name = module_meta.select_entry(
+                    step_mod.funcs, platform,
+                    cross_platform=step_mod.cross_platform)
                 if func_name is None:
                     lines.append(
                         f"results.append('[module {module_name}: "

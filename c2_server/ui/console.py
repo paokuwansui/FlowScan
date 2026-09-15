@@ -59,7 +59,12 @@ def render_event(rec: dict) -> str:
         fork = " (fork)" if rec.get("fork") else ""
         return f"[+] 上线: {bid}...{fork}"
     if ev == "disconnect":
-        return ""  # 断开不渲染（避免每个回连周期刷屏）
+        # R22:正常收尾(每 60s 一次)与失联移除不渲染,避免刷屏;
+        # 异常中断(收帧断开/非法消息/发送失败/回放失败)提示一行,便于当场发现
+        reason = str(rec.get("reason") or "")
+        if reason in ("", "normal", "timeout"):
+            return ""
+        return f"[!] 连接中断: {bid}... 原因={reason}"
     if ev == "task_sent":
         # 完整 task_id（36 字符 UUID）+ 完整 beacon id，便于与入队消息对照
         return f"[>] {rec.get('beacon', '-')} 任务下发: {rec.get('task_id', '')}"

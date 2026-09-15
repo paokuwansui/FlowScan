@@ -1,6 +1,6 @@
 import os
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Dict, List
 
 import yaml
 
@@ -19,6 +19,8 @@ class ToolModule:
     check_command: str = ""
     expect_keyword: str = ""
     exclude_keyword: str = ""
+    # 注:install_steps/install_timeout 由模板实验室(web_app/template_lab.py)
+    # 的 install 动作消费(Docker 化后模块 YAML 不再写这两项,但功能保留)
     install_steps: List[str] = field(default_factory=list)
     install_timeout: int = 900
     enabled: bool = True

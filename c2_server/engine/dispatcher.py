@@ -167,7 +167,7 @@ class Dispatcher:
                 missing = (param_names[len(args):idx + 1]
                            if len(args) < idx else [rest_name])
                 raise ValueError(
-                    f"module '{name}': 缺少参数 {', '.join(missing)}")
+                    f"module '{name}': 缺少必需参数 {', '.join(missing)}")
             kwargs = {}
             for i, pname in enumerate(param_names):
                 if pname == rest_name:

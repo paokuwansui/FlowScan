@@ -736,8 +736,10 @@ async function fetchMessages(incremental) {
     const data = await resp.json();
     const box = document.getElementById('agent-trajectory');
     for (const m of data.messages || []) {
-        if (m.ts > lastTs) lastTs = m.ts;
-        box.appendChild(renderMessage(m));
+        if (m.ts > lastTs) {
+            lastTs = m.ts;
+            box.appendChild(renderMessage(m));
+        }
     }
     box.scrollTop = box.scrollHeight;
     updateGoalBar(data.state || {});

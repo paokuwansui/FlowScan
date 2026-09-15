@@ -27,5 +27,5 @@ mkdir -p pkg
 unzip -o dl.zip -d pkg
 mkdir -p "$BIN_DIR"
 find pkg -type f -name "ksubdomain" -perm /111 -print -quit | xargs -I{} install -m 0755 {} "$BIN"
-command -v ksubdomain >/dev/null 2>&1
+[ -x "$BIN_DIR/ksubdomain" ] || command -v ksubdomain >/dev/null 2>&1
 echo "[install] ksubdomain 安装完成"

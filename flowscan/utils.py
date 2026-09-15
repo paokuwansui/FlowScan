@@ -4,7 +4,6 @@ from typing import Any, Dict, Tuple
 
 from .config import load_yaml
 
-_EXECUTED_COMMANDS: set[str] = set()
 
 
 def project_root() -> str:
@@ -58,9 +57,3 @@ def load_config(path: str = "config.yaml") -> Dict[str, Any]:
     return load_yaml(path)
 
 
-def mark_local_command(cmd: str) -> None:
-    _EXECUTED_COMMANDS.add(cmd)
-
-
-def is_local_command_done(cmd: str) -> bool:
-    return cmd in _EXECUTED_COMMANDS

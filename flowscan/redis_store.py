@@ -1,5 +1,6 @@
 import hashlib
 import json
+import threading
 import time
 from typing import Any, Dict, Iterable, List, Optional, Set
 
@@ -106,6 +107,8 @@ class FlowScanRedis:
         self._push_script = self.conn.register_script(PUSH_EVENT_LUA)
         self._tools_cache: Optional[tuple] = None   # (version, {name: info})
         self._rule_cache: Dict[str, tuple] = {}     # kind -> (version, rules)
+        self._time_cache: Optional[tuple] = None    # (monotonic 取时点, redis 时间)
+        self._time_lock = threading.Lock()
 
     @staticmethod
     def fingerprint(event_type: str, value: str) -> str:
@@ -121,6 +124,23 @@ class FlowScanRedis:
             return float(t[0]) + float(t[1]) / 1e6
         except Exception:
             return time.time()
+
+    def _now(self) -> float:
+        """统一时钟:Redis 服务器时间,进程内缓存 1 秒(每 1s 多一次 TIME 往返)。
+
+        2026-09-15(R19):claim/heartbeat/release 此前各用 `time.time()`(节点本地
+        时间),而工具存活判定用 `_redis_time()` —— 节点间时钟漂移超过
+        lock_stale_seconds(默认 120s)就会把「别人正持有的锁」误判成死锁抢占
+        → 同一任务被两个节点各跑一遍。现统一走 Redis 时间。
+        取不到 Redis 时间时 `_redis_time()` 内部回退本地时间(单机部署等价)。
+        """
+        cached = self._time_cache
+        if cached and (time.monotonic() - cached[0]) < 1.0:
+            return cached[1]
+        val = self._redis_time()
+        with self._time_lock:
+            self._time_cache = (time.monotonic(), val)
+        return val
 
     def push_event(self, event_type: str, value: str, source_tool: str = "manual", parent_fp: str = "", root_fp: str = "") -> Optional[str]:
         event_type = str(event_type).strip()
@@ -141,7 +161,7 @@ class FlowScanRedis:
             return None
 
         fp = self.fingerprint(event_type, value)
-        now = str(time.time())
+        now = str(self._now())      # R19:统一 Redis 时钟(事件 created_at 与锁判定同源)
         root = root_fp or parent_fp or fp
         consumers = sorted(self.consumers_for_event_type(event_type))
         # 原子入队（Lua）：父取消检查 → 去重 → 落库 → 时间索引 → 统计 → 子索引 → pending
@@ -220,33 +240,66 @@ class FlowScanRedis:
         events.sort(key=lambda e: float(e.get("created_at") or 0))
         return events
 
+    def _index_batch(self, fps: List[str], *, roots_only: bool = False) -> int:
+        """把一批事件指纹补进时间/根事件索引(2026-09-15 R21)。
+
+        单批只需 2 次往返:先 pipeline 批量 hgetall,再 pipeline 批量 zadd。
+        此前是"每个事件一次 hgetall + 多次 zadd",上万事件时启动要等很久。
+        score 取自事件的 created_at,缺失时用统一 Redis 时钟(B7,与 push_event 同源)。
+        """
+        pipe = self.conn.pipeline()
+        for fp in fps:
+            pipe.hgetall(f"fs3:event:{fp}")
+        rows = pipe.execute()
+        pipe = self.conn.pipeline()
+        now = self._now()
+        n = 0
+        for fp, ev in zip(fps, rows):
+            if not ev:
+                continue
+            if roots_only and ev.get("parent_fp"):
+                continue
+            score = float(ev.get("created_at") or now)
+            if roots_only:
+                pipe.zadd(_ROOTS_INDEX_KEY, {fp: score}, nx=True)
+            else:
+                pipe.zadd(_TIME_INDEX_KEY, {fp: score}, nx=True)
+                pipe.zadd(_TYPE_TIME_INDEX_KEY.format(ev.get("event_type", "")),
+                          {fp: score}, nx=True)
+            n += 1
+        pipe.execute()
+        return n
+
+    def _index_backfill(self, *, roots_only: bool = False) -> int:
+        """全量回填(批量),并在"索引已覆盖全部事件"时直接跳过。"""
+        key = _ROOTS_INDEX_KEY if roots_only else _TIME_INDEX_KEY
+        total = int(self.conn.scard("fs3:event:all") or 0)
+        if total and int(self.conn.zcard(key) or 0) >= total:
+            return 0          # 索引不缺 → 跳过整轮扫描(R21 快路径)
+        n = 0
+        batch: List[str] = []
+        for fp in self.conn.sscan_iter("fs3:event:all", count=500):
+            batch.append(fp)
+            if len(batch) >= 500:
+                n += self._index_batch(batch, roots_only=roots_only)
+                batch = []
+        if batch:
+            n += self._index_batch(batch, roots_only=roots_only)
+        return n
+
     def ensure_time_index(self) -> int:
         """把存量事件补进时间索引(幂等:zadd nx 只补缺失,可安全重复执行)。
 
         每次调用都会扫描 event:all 补齐缺失条目;不依赖 flag 早退,
         这样「有事件但时间索引缺失」的历史数据(旧版写入/迁移遗漏)在启动时自动自愈。
         flag 仅用于多节点并发时避免同一时刻重复全量扫描。
+        2026-09-15(R21):改为批量回填 + "索引已齐则跳过",不再逐条 hgetall。
         """
         self.conn.set(_TIME_INDEX_FLAG, "1", nx=True)  # 占位防并发,不用于早退
-        try:
-            n = 0
-            pipe = self.conn.pipeline()
-            for fp in self.conn.sscan_iter("fs3:event:all", count=500):
-                ev = self.conn.hgetall(f"fs3:event:{fp}")
-                if not ev:
-                    continue
-                score = float(ev.get("created_at") or time.time())
-                pipe.zadd(_TIME_INDEX_KEY, {fp: score}, nx=True)
-                pipe.zadd(_TYPE_TIME_INDEX_KEY.format(ev.get("event_type", "")), {fp: score}, nx=True)
-                n += 1
-                if n % 500 == 0:
-                    pipe.execute()
-                    pipe = self.conn.pipeline()
-            pipe.execute()
+        n = self._index_backfill()
+        if n:
             self.log(f"[INDEX] time index ensured: {n} events")
-            return n
-        except Exception:
-            raise
+        return n
 
     def recent_root_fps(self, limit: int = 200, offset: int = 0) -> tuple:
         """按创建时间倒序取一页根事件指纹（parent 为空的事件，事件图谱用）。"""
@@ -256,26 +309,18 @@ class FlowScanRedis:
         return fps, total
 
     def ensure_root_index(self) -> int:
-        """一次性把存量根事件补进根事件索引（多节点并发由 SET NX 保证只跑一次）。"""
+        """一次性把存量根事件补进根事件索引（多节点并发由 SET NX 保证只跑一次）。
+
+        2026-09-15(R21):批量回填 + 已齐跳过(同 ensure_time_index)。
+        """
         if self.conn.exists(_ROOTS_INDEX_FLAG):
             return 0
         if not self.conn.set(_ROOTS_INDEX_FLAG, "1", nx=True):
             return 0
         try:
-            n = 0
-            pipe = self.conn.pipeline()
-            for fp in self.conn.sscan_iter("fs3:event:all", count=500):
-                ev = self.conn.hgetall(f"fs3:event:{fp}")
-                if not ev or ev.get("parent_fp"):
-                    continue
-                score = float(ev.get("created_at") or time.time())
-                pipe.zadd(_ROOTS_INDEX_KEY, {fp: score}, nx=True)
-                n += 1
-                if n % 500 == 0:
-                    pipe.execute()
-                    pipe = self.conn.pipeline()
-            pipe.execute()
-            self.log(f"[INDEX] root index backfilled: {n} events")
+            n = self._index_backfill(roots_only=True)
+            if n:
+                self.log(f"[INDEX] root index backfilled: {n} events")
             return n
         except Exception:
             self.conn.delete(_ROOTS_INDEX_FLAG)  # 失败允许下次重试
@@ -401,11 +446,16 @@ class FlowScanRedis:
         # heartbeat_at,若超过 stale_after 秒无心跳(持有者已死)则释放锁允许抢占。
         return bool(self._claim_script(
             keys=[f"fs3:done:{tool_name}:{fp}", f"fs3:lock:{tool_name}:{fp}"],
-            args=[node_id, str(time.time()), str(stale_after)],
+            args=[node_id, str(self._now()), str(stale_after)],
         ))
 
-    def heartbeat_lock(self, tool_name: str, fp: str, now: float) -> None:
-        """看门狗心跳:刷新 lock 的 heartbeat_at,证明持有者仍存活。"""
+    def heartbeat_lock(self, tool_name: str, fp: str, now: float = None) -> None:
+        """看门狗心跳:刷新 lock 的 heartbeat_at,证明持有者仍存活。
+
+        now 缺省用统一 Redis 时钟(R19);显式传值时调用方需自行保证同源。
+        """
+        if now is None:
+            now = self._now()
         key = f"fs3:lock:{tool_name}:{fp}"
         if self.conn.exists(key):
             self.conn.hset(key, "heartbeat_at", str(now))
@@ -413,7 +463,7 @@ class FlowScanRedis:
     def release_task(self, tool_name: str, fp: str, node_id: str, mark_done: bool = True, status: str = "done") -> None:
         self._release_script(
             keys=[f"fs3:done:{tool_name}:{fp}", f"fs3:lock:{tool_name}:{fp}"],
-            args=["1" if mark_done else "0", node_id, str(time.time()), status],
+            args=["1" if mark_done else "0", node_id, str(self._now()), status],
         )
         if mark_done:
             self.conn.zrem(f"fs3:pending:{tool_name}", fp)

@@ -45,6 +45,10 @@ class Worker:
         self._cooldowns: Dict[Tuple[str, str], float] = {}
         self._retry_base = int(config.get("worker", {}).get("retry_base_seconds", 5))
         self._retry_cap = int(config.get("worker", {}).get("retry_cap_seconds", 21600))   # 上限 6 小时
+        # 放弃机制(2026-09-15 定稿):同一 (工具, 事件) 连续失败达到该次数即放弃
+        # ——标 done(全集群都不再重试)+ 醒目日志。防模块自身坏掉(如 YAML 用了
+        # 沙箱不支持的名字)时该事件永远在 pending 里打转(退避封顶 6h 也不会消失)。
+        self._give_up_after = int(config.get("worker", {}).get("give_up_after_failures", 12))
 
     def install_tools(self) -> None:
         """安装所有工具 + 检查可用性(不依赖 redis),填充 self.tools。
@@ -185,6 +189,37 @@ class Worker:
                 submitted += 1
         return submitted
 
+    def _note_failure(self, tool_name: str, fp: str, reason: str,
+                      detail: str = "") -> Tuple[int, int, bool]:
+        """登记一次失败并算退避。返回 (retry_n, backoff_seconds, gave_up)。
+
+        失败统一入口(2026-09-15):命令 exit≠0 / transform / parse 代码异常 /
+        内部异常 全部走这里 —— 计数、指数退避(base×2^(n-1),cap 封顶)、状态行。
+        gave_up=True 表示已达放弃阈值:不再设冷却(调用方改为标 done)。
+        """
+        key = (tool_name, fp)
+        with self.lock:
+            n = self._retry_counts.get(key, 0) + 1
+            self._retry_counts[key] = n
+        if n >= self._give_up_after:
+            with self.lock:
+                self._cooldowns.pop(key, None)
+            return n, 0, True
+        backoff = min(self._retry_base * (2 ** (n - 1)), self._retry_cap)
+        with self.lock:
+            self._cooldowns[key] = time.time() + backoff
+        return n, backoff, False
+
+    def _log_failure(self, tool_name: str, fp: str, n: int, backoff: int,
+                     reason: str, detail: str = "") -> None:
+        """失败日志(首败明确标注,便于在面板日志里一眼看到起病点)。"""
+        head = f"[{self.node_id}] [{tool_name}] "
+        tail = f" fp={fp[:10]}" + (f" detail={detail[:200]}" if detail else "")
+        if n == 1:
+            self.redis.log(f"{head}首次失败({reason}),{backoff}s 后重试{tail}")
+        else:
+            self.redis.log(f"{head}重试仍失败 {reason}(retry={n},backoff={backoff}s){tail}")
+
     def _run_task(self, event: dict, tool: ToolModule) -> None:
         fp = event.get("fingerprint", "")
         status = "done"
@@ -194,25 +229,39 @@ class Worker:
                 status = "cancelled"
                 self.redis.log(f"[{self.node_id}] [{tool.name}] skip cancelled event fp={fp[:10]}")
                 return
-            published, failed = self.pipeline.process(event, tool, self.redis)
+            result = self.pipeline.process(event, tool, self.redis)
+            failed = result[1]                      # published 已由 pipeline 内部日志记录
+            reason = (result[2] if len(result) > 2 else "") or "exit"
             if failed:
-                # 命令报错退出:不标记完成,释放锁(pending 保留)让其他节点抢占。
-                # 本节点对该 (tool, fp) 指数退避(base×2^(n-1),cap 封顶),退避期内
-                # 不再抢占该事件;其他节点不受影响,可立即抢占(网络可达时成功)。
-                mark_done = False
-                key = (tool.name, fp)
-                with self.lock:
-                    n = self._retry_counts.get(key, 0) + 1
-                    self._retry_counts[key] = n
-                backoff = min(self._retry_base * (2 ** (n - 1)), self._retry_cap)
-                with self.lock:
-                    self._cooldowns[key] = time.time() + backoff
-                status = f"error:exit(retry={n},backoff={backoff}s)"
-                self.redis.log(f"[{self.node_id}] [{tool.name}] {status} fp={fp[:10]}")
+                # 命令报错/变换解析异常:不标记完成,释放锁(pending 保留)让其他节点
+                # 抢占;本节点按 (工具, 事件) 粒度指数退避后重试。
+                n, backoff, gave_up = self._note_failure(tool.name, fp, reason)
+                if gave_up:
+                    # 放弃机制:连续失败达阈值 → 标 done(全集群不再重试)+ 醒目告警
+                    status = f"error:giveup(retry={n},{reason})"
+                    self.redis.log(
+                        f"[{self.node_id}] [{tool.name}] 连续失败 {n} 次,放弃重试"
+                        f"(标 done,该事件不再重扫;请检查该模块/工具是否可用)"
+                        f" fp={fp[:10]}")
+                else:
+                    mark_done = False
+                    status = f"error:{reason}(retry={n},backoff={backoff}s)"
+                    self._log_failure(tool.name, fp, n, backoff, reason)
         except Exception as exc:
-            status = f"error:{exc}"
-            mark_done = False
-            self.redis.log(f"[{self.node_id}] [{tool.name}] fatal: {exc}")
+            # 内部异常(redis 抖动/pipeline 抛错等):与 exit≠0 走同一条退避链——
+            # 此前只 mark_done=False 不登记退避,下一轮立即重新 claim 同一事件,
+            # 形成无 sleep 的紧凑重试循环占住线程槽(2026-09-15 修复)。
+            n, backoff, gave_up = self._note_failure(tool.name, fp, "exc", str(exc))
+            if gave_up:
+                mark_done = True
+                status = f"error:giveup(retry={n},exc)"
+                self.redis.log(
+                    f"[{self.node_id}] [{tool.name}] 连续失败 {n} 次,放弃重试(标 done)"
+                    f" fp={fp[:10]} last_error={exc}")
+            else:
+                mark_done = False
+                status = f"error:exc(retry={n},backoff={backoff}s)"
+                self._log_failure(tool.name, fp, n, backoff, "exc", str(exc))
         finally:
             with self.lock:
                 self._running_by_tool[tool.name] = max(0, self._running_by_tool.get(tool.name, 0) - 1)
@@ -231,6 +280,12 @@ class Worker:
 
     def _heartbeat_loop(self) -> None:
         interval = int(self.config.get("worker", {}).get("heartbeat_interval_seconds", 10))
+        # 2026-09-15:心跳失败不再静默。worker 只与主节点 Redis 通信(唯一通道),
+        # 所以"报错"不能写回 Redis —— 故障本身常常就是连不上它。唯一送得出去的
+        # 落点是本进程的 stderr(宿主机 `docker logs flowscan-worker` 可见):
+        # 第一次失败一行,此后最多每 60 秒一行(避免刷屏),恢复时再一行。
+        fail_count = 0
+        last_warn = 0.0
         while self.running:
             with self.lock:
                 running_by_tool = dict(self._running_by_tool)
@@ -250,16 +305,27 @@ class Worker:
                 # 工具注册自愈:注册表(fs3:tools)被误删/清空时,心跳周期自动重建。
                 # register_tool 幂等(配置一致时不写、不 bump 版本),每轮开销仅 16 次 hget。
                 self.register_tools()
-                # 看门狗:刷新每个持有锁的 heartbeat_at,证明本节点仍存活
-                now = time.time()
+                # 看门狗:刷新每个持有锁的 heartbeat_at,证明本节点仍存活。
+                # R19:心跳时间戳必须与 claim/release 同源(Redis 时钟),
+                # 否则节点本地时钟漂移会让别的节点误判本节点已死并抢锁。
                 for tool_name, fp in active_locks:
-                    self.redis.heartbeat_lock(tool_name, fp, now)
+                    self.redis.heartbeat_lock(tool_name, fp)
                 # 工具存活刷新 + 失联工具清理(多节点由 SET NX 锁保证单执行者)
                 self.redis.touch_tools(sorted(self.tools))
                 self.redis.sweep_stale_tools(
                     int(self.config.get("worker", {}).get("tool_stale_seconds", 90)))
-            except Exception:
-                pass
+            except Exception as exc:
+                fail_count += 1
+                now_ts = time.time()
+                if fail_count == 1 or now_ts - last_warn >= 60:
+                    print(f"[{self.node_id}] 心跳失败(连续 {fail_count} 次): "
+                          f"{type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
+                    last_warn = now_ts
+            else:
+                if fail_count:
+                    print(f"[{self.node_id}] 心跳恢复(此前连续失败 {fail_count} 次)",
+                          flush=True)
+                fail_count = 0
             time.sleep(interval)
 
 

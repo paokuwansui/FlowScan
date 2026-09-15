@@ -19,6 +19,10 @@ worker:
   max_local_pending: 40
   heartbeat_interval_seconds: 10
   lock_stale_seconds: 120
+  # 失败重试(命令 exit≠0 / 变换·解析代码异常 / worker 内部异常 统一走本地指数退避)
+  retry_base_seconds: 5          # 首次失败后退避 5s,之后 10/20/40… 翻倍
+  retry_cap_seconds: 21600       # 单次退避上限 6 小时
+  give_up_after_failures: 12     # 连续失败达 12 次放弃重试(标 done 不再重扫 + 日志告警)
 fofa:
   api_key: YOUR_FOFA_API_KEY
   base_url: https://fofa.info

@@ -11,7 +11,6 @@ import os
 import secrets
 
 from server.core.bootstrap import deploy_command
-from server.core.config import load_config
 from server.transports.agent_base import relay_code
 
 MODULE = {
@@ -51,7 +50,6 @@ finally:
 
 
 def run(host, port, server_key_hex=None, out_dir=None):
-    from server.core.config import ServerConfig
     if server_key_hex:
         if len(server_key_hex) != 64:
             return {"status": "error",

@@ -30,7 +30,6 @@ PROTOCOL_VERSION = 2   # v2: 批量任务模型(TASKS/FETCH/batch 标记);版本
 # ── 消息类型 (7.3) ──
 REGISTER = "register"   # → Server：注册即握手（version/role/id/via/batch）
 WELCOME = "welcome"     # Server →：握手成功 + 服务端 banner
-TASK = "task"           # Server →：下发单条代码（task_id/code）[legacy 保留类型,新流程不主动使用]
 TASKS = "tasks"         # Server →：批量下发任务数组 + 结果确认回执（tasks/acked）
 RESULT = "result"       # → Server：单条执行结果（task_id/output/error）
 FETCH = "fetch"         # → Server：声明结果已全部上报,请求下发任务
@@ -40,7 +39,7 @@ RESPONSE = "response"   # Client 通道：命令输出
 ERROR = "error"         # 双向：错误消息（code/message），发送后关闭连接
 
 MESSAGE_TYPES = (
-    REGISTER, WELCOME, TASK, TASKS, RESULT, FETCH, PONG, COMMAND, RESPONSE, ERROR,
+    REGISTER, WELCOME, TASKS, RESULT, FETCH, PONG, COMMAND, RESPONSE, ERROR,
 )
 
 # ── 错误码 (10.4) ──
@@ -50,10 +49,6 @@ BAD_JSON = "BAD_JSON"                   # 载荷 JSON 解析失败
 UNKNOWN_TYPE = "UNKNOWN_TYPE"           # 未知消息类型
 INTERNAL = "INTERNAL"                   # 服务端内部错误
 AUTH_FAILED = "AUTH_FAILED"             # 预留：未来认证机制
-
-ERROR_CODES = (
-    VERSION_MISMATCH, BAD_FRAME, BAD_JSON, UNKNOWN_TYPE, INTERNAL, AUTH_FAILED,
-)
 
 # ── 角色 ──
 VALID_ROLES = ("beacon", "client")
@@ -101,10 +96,6 @@ def validate_message(msg) -> Optional[str]:
         # 处抛 TypeError 且不在会话捕获列表 → 直接杀会话（S9）
         if (not isinstance(msg.get("output", ""), str)
                 or not isinstance(msg.get("error", ""), str)):
-            return BAD_JSON
-    elif mtype == TASK:
-        if not isinstance(msg.get("task_id"), str) or \
-                not isinstance(msg.get("code"), str):
             return BAD_JSON
     elif mtype == TASKS:
         # 批量任务帧: tasks 必须是数组且元素含 str task_id + str code;acked 必须是数组

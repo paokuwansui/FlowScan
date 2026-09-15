@@ -1,3 +1,4 @@
+import json
 import textwrap
 from typing import Any, Dict, List
 
@@ -62,6 +63,26 @@ SAFE_BUILTINS = {
     "all": all,
     "isinstance": isinstance,
     "type": type,
+    # ── 2026-09-15(R28)补充:模块 YAML 的 transform/parse 代码常用这些,此前
+    # 缺失会 NameError → CodeExecutionError → 事件被当「解析失败」(链路静默)。
+    # 只补纯数据处理/输出类,继续排除逃逸面大的:eval/exec/compile/open/input/
+    # globals/locals/vars/dir/getattr/setattr/delattr/__import__ 之外的动态加载。
+    "print": print, "repr": repr, "format": format,
+    "abs": abs, "round": round, "divmod": divmod, "pow": pow,
+    "zip": zip, "map": map, "filter": filter, "reversed": reversed,
+    "next": next, "iter": iter, "slice": slice,
+    "frozenset": frozenset, "bytes": bytes,
+    "ord": ord, "chr": chr, "hex": hex, "bin": bin, "oct": oct, "ascii": ascii,
+    "issubclass": issubclass, "hasattr": hasattr,
+    # 异常类(pipeline 把沙箱异常按失败处理,模块内 except 必须能引用这些名字)
+    "Exception": Exception, "BaseException": BaseException,
+    "ValueError": ValueError, "TypeError": TypeError, "KeyError": KeyError,
+    "IndexError": IndexError, "AttributeError": AttributeError,
+    "ZeroDivisionError": ZeroDivisionError, "ArithmeticError": ArithmeticError,
+    "LookupError": LookupError, "RuntimeError": RuntimeError,
+    "StopIteration": StopIteration, "NotImplementedError": NotImplementedError,
+    "UnicodeDecodeError": UnicodeDecodeError, "UnicodeEncodeError": UnicodeEncodeError,
+    "JSONDecodeError": json.JSONDecodeError,
 }
 
 

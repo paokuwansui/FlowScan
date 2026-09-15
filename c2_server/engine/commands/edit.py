@@ -10,7 +10,6 @@ edit <beacon_id> <remote_path> <文本内容...>        直接文本推写(空�
 
 import base64
 
-from server.task_queue import Task
 
 
 def run(disp, args):

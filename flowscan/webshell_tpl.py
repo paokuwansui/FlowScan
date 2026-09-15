@@ -16,7 +16,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 logger = logging.getLogger("webshell.template_loader")
 

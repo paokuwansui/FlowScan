@@ -29,7 +29,7 @@ from . import (
     template_lab,
     views,
 )
-from ._common import fmt_ts
+from ._common import _to_bool, fmt_ts
 
 DEFAULT_WEB_CONFIG = {
     "username": "admin",
@@ -122,12 +122,14 @@ def create_app(config_path: str = "config.yaml", modules_dir: str = "modules") -
 
     # Skill 渐进式加载关闭提示(config.yaml 显式 enabled:false 会覆盖代码默认 True,
     # 静默关闭容易误以为功能坏了;启动时打一条 warning)
+    # 注:此处变量名是 cfg(load_yaml 的结果),此前误写 config 触发 NameError
+    # 被 except 吞掉 → 该提示从未输出(2026-09-15 修复)
     try:
-        skills_cfg = config.get("skills", {}) or {}
+        skills_cfg = cfg.get("skills", {}) or {}
         if not _to_bool(skills_cfg.get("enabled", True)):
             app.logger.warning("skills.enabled=false:Skill 渐进式加载已关闭,Agent 的 load_skill/search_skills 工具不可用")
-    except Exception:
-        pass
+    except Exception as exc:
+        app.logger.warning("skills 配置检查失败: %s", exc)
 
     # 默认技能库目录(项目内 skills/):不存在则创建,保证 AI 管理默认有技能目录可用
     try:

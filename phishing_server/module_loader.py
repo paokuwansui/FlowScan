@@ -16,7 +16,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Optional
 
 logger = logging.getLogger("phishing.module_loader")
 
@@ -31,6 +31,42 @@ class ModuleInfo:
     category: str = "自定义"
     params: list = field(default_factory=list)   # [(name, hint), ...]
     body: str = ""                               # 去 MODULE 注释行后的源码
+
+
+def param_default(params, name: str) -> str:
+    r"""参数缺省值(单一实现,B8):优先 params 第三元素,否则从 hint 正则兜底。
+
+    R30 规则:显式第三元素最可靠;老格式正则兜底时剥掉标点,且「纯中文说明文字」
+    (如「常见站点」)判定为无默认值 —— 中文默认值(如弹窗标题「登录验证」)请用第三元素。
+    """
+    hint = ""
+    for dp in (params or []):
+        if not isinstance(dp, (list, tuple)) or not dp or dp[0] != name:
+            continue
+        if len(dp) > 2 and dp[2] is not None:
+            return str(dp[2])
+        if len(dp) > 1:
+            hint = str(dp[1] or "")
+        break
+    m = re.search(r"默认\s*([^\s,;()（）\[\]【】\"'`]+)", hint)
+    if not m:
+        return ""
+    val = m.group(1).strip()
+    if re.search(r"[\u4e00-\u9fff]", val) and not re.search(r"[A-Za-z0-9]", val):
+        return ""      # 纯中文 = 说明文字,不是取值
+    return val
+
+
+def params_with_defaults(mod) -> list:
+    """把模块参数整理成 [name, hint, default] 三元素形式(默认值后端算好)。"""
+    out = []
+    for p in (getattr(mod, "params", []) or []):
+        if not isinstance(p, (list, tuple)) or not p:
+            continue
+        name = str(p[0])
+        hint = str(p[1]) if len(p) > 1 and p[1] is not None else ""
+        out.append([name, hint, param_default(mod.params, name)])
+    return out
 
 
 class JsModuleLoader:
@@ -55,9 +91,14 @@ class JsModuleLoader:
             self._load_module(filename, path)
 
     def list_modules(self) -> list:
-        """列出模块摘要: [{name, desc, category, params}]"""
+        """列出模块摘要: [{name, desc, category, params}]
+
+        params 每项固定为 [name, hint, default] —— 默认值由后端解析(B8),
+        前端不再自己从提示文字里正则猜(避免前后端两套规则改一边漏一边)。
+        """
         return [
-            {"name": m.name, "desc": m.desc, "category": m.category, "params": list(m.params)}
+            {"name": m.name, "desc": m.desc, "category": m.category,
+             "params": params_with_defaults(m)}
             for m in self._modules.values()
         ]
 
@@ -67,7 +108,7 @@ class JsModuleLoader:
         if not mod:
             return None
         return {"name": mod.name, "desc": mod.desc,
-                "params": list(mod.params), "body": mod.body}
+                "params": params_with_defaults(mod), "body": mod.body}
 
     def param_names(self, name: str) -> list:
         """模块声明的参数名列表。"""
@@ -119,7 +160,12 @@ class JsModuleLoader:
         for p in params:
             if isinstance(p, (list, tuple)) and len(p) >= 1 and isinstance(p[0], str):
                 hint = p[1] if len(p) > 1 and isinstance(p[1], str) else ""
-                norm.append((p[0], hint))
+                # 第三元素 = 显式默认值(R30):保留传给构建表单/构建接口,
+                # 不再让前后端从 hint 文案里正则猜
+                if len(p) > 2 and p[2] is not None:
+                    norm.append((p[0], hint, str(p[2])))
+                else:
+                    norm.append((p[0], hint))
             else:
                 logger.warning("js module %s: 非法 params 项 %r 忽略", name, p)
         # 去 MODULE 注释行(保留其他注释)

@@ -18,7 +18,7 @@ from flowscan.filter import (
 )
 from flowscan.redis_store import FlowScanRedis
 
-from ._common import _to_int, login_required
+from ._common import login_required
 from ._helpers import (
     _clear_all_events,
     _count_events,

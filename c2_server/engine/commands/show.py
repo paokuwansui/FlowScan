@@ -25,6 +25,9 @@ def run(disp, args):
     distro = getattr(rec, "sys_distro", "") or ""
     if kern or distro:
         esc_lines.append(f"    内核/发行版: {kern} / {distro}")
+    dl_err = getattr(rec, "dl_error", "") or ""      # R11:最近一次下载失败原因
+    if dl_err:
+        esc_lines.append(f"    最近下载错误: {dl_err}")
     return (
         f"[*] {rec.client_id}\n"
         f"    首次上线: {rec.first_seen.strftime('%Y-%m-%d %H:%M:%S')}\n"

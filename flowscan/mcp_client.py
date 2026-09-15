@@ -127,6 +127,8 @@ class McpClient:
         self._endpoint = self._url
         self._proc = None
         self._stdout_q = None
+        self._sse_resp = None               # SSE 保持的长连接(session 绑定连接生命周期)
+        self._sse_responses = queue.Queue()  # SSE 流推送的 JSON-RPC 消息队列
         self._initialized = False
 
     # ── 传输层 ──
@@ -148,13 +150,65 @@ class McpClient:
         if not self._url.startswith(("http://", "https://")):
             raise McpError(f"invalid url: {self._url!r}")
         if self._stype == "sse":
-            try:
-                endpoint = _sse_handshake(self._url, timeout=self._timeout)
-            except Exception as exc:
-                raise McpError(f"SSE 握手失败: {exc}") from exc
-            self._endpoint = (urllib.parse.urljoin(self._url, endpoint)
-                              if endpoint else self._url)
-        # http: 直接 POST 到 url
+            self._connect_sse()
+        # http: 直接 POST 到 url(无独立连接)
+
+    def _connect_sse(self) -> None:
+        """标准 MCP SSE 连接:打开 SSE 长连接并保持,后台线程持续读流。
+
+        session 绑定 SSE 连接生命周期——连接一关 session 立即失效
+        (yak mcp 1.4.8+ 报 Invalid session ID)。因此握手读到 event:endpoint
+        后不能关闭连接,而是起后台线程继续读后续推送的 JSON-RPC 响应。
+        """
+        req = urllib.request.Request(self._url, headers={
+            "Accept": "text/event-stream",
+            "User-Agent": "FlowScan-MCP/1.0",
+        })
+        try:
+            self._sse_resp = urllib.request.urlopen(
+                req, timeout=self._timeout, context=_ssl_ctx())
+        except Exception as exc:
+            raise McpError(f"SSE 握手失败: {exc}") from exc
+        # 同步读第一条 event:endpoint(拿带 sessionId 的 message endpoint)
+        endpoint = ""
+        event = None
+        try:
+            for raw in self._sse_resp:
+                line = raw.decode("utf-8", "replace").strip()
+                if line.startswith("event:"):
+                    event = line[6:].strip()
+                    continue
+                if line.startswith("data:") and event == "endpoint":
+                    endpoint = line[5:].strip()
+                    break
+        except Exception:
+            pass
+        self._endpoint = (urllib.parse.urljoin(self._url, endpoint)
+                          if endpoint else self._url)
+        # 后台线程继续读 SSE 流,收集服务端推送的响应(连接保持, session 不失效)
+        threading.Thread(target=self._sse_reader, daemon=True).start()
+
+    def _sse_reader(self) -> None:
+        """后台读 SSE 流,把 data: 行的 JSON-RPC 消息(响应/通知)放进队列。"""
+        resp = self._sse_resp
+        if resp is None:
+            return
+        try:
+            for raw in resp:
+                line = raw.decode("utf-8", "replace").strip()
+                if not line.startswith("data:"):
+                    continue
+                data = line[5:].strip()
+                if not data or data == "[DONE]":
+                    continue
+                try:
+                    msg = json.loads(data)
+                except Exception:
+                    continue
+                if isinstance(msg, dict):
+                    self._sse_responses.put(msg)
+        except Exception:
+            pass
 
     def _stdio_reader(self) -> None:
         try:
@@ -202,6 +256,45 @@ class McpClient:
                         raise McpError(f"{method}: {resp['error']}")
                     return resp.get("result")
             raise McpError(f"{method}: stdio 响应超时")
+
+        if self._stype == "sse":
+            # 标准 MCP SSE:POST 发请求(响应经保持的 SSE 连接推送回),再从流队列等 id。
+            # 这里只发请求拿状态码,不读 HTTP body(响应不在 body,读了只会空/阻塞)。
+            try:
+                data = json.dumps(req).encode("utf-8")
+                preq = urllib.request.Request(
+                    self._endpoint, data=data,
+                    headers={
+                        "Content-Type": "application/json",
+                        "Accept": "application/json, text/event-stream",
+                        "User-Agent": "FlowScan-MCP/1.0",
+                    },
+                    method="POST")
+                with urllib.request.urlopen(preq, timeout=self._timeout,
+                                            context=_ssl_ctx()):
+                    pass
+            except urllib.error.HTTPError as exc:
+                detail = ""
+                try:
+                    detail = (exc.read() or b"").decode("utf-8", "replace")[:300]
+                except Exception:
+                    pass
+                raise McpError(f"{method}: HTTP {exc.code} {detail}") from exc
+            except Exception as exc:
+                raise McpError(f"{method}: {exc}") from exc
+            if notify:
+                return None
+            deadline = time.time() + self._timeout
+            while time.time() < deadline:
+                try:
+                    msg = self._sse_responses.get(timeout=0.5)
+                except queue.Empty:
+                    continue
+                if msg.get("id") == msg_id:
+                    if "error" in msg:
+                        raise McpError(f"{method}: {msg['error']}")
+                    return msg.get("result")
+            raise McpError(f"{method}: SSE 响应超时(未收到 id={msg_id})")
 
         try:
             _status, _ctype, body = _http_post(self._endpoint, req, timeout=self._timeout)
@@ -275,6 +368,12 @@ class McpClient:
                 except Exception:
                     pass
             self._proc = None
+        if self._sse_resp is not None:
+            try:
+                self._sse_resp.close()
+            except Exception:
+                pass
+            self._sse_resp = None
 
 
 def list_all_mcp_tools(servers: list, timeout: int = DEFAULT_TIMEOUT) -> list:

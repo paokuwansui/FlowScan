@@ -153,10 +153,3 @@ def decode_frame(data: bytes, key: bytes) -> bytes:
         raise ValueError(f"decode_frame: decompression failed: {e}") from e
 
 
-# 保留 XOR 原语（测试/通用用途；帧管道已改用 ChaCha20+HMAC）
-def xor_crypt(data: bytes, key: bytes) -> bytes:
-    """逐字节循环异或（历史原语，非帧管道）。"""
-    if not key:
-        raise ValueError("xor_crypt: key must not be empty")
-    key_len = len(key)
-    return bytes(b ^ key[i % key_len] for i, b in enumerate(data))

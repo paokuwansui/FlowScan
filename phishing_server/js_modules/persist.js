@@ -1,4 +1,4 @@
-// MODULE = {"desc": "持久化:定时重新注入反连 script,页面跳转/刷新后保持 hook(BeEF persistence)", "category": "持久化", "params": [["interval", "重注入间隔ms,默认 5000"], ["module", "反连模块名,默认 hello"]]}
+// MODULE = {"desc": "持久化:定时重新注入反连 script,页面跳转/刷新后保持 hook(BeEF persistence)", "category": "持久化", "params": [["interval", "重注入间隔ms,默认 5000", "5000"], ["module", "反连模块名,默认 hello", "hello"]]}
 (function () {
   var iv = parseInt(_q("interval", "{{interval}}"), 10) || 5000;
   var mod = _q("module", "{{module}}") || "hello";

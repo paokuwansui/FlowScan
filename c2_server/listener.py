@@ -39,17 +39,36 @@ class Listener:
         self._active = 0
         self._lock = threading.Lock()
         self._stopped = False
+        # 绑定失败记录 {role: 错误信息}(2026-09-15 R12:此前 bind 失败直接冒泡
+        # 出 start() 打死后台线程,面板仍显示「已启动」)
+        self._errors: dict = {}
 
-    def start(self) -> None:
-        """启动所有监听线程。"""
+    @property
+    def errors(self) -> dict:
+        """绑定失败的通道 → 错误文本(空 dict = 全部成功)。"""
+        return dict(self._errors)
+
+    def start(self) -> int:
+        """启动所有监听线程。返回成功绑定的端口数(失败项记入 errors,不抛)。"""
         for role, (port, key) in self._ports.items():
             self._listen_one(port, key, role)
+        return len(self._sockets)
 
-    def _listen_one(self, port: int, key: bytes, expected_role: str) -> None:
+    def _listen_one(self, port: int, key: bytes, expected_role: str) -> bool:
         srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        srv.bind((self._host, port))
-        srv.listen(128)
+        try:
+            srv.bind((self._host, port))
+            srv.listen(128)
+        except OSError as exc:
+            try:
+                srv.close()
+            except OSError:
+                pass
+            self._errors[expected_role] = f"{self._host}:{port} 绑定失败: {exc}"
+            logger.error("bind failed %s:%d (role=%s): %s",
+                         self._host, port, expected_role, exc)
+            return False
         self._sockets.append(srv)
         t = threading.Thread(target=self._accept_loop,
                              args=(srv, key, expected_role), daemon=True)
@@ -57,6 +76,7 @@ class Listener:
         self._threads.append(t)
         logger.info("listening %s:%d (role=%s)", self._host, port,
                     expected_role)
+        return True
 
     def _accept_loop(self, srv: socket.socket, key: bytes,
                      expected_role: str) -> None:

@@ -3,9 +3,7 @@ upload <beacon_id> <local_path> <remote_path>
 """
 
 import base64
-import os
 
-from server.task_queue import Task
 
 _CHUNK = 180 * 1024  # 原始字节/块（base64 后 ~240KB，帧内）
 

@@ -129,8 +129,14 @@ def update_connection(redis, conn_id: str, data: dict):
 
 
 def delete_connection(redis, conn_id: str) -> bool:
+    """删除 webshell 连接(连同执行历史)。
+
+    2026-09-15(R18):此前只删连接键与列表成员,`fs3:webshell:history:{conn_id}`
+    留在 Redis 里成为不可达垃圾,而且 conn_id 被复用时还会串到旧历史。
+    """
     existed = bool(redis.conn.exists(_CONN_KEY(conn_id)))
     redis.conn.delete(_CONN_KEY(conn_id))
+    redis.conn.delete(_HIST_KEY(conn_id))
     redis.conn.zrem(_LIST_KEY, conn_id)
     return existed
 

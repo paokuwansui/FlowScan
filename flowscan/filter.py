@@ -21,11 +21,15 @@ from __future__ import annotations
 
 import hashlib
 import ipaddress
+import logging
 import os
 import re
+import time
 import warnings
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
+
+_logger = logging.getLogger("flowscan.filter")
 
 CONFIG_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -150,14 +154,49 @@ def _fingerprint(event_type: str, match_mode: str, value: str) -> str:
 # ============================================================
 
 
-_FILE_RULES: List[BlacklistRule] = load_file_rules()
+_FILE_RULES: List[BlacklistRule] = []
+_FILE_RULES_PATH: str = CONFIG_PATH  # 上次加载用的规则文件路径(自动刷新盯它)
+_FILE_RULES_MTIME: float = 0.0      # 上次加载时规则文件的 mtime
+_FILE_RULES_STAT_AT: float = 0.0    # 上次 stat 的时间(节流)
+_FILE_RULES_STAT_INTERVAL = 2.0     # 最多每 2 秒检查一次文件是否变过
+
+
+def _load_and_stamp(config_path: str = CONFIG_PATH) -> int:
+    """加载文件规则并记下源文件路径/mtime(供自动刷新比对)。"""
+    global _FILE_RULES, _FILE_RULES_PATH, _FILE_RULES_MTIME
+    _FILE_RULES_PATH = config_path
+    _FILE_RULES = load_file_rules(config_path)
+    try:
+        _FILE_RULES_MTIME = os.path.getmtime(config_path)
+    except OSError:
+        _FILE_RULES_MTIME = 0.0
+    return len(_FILE_RULES)
 
 
 def reload_file_rules(config_path: str = CONFIG_PATH) -> int:
     """重新加载 black_list.cfg 文件规则。返回加载的规则数。"""
-    global _FILE_RULES
-    _FILE_RULES = load_file_rules(config_path)
-    return len(_FILE_RULES)
+    return _load_and_stamp(config_path)
+
+
+def _auto_reload_file_rules() -> None:
+    """规则文件被改动后自动刷新(2026-09-15 B)。
+
+    此前「重载文件黑名单」只在**调用它的那个进程**里生效:web 点了重载,
+    worker 仍用启动时读进的旧规则(点了等于没点)。这里按源文件 mtime 自动
+    感知变化(节流 2s,单次 os.stat 开销可忽略),web/worker 都能生效,
+    也不依赖 Redis 广播;直接编辑规则文件同样会被感知。
+    """
+    global _FILE_RULES_STAT_AT
+    now = time.monotonic()
+    if now - _FILE_RULES_STAT_AT < _FILE_RULES_STAT_INTERVAL:
+        return
+    _FILE_RULES_STAT_AT = now
+    try:
+        mtime = os.path.getmtime(_FILE_RULES_PATH)
+    except OSError:
+        return
+    if mtime > _FILE_RULES_MTIME:
+        _load_and_stamp(_FILE_RULES_PATH)   # 必须带路径,否则会退回默认文件(实测踩到)
 
 
 def get_file_rules() -> List[Dict[str, Any]]:
@@ -167,10 +206,14 @@ def get_file_rules() -> List[Dict[str, Any]]:
 
 def check_file_rules(event_type: str, value: str) -> bool:
     """检查文件规则。返回 True 表示应拦截。"""
+    _auto_reload_file_rules()
     for rule in _FILE_RULES:
         if rule_matches(rule, event_type, value):
             return True
     return False
+
+
+_load_and_stamp()   # 模块导入时载入一次
 
 
 def test_file_rules(event_type: str, value: str) -> List[Dict[str, Any]]:
@@ -434,17 +477,68 @@ def test_redis_whitelist(
 # 失效：add/delete 规则时版本+1，各进程（web/worker）下次检查自动刷新。
 
 
+def _mark_degraded(redis_client: Any, kind: str, flag: bool) -> None:
+    """记录/清除“规则读取降级”标记(供后续观测;失败不影响主流程)。"""
+    try:
+        state = getattr(redis_client, "_fs3_rules_degraded", None)
+        if not isinstance(state, dict):
+            state = {}
+            setattr(redis_client, "_fs3_rules_degraded", state)
+        state[kind] = bool(flag)
+    except Exception:
+        pass
+
+
+def _rules_warn(redis_client: Any, kind: str, message: str) -> None:
+    """规则读取失败告警(限流:同 kind 每 60s 最多一条,防故障期刷爆日志)。
+
+    注意:不能用 redis_client.log()——写 Redis 正是失败源;走 logging,
+    worker 的 stdout / web 的日志都能看到。
+    """
+    attr = f"_fs3_rules_warn_at_{kind}"
+    now = time.time()
+    try:
+        last = float(getattr(redis_client, attr, 0.0) or 0.0)
+    except (TypeError, ValueError):
+        last = 0.0
+    if now - last < 60.0:
+        return
+    try:
+        setattr(redis_client, attr, now)
+    except Exception:
+        pass
+    _logger.warning("[FILTER] %s 规则读取失败,过滤降级(沿用上次规则;"
+                    "白名单将按上次名单继续拦截): %s", kind, message)
+
+
 def _cached_rules(redis_client: Any, kind: str) -> List[BlacklistRule]:
-    """kind: "blacklist" | "whitelist"。返回缓存的规则对象列表。"""
+    """kind: "blacklist" | "whitelist"。返回缓存的规则对象列表。
+
+    2026-09-15(R8 fail-open 修复):此前版本号读失败兜底成 "0"、规则拉取失败
+    `except: pass` 后**仍无条件写缓存** —— zrange/逐条 hgetall 抖动一次,就会把
+    「空规则表」(或半截规则表)当成当前版本的有效结果缓存下来并长期命中:
+    白名单语义是「空 = 全放行」→ 过滤整体失效且无声。现在:
+      - 任何失败都不写缓存(下次调用自然重试,Redis 恢复即自愈);
+      - 失败时沿用上一次的规则(策略保持 = fail-closed,而不是清空);
+      - 限流告警 + `_fs3_rules_degraded` 降级标记,避免「错了不知道」。
+    """
     ver_key = f"fs3:ver:{kind}"
     cache_attr = f"_fs3_rules_cache_{kind}"
+    cached = getattr(redis_client, cache_attr, None)
+    old_rules: List[BlacklistRule] = list(cached[1]) if cached else []
+
     try:
         ver = redis_client.conn.get(ver_key) or "0"
-    except Exception:
-        ver = "0"
-    cached = getattr(redis_client, cache_attr, None)
+    except Exception as exc:
+        # 版本号读不到 → 无法判断新旧,不能走「版本相同即命中」短路
+        _mark_degraded(redis_client, kind, True)
+        _rules_warn(redis_client, kind, f"版本号读取失败: {exc}")
+        return old_rules
+
     if cached and cached[0] == ver:
+        _mark_degraded(redis_client, kind, False)
         return cached[1]
+
     rules: List[BlacklistRule] = []
     try:
         for raw_fp in redis_client.conn.zrange(f"fs3:{kind}:rules", 0, -1):
@@ -459,8 +553,13 @@ def _cached_rules(redis_client: Any, kind: str) -> List[BlacklistRule]:
                 fp=raw_fp,
                 comment=raw.get("comment", ""),
             ))
-    except Exception:
-        pass
+    except Exception as exc:
+        # 关键:不写缓存——否则「空表/半截表 + 当前版本号」会被长期命中
+        _mark_degraded(redis_client, kind, True)
+        _rules_warn(redis_client, kind, f"规则拉取失败: {exc}")
+        return old_rules
+
+    _mark_degraded(redis_client, kind, False)
     setattr(redis_client, cache_attr, (ver, rules))
     return rules
 
@@ -563,6 +662,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    import sys
-
     raise SystemExit(main())
