@@ -1,9 +1,9 @@
 """
 @module: set_interval
 @desc: 修改 Beacon 回连间隔和抖动
-@contract: 用 globals() 字符串键 _I/_J 读写——minify 后模块与模板独立池化,
-直接 global _I 写入的是模块短名键, 模板 sleep_jitter 读不到(多线程 exec
-在同一共享全局 dict, 但键名已不一致); 字符串键不受压缩影响(D2)
+@contract: 用 globals() 字符串键 _I/_J 读写——任务代码跑在**专用命名空间**里,
+直接 `_I = x` 只写进任务自己的命名空间, 植入物 sleep_jitter 读不到; 只有
+字符串键(或 _glb_API)才能写回植入物状态(任务隔离见 implant_template D3)
 """
 MODULE = {
     "desc": "修改 Beacon 回连间隔和抖动",

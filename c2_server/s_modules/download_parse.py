@@ -46,12 +46,16 @@ def run(output, error="", arg="", disp=None, bid=""):
     if chunk + 1 < total and disp is not None and bid:
         try:
             task = disp.build_task("download", [path, str(chunk + 1)])
-            if task is not None:
-                task.result_processor = "download_parse"
-                task.proc_arg = local
-                disp.push_task(bid, task)
-        except Exception:
-            pass
+            if task is None:
+                return json.dumps({"dl_error": "续传失败:无法构建下一块任务"})
+            task.result_processor = "download_parse"
+            task.proc_arg = local
+            msg = disp.push_task(bid, task)
+            # 队列满时 push_task 返回 "[!] ..." → 下一块静默丢失会损坏/截断下载
+            if isinstance(msg, str) and msg.startswith("[!]"):
+                return json.dumps({"dl_error": "队列已满,续传中断"})
+        except Exception as e:
+            return json.dumps({"dl_error": f"续传失败:{e}"})
     return "{}"
 
 

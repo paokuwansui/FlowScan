@@ -31,6 +31,10 @@ _ALLOWED_EXTS = {".html", ".css", ".js", ".png", ".jpg", ".jpeg", ".gif",
 
 _PLACEHOLDER_RE = re.compile(r"\{\{\s*([^{}]+?)\s*\}\}")
 
+# 页面名:仅字母/数字/下划线/短横线。所有公开接口统一在此校验(清单/读取/渲染/
+# 写入/删除共用),避免 name 含 ".."、"/" 时 path join 逃出 pages/ 目录。
+_PAGE_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
 # 占位符替换表:{{host}}/{{port}}/{{active_page}}/{{config.xxx}}
 def _render_page(template: str, config) -> str:
     if not template:
@@ -60,6 +64,16 @@ class PageRenderer:
     def __init__(self, pages_dir: str = "pages"):
         self._pages_dir = pages_dir
 
+    def _page_dir(self, name: str) -> Optional[str]:
+        """校验页面名并返回其绝对路径;非法返回 None(公开方法入口统一调用)。"""
+        name = str(name or "")
+        if not name or not _PAGE_NAME_RE.match(name):
+            return None
+        d = os.path.normpath(os.path.join(self._pages_dir, name))
+        if not d.startswith(os.path.normpath(self._pages_dir) + os.sep):
+            return None
+        return d
+
     # ── 公开接口 ──
 
     def list_pages(self) -> list:
@@ -78,10 +92,10 @@ class PageRenderer:
         return out
 
     def page_exists(self, name: str) -> bool:
-        if not name:
+        page_dir = self._page_dir(name)
+        if page_dir is None:
             return False
-        index = os.path.join(self._pages_dir, name, "index.html")
-        return os.path.isfile(index)
+        return os.path.isfile(os.path.join(page_dir, "index.html"))
 
     def active_page(self, config) -> str:
         """当前活动页面名;配置的 active_page 不存在时回退第一个可用,再没有返回 ""。"""
@@ -95,7 +109,10 @@ class PageRenderer:
 
     def render_index(self, name: str, config) -> Optional[Dict[str, str]]:
         """渲染指定页面 index.html(占位符替换)。返回 {html, mime} 或 None。"""
-        index = os.path.join(self._pages_dir, name, "index.html")
+        page_dir = self._page_dir(name)
+        if page_dir is None:
+            return None
+        index = os.path.join(page_dir, "index.html")
         if not os.path.isfile(index):
             return None
         try:
@@ -109,8 +126,8 @@ class PageRenderer:
 
     def serve_file(self, name: str, file: str, config) -> Optional[Dict[str, bytes]]:
         """提供页面内静态资源。路径穿越/白名单防护。返回 {data, mime} 或 None。"""
-        page_dir = os.path.normpath(os.path.join(self._pages_dir, name))
-        if not page_dir.startswith(os.path.normpath(self._pages_dir) + os.sep):
+        page_dir = self._page_dir(name)
+        if page_dir is None:
             return None
         path = os.path.normpath(os.path.join(page_dir, file))
         # 穿越防护:规范化后必须仍在页面目录内
@@ -136,8 +153,8 @@ class PageRenderer:
 
     def list_page_files(self, name: str) -> list:
         """页面内文件清单(面板浏览/编辑用)。"""
-        d = os.path.join(self._pages_dir, name)
-        if not os.path.isdir(d):
+        d = self._page_dir(name)
+        if d is None or not os.path.isdir(d):
             return []
         return sorted(f for f in os.listdir(d)
                       if os.path.isfile(os.path.join(d, f)) and not f.startswith("."))
@@ -162,8 +179,8 @@ class PageRenderer:
             return False, "页面名/文件名不能为空"
         if ".." in file.split("/") or file.startswith("/") or "\\" in file:
             return False, "文件名非法"
-        page_dir = os.path.normpath(os.path.join(self._pages_dir, name))
-        if not page_dir.startswith(os.path.normpath(self._pages_dir) + os.sep):
+        page_dir = self._page_dir(name)
+        if page_dir is None:
             return False, "页面名非法"
         ext = os.path.splitext(file)[1].lower()
         if ext not in _ALLOWED_EXTS:
@@ -190,9 +207,9 @@ class PageRenderer:
 
     def create_page(self, name: str, desc: str = "") -> tuple:
         """新建页面文件夹(index.html + meta.json 骨架)。返回 (ok, message)。"""
-        if not name or not re.match(r"^[A-Za-z0-9_-]+$", name):
+        d = self._page_dir(name)
+        if d is None:
             return False, "页面名只允许字母/数字/下划线/短横线"
-        d = os.path.join(self._pages_dir, name)
         if os.path.exists(d):
             return False, f"页面 {name} 已存在"
         try:
@@ -227,8 +244,8 @@ class PageRenderer:
             return False, "页面名/文件名不能为空"
         if ".." in file.split("/") or file.startswith("/") or "\\" in file:
             return False, "文件名非法"
-        page_dir = os.path.normpath(os.path.join(self._pages_dir, name))
-        if not page_dir.startswith(os.path.normpath(self._pages_dir) + os.sep):
+        page_dir = self._page_dir(name)
+        if page_dir is None:
             return False, "页面名非法"
         ext = os.path.splitext(file)[1].lower()
         if ext not in _ALLOWED_EXTS:
@@ -251,10 +268,8 @@ class PageRenderer:
         字母/数字/下划线/短横线 —— 否则 name=".." 会让 shutil.rmtree 删掉
         pages/ 的父目录(整个 phishing_server),2026-09-15 修复。
         """
-        if not name or not re.match(r"^[A-Za-z0-9_-]+$", str(name)):
-            return False, "页面名只允许字母/数字/下划线/短横线"
-        d = os.path.normpath(os.path.join(self._pages_dir, name))
-        if not d.startswith(os.path.normpath(self._pages_dir) + os.sep):
+        d = self._page_dir(name)
+        if d is None:
             return False, "页面名非法"
         if not os.path.isdir(d):
             return False, f"页面 {name} 不存在"

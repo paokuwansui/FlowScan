@@ -24,22 +24,63 @@ class InFlight:
     该 beacon 的在途登记, 防条目永久泄漏。
     """
 
-    def __init__(self):
+    def __init__(self, on_change=None):
         self._d = {}
         self._lock = threading.Lock()
+        # 落盘回调(2026-09-28): 在途登记变更 → 置脏(重启后迟到结果仍能路由到处理器)
+        self._on_change = on_change
+
+    def _touch(self) -> None:
+        cb = self._on_change
+        if cb is None:
+            return
+        try:
+            cb()
+        except Exception:
+            pass
+
+    def snapshot(self) -> dict:
+        """在途登记快照(加密落盘用)。"""
+        with self._lock:
+            return {k: {"client_id": v[0], "result_processor": v[1], "proc_arg": v[2]}
+                    for k, v in self._d.items()}
+
+    def apply_snapshot(self, data: dict) -> int:
+        """重启恢复在途登记。返回恢复条数。"""
+        n = 0
+        if not isinstance(data, dict):
+            return 0
+        with self._lock:
+            for tid, item in data.items():
+                if not isinstance(tid, str) or not isinstance(item, dict):
+                    continue
+                if tid in self._d:
+                    continue
+                self._d[tid] = (str(item.get("client_id") or ""),
+                                str(item.get("result_processor") or ""),
+                                str(item.get("proc_arg") or ""))
+                n += 1
+        return n
 
     def track(self, task, client_id: str = "") -> None:
-        if getattr(task, "result_processor", ""):
-            with self._lock:
-                self._d[task.task_id] = (client_id,
-                                         task.result_processor,
-                                         getattr(task, "proc_arg", ""))
+        """登记"已下发未回收"的任务:task_id → (bid, 结果处理器, 处理器参数)。
+
+        2026-09-28: 不再只登记带结果处理器的任务 —— **全部已下发任务**都登记。
+        原语义只服务 download 续传;现在多一层用途:重启后据此列出"重启前已下发
+        但结果未知"的任务(用户要求不静默消失),并在 beacon 超时清理时一并回收。
+        """
+        with self._lock:
+            self._d[task.task_id] = (client_id,
+                                     getattr(task, "result_processor", "") or "",
+                                     getattr(task, "proc_arg", "") or "")
+        self._touch()
 
     def take(self, task_id: str) -> tuple:
         with self._lock:
             v = self._d.pop(task_id, None)
         if not v:
             return "", ""
+        self._touch()
         return v[1], v[2]
 
     def remove_client(self, client_id: str) -> None:
@@ -48,6 +89,9 @@ class InFlight:
             stale = [k for k, v in self._d.items() if v[0] == client_id]
             for k in stale:
                 del self._d[k]
+            if not stale:
+                return
+        self._touch()
 
 
 def register_beacon(reg: dict, mgr, events) -> tuple:
@@ -70,6 +114,25 @@ def register_beacon(reg: dict, mgr, events) -> tuple:
     return client_id, is_new
 
 
+def _redact_binary(output: str) -> str:
+    """展示/落库副本里去掉二进制载荷(download 的分块 base64)。
+
+    download 模块回传 {"chunk":n,"total":m,"data":"<base64>","path":..} —— 原始内容
+    仍原样交给结果处理器(download_parse 落盘), 但**结果列表/事件/控制台只留摘要**,
+    否则每下载一个文件就往屏幕刷一屏 base64(2026-09-28 用户要求去除)。
+    """
+    if len(output) < 512:
+        return output
+    try:
+        d = json.loads(output)
+    except ValueError:
+        return output
+    if isinstance(d, dict) and isinstance(d.get("data"), str) and len(d["data"]) > 512:
+        d["data"] = f"<已省略 {len(d['data'])} 字符 base64 二进制块(已交服务端落盘)>"
+        return json.dumps(d, ensure_ascii=False)
+    return output
+
+
 def store_result(client_id, task_id, output, error, mgr, events,
                  max_result_size, smods=None, dispatcher=None,
                  result_processor="", proc_arg="", overwrite=False):
@@ -88,12 +151,23 @@ def store_result(client_id, task_id, output, error, mgr, events,
         # 超长 traceback 能撑爆结果存储/前端渲染)
         error = (error[:max_result_size]
                  + f"\n... (truncated, {len(error)} bytes total)")
-    added = mgr.add_result(client_id, TaskResult(task_id=task_id, output=output,
+    # D(2026-09-28):落库/展示用摘要副本(去掉 base64 大块),原始内容只给结果处理器
+    stored_output = _redact_binary(output)
+    if overwrite:
+        # 交互式 shell 每轮回连覆盖上报累积输出:内容未变则不重复落库/发事件
+        # (否则控制台每轮重印整段输出刷屏——2026-09-28 修复)
+        prev = mgr.result_output(client_id, task_id)
+        if prev is not None and prev == (stored_output, error):
+            return
+    added = mgr.add_result(client_id, TaskResult(task_id=task_id,
+                                                 output=stored_output,
                                                  error=error), overwrite=overwrite)
     if not added:
         return  # 重复结果: 静默丢弃(不入事件、不跑结果处理器)
+    # C(2026-09-28):事件只记元数据(不再写 output 内容)——事件文件是明文,
+    # 写内容会让"结果加密落盘"漏成明文;完整输出在内存/加密状态文件里。
     events.emit(EVT_TASK_RESULT, client_id, task_id=task_id,
-                output=output[:200])
+                ok=not error, out_len=len(output), err_len=len(error))
     if result_processor and smods is not None:
         try:
             out = smods.run(result_processor,

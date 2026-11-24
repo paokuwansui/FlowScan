@@ -14,6 +14,7 @@ import struct
 
 MODULE = {
     "desc": "查看网卡信息(接口/MAC/IP/状态/MTU/收发包统计)",
+    "platforms": ["linux"],
     "params": [],
 }
 

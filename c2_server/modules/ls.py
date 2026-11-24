@@ -8,6 +8,7 @@ import time
 
 MODULE = {
     "desc": "列出目录内容（权限/属主/大小/时间）",
+    "platforms": ["linux", "mac"],
     "params": [("path", '默认 "."')],
 }
 

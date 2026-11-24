@@ -11,6 +11,7 @@ import subprocess
 
 MODULE = {
     "desc": "Linux 提权检测(SUID + 内核 CVE,只检测不利用)",
+    "platforms": ["linux"],
     "params": [],
     "result_processor": "priv_esc_parse",
 }
@@ -116,7 +117,7 @@ SUID_BINS = {
 def _sh(cmd, timeout=10):
     """执行 shell 命令,返回 stdout(失败/超时返回空串,不抛异常)。"""
     try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True,
+        r = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
                            timeout=timeout, executable="/bin/sh")
         return (r.stdout or "").strip()
     except Exception:

@@ -14,7 +14,6 @@ tools/list / tools/call 四个调用，够用即可。
 import json
 import queue
 import shlex
-import socket
 import ssl
 import subprocess
 import threading
@@ -38,38 +37,6 @@ def _ssl_ctx():
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
     return ctx
-
-
-def _sse_handshake(url: str, timeout: int = DEFAULT_TIMEOUT) -> str:
-    """SSE 握手:流式迭代读取,拿到 event: endpoint 即返回。
-
-    标准 MCP SSE 服务器(FastMCP 等)GET /sse 后保持长连接推送消息,
-    全量 read() 会阻塞到超时(2026-08 修复);逐行读,读到 endpoint 事件或
-    socket 超时即停,不读全量。返回 endpoint(相对/绝对路径),未找到返回 ""。
-    """
-    req = urllib.request.Request(url, headers={
-        "Accept": "text/event-stream",
-        "User-Agent": "FlowScan-MCP/1.0",
-    })
-    try:
-        with urllib.request.urlopen(req, timeout=timeout, context=_ssl_ctx()) as resp:
-            event = None
-            deadline = time.time() + timeout
-            for raw in resp:
-                if time.time() > deadline:
-                    break
-                line = raw.decode("utf-8", "replace").strip()
-                if line.startswith("event:"):
-                    event = line[6:].strip()
-                    continue
-                if line.startswith("data:") and event == "endpoint":
-                    return line[5:].strip()
-    except socket.timeout:
-        pass  # 长连接未发 endpoint:按未找到处理
-    except Exception:
-        raise
-    return ""
-
 
 def _http_post(url: str, payload: dict, timeout: int = DEFAULT_TIMEOUT):
     data = json.dumps(payload).encode("utf-8")
@@ -374,31 +341,3 @@ class McpClient:
             except Exception:
                 pass
             self._sse_resp = None
-
-
-def list_all_mcp_tools(servers: list, timeout: int = DEFAULT_TIMEOUT) -> list:
-    """批量列出所有启用 server 的工具（单个失败不拖垮整体）。
-
-    Returns:
-        [{server, ok, tools?|error}]
-    """
-    out = []
-    for s in servers or []:
-        if not isinstance(s, dict) or not s.get("name"):
-            continue
-        try:
-            cli = McpClient(s, timeout=timeout)
-            tools = cli.list_tools()
-            cli.close()
-            out.append({
-                "server": s.get("name"),
-                "ok": True,
-                "tools": [
-                    {"name": t.get("name"), "description": t.get("description", ""),
-                     "inputSchema": t.get("inputSchema", {})}
-                    for t in tools
-                ],
-            })
-        except Exception as exc:
-            out.append({"server": s.get("name"), "ok": False, "error": str(exc)})
-    return out

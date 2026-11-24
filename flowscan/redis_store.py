@@ -42,7 +42,12 @@ local status = ARGV[4]
 if mark_done == '1' then
   redis.call('HSET', done_key, 'node_id', node_id, 'finished_at', now, 'status', status)
 end
-redis.call('DEL', lock_key)
+-- 只有仍是锁持有者才删锁:stale 抢占后老持有者收尾不得删掉新持有者的锁,
+-- 否则第三方可再次抢锁 → 同一 (tool,事件) 被多节点并发重复执行(2026-09-28 修复)
+local owner = redis.call('HGET', lock_key, 'node_id')
+if (not owner) or owner == node_id then
+  redis.call('DEL', lock_key)
+end
 return 1
 """
 
@@ -394,21 +399,6 @@ class FlowScanRedis:
         """
         return bool(fp and self.conn.exists(f"fs3:cancelled:{fp}"))
 
-    def iter_event_fps(self, event_types: Iterable[str], limit_per_type: int = 200) -> List[str]:
-        """按时间倒序取多类型最近事件（替代全量集合扫描）。"""
-        fps: List[str] = []
-        seen: Set[str] = set()
-        for event_type in event_types:
-            key = _TYPE_TIME_INDEX_KEY.format(event_type)
-            for fp in self.conn.zrevrange(key, 0, max(0, limit_per_type - 1)):
-                if fp in seen:
-                    continue
-                seen.add(fp)
-                fps.append(fp)
-                if len(fps) >= limit_per_type:
-                    return fps
-        return fps
-
     def pending_for_tool(self, tool_name: str, event_types: Iterable[str], limit: int = 200) -> List[Dict[str, Any]]:
         events: List[Dict[str, Any]] = []
         queue_key = f"fs3:pending:{tool_name}"
@@ -547,7 +537,7 @@ class FlowScanRedis:
         - 首次注册最多扫最近 window_days 的增量（可配置）
         - 重启后从游标继续，只有重启期间产生的新事件会被重扫
         """
-        now = time.time()
+        now = self._now()
         cutoff = now - window_days * 86400
         cursor_key = _ENQ_CURSOR_KEY.format(tool_name)
         try:

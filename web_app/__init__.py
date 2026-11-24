@@ -24,6 +24,7 @@ from . import (
     ai_schedule,
     auth,
     c2,
+    c2_state,
     dashboard,
     events,
     template_lab,
@@ -52,6 +53,7 @@ _ROUTE_MODULES = (
     ai_schedule,
     agent,
     c2,
+    c2_state,
     views,
 )
 

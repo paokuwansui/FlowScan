@@ -99,7 +99,7 @@ def _fork_exec(code):
     o, e = io_.StringIO(), io_.StringIO()
     _TLS.buf = (o, e)
     try:
-        exec(code, globals())
+        exec(code, _task_ns())      # 与主模板同规则: 专用命名空间 + _glb_API
     except Exception:
         e.write(tb.format_exc())
     finally:

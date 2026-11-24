@@ -7,6 +7,8 @@ import json
 import os
 import secrets
 
+from server.core.config import update_config_file
+
 MODULE = {
     "desc": "随机生成 implant_key/client_key 并自动写入 config.json",
     "params": [("client_config", "可选：同时写入 client 侧 config 文件路径")],
@@ -26,15 +28,10 @@ def run(client_config=None):
     client_key = secrets.token_hex(32)
 
     try:
-        with open(_CONFIG_PATH, "r", encoding="utf-8") as f:
-            raw = json.load(f)
+        update_config_file(_CONFIG_PATH, implant_key=implant_key,
+                           client_key=client_key)
     except (OSError, json.JSONDecodeError) as e:
-        return {"status": "error", "message": f"read config failed: {e}"}
-
-    raw["implant_key"] = implant_key
-    raw["client_key"] = client_key
-    with open(_CONFIG_PATH, "w", encoding="utf-8") as f:
-        json.dump(raw, f, indent=2)
+        return {"status": "error", "message": f"write config failed: {e}"}
 
     result = {
         "status": "ok",
@@ -47,11 +44,7 @@ def run(client_config=None):
 
     if client_config:
         try:
-            with open(client_config, "r", encoding="utf-8") as f:
-                craw = json.load(f)
-            craw["client_key"] = client_key
-            with open(client_config, "w", encoding="utf-8") as f:
-                json.dump(craw, f, indent=2)
+            update_config_file(client_config, client_key=client_key)
             result["client_config"] = client_config
         except (OSError, json.JSONDecodeError) as e:
             result["client_config_error"] = str(e)

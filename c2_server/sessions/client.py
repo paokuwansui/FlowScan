@@ -81,8 +81,11 @@ class ClientSession:
                 send_error(self._sock, self._key, UNKNOWN_TYPE,
                            "line must be a string")
                 break
-            if not line or line.lower() == "exit":
-                break  # 远程 exit：仅断开本连接
+            # 远程会话终止:exit(旧名)与 s_exit(新名,与本地 console 对齐)都只断开
+            # 本连接,不停止 Server(2026-09-28:s_exit 此前落到引擎处理器而 ClientSession
+            # 的 on_exit 为 None → 只回一句"session ended"却不关连接)
+            if not line or line.lower() in ("exit", "s_exit"):
+                break  # 远程 exit/s_exit:仅断开本连接
 
             output = self._dispatcher.execute(line)
             # 响应截断(2026-09-04 B11): 超帧上限的大输出(result <bid> 全量

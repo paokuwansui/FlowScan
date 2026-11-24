@@ -58,6 +58,10 @@ class Worker:
         all_tools = load_tools(self.modules_dir)
         self.tools = {}
         for name, tool in all_tools.items():
+            # YAML 声明 enabled: false 的模块视为禁用,不注册(2026-09-28)
+            if not getattr(tool, "enabled", True):
+                print(f"[{self.node_id}] skip disabled tool {name}")
+                continue
             # 按模块 YAML 文件名找对应安装脚本,存在则执行(幂等:已装则跳过)
             base = os.path.splitext(os.path.basename(tool.yaml_path))[0]
             install_script = os.path.join(self.install_dir, f"{base}.sh")

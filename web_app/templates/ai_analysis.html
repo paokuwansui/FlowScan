@@ -735,11 +735,14 @@ async function fetchMessages(incremental) {
     const resp = await fetch(url);
     const data = await resp.json();
     const box = document.getElementById('agent-trajectory');
+    // 全量重渲染:先清空,否则历史消息会被再追加一遍(2026-09-28 修复)
+    if (!incremental) { box.innerHTML = ''; lastTs = 0; }
     for (const m of data.messages || []) {
-        if (m.ts > lastTs) {
-            lastTs = m.ts;
-            box.appendChild(renderMessage(m));
-        }
+        const ts = Number(m.ts) || 0;   // 旧会话消息无 ts → 0
+        // 增量去重:ts<=lastTs 跳过;ts=0 的旧消息已在全量渲染时显示,增量时同样跳过
+        if (incremental && ts <= lastTs) continue;
+        if (ts > lastTs) lastTs = ts;
+        box.appendChild(renderMessage(m));
     }
     box.scrollTop = box.scrollHeight;
     updateGoalBar(data.state || {});

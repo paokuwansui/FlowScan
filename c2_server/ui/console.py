@@ -10,13 +10,16 @@ server/ui/console.py — 交互式控制台（纯 UI，T3.3/T4.6）
 新事件经 safe_print 打断渲染——会话只写文件，UI 只读文件。
 """
 
+import json as _json
 import os as _os
 import readline
+import secrets as _secrets
 import sys as _sys
 import threading
 import time
 from typing import Optional
 
+from server.core.config import update_config_file
 from server.core.log import get_logger
 from server.infra.event_writer import EventWriter
 
@@ -26,24 +29,29 @@ _FORWARD_POLL_INTERVAL = 0.2  # 秒（8.3 风险项：可接受）
 
 
 def enrich_result_output(mgr, rec: dict) -> dict:
-    """task_result 事件行里的 output 是摘要（≤200 字符，beacon.py 截断），
-    从内存结果队列按 task_id 补全为完整输出，供 UI 完整显示。
+    """task_result 事件只记元数据(out_len/ok)，完整输出从内存结果队列按 task_id 取。
 
-    Returns:
-        补全后的新 dict；未匹配到结果时原样返回 rec。
+    2026-09-28:事件里不再写 output 内容(事件文件是明文, 写内容会绕过加密落盘),
+    所以这里必须从内存补全;取不到(如结果已被上限挤出/重启后不在内存)时给出
+    明确的元数据说明, 而不是显示成"空结果"。
     """
     bid = rec.get("beacon", "")
     task_id = rec.get("task_id", "")
-    if not bid or not task_id:
-        return rec
-    client = mgr.get_client(bid)
-    if not client:
-        return rec
-    for r in client.results:
-        if r.task_id == task_id:
-            rec = dict(rec)
-            rec["output"] = r.output
-            break
+    rec = dict(rec)
+    if bid and task_id:
+        client = mgr.get_client(bid)
+        if client:
+            for r in client.results:
+                if r.task_id == task_id:
+                    rec["output"] = r.output
+                    return rec
+    if "output" not in rec:
+        bits = []
+        if rec.get("out_len") is not None:
+            bits.append(f"{rec.get('out_len')} 字符")
+        if rec.get("ok") is False:
+            bits.append("执行失败")
+        rec["output"] = "(结果已不在内存" + ("; " + ", ".join(bits) if bits else "") + ")"
     return rec
 
 
@@ -69,9 +77,10 @@ def render_event(rec: dict) -> str:
         # 完整 task_id（36 字符 UUID）+ 完整 beacon id，便于与入队消息对照
         return f"[>] {rec.get('beacon', '-')} 任务下发: {rec.get('task_id', '')}"
     if ev == "task_result":
-        # 事件行是摘要；完整输出由 enrich_result_output 补全后传入。
+        # 事件只有元数据;完整输出由 enrich_result_output 从内存补全后传入。
         # 结果从新行开始，避免长输出挤在"结果:"同一行。
-        return f"[*] {rec.get('beacon', '-')} 结果:\n{rec.get('output', '')}"
+        head = "" if rec.get("ok", True) else " (失败)"
+        return f"[*] {rec.get('beacon', '-')} 结果{head}:\n{rec.get('output', '')}"
     return ""
 
 
@@ -100,14 +109,87 @@ class Console:
         self._running = False
 
 
+def _history_master(console: Console) -> Optional[bytes]:
+    """CLI 历史加密主密钥:config.json 的 history_key(缺则生成并原子写回)。
+
+    与 web 面板状态同思路(密钥托管在项目配置文件里):配置文件本身已 gitignore,
+    不额外引出密钥文件。取不到配置(如自定义部署)时返回 None → 历史不落盘,
+    只保留本次会话内存历史, 并打印原因(不静默)。
+    """
+    try:
+        cfg = getattr(console.dispatcher, "config", None)
+        path = getattr(cfg, "config_path", "") or ""
+        if not path or not _os.path.isfile(path):
+            print("[历史] 未取到 C2 配置文件路径; 历史本次不落盘")
+            return None
+        with open(path, encoding="utf-8") as f:
+            raw = _json.load(f)
+        key = str(raw.get("history_key") or "")
+        if not key:
+            key = _secrets.token_hex(32)
+            update_config_file(path, history_key=key)
+            print(f"[历史] 已在 {_os.path.basename(path)} 生成 history_key(历史加密用)")
+        return key.encode()
+    except Exception as exc:
+        print(f"[历史] 密钥准备失败, 本次历史不落盘: {exc}")
+        return None
+
+
+def _history_load(path: str, master: bytes) -> None:
+    """读加密历史(JSON 数组)→ readline 历史;解密失败只提示, 不删原文件。"""
+    try:
+        from server.core.crypto import open_sealed
+        with open(path, "rb") as f:
+            blob = f.read()
+        if not blob:
+            return
+        data = _json.loads(open_sealed(blob, master).decode("utf-8"))
+        for line in (data if isinstance(data, list) else []):     # 文件顺序=从旧到新
+            readline.add_history(str(line))
+    except FileNotFoundError:
+        return
+    except Exception as exc:
+        print(f"[历史] 解密失败({exc}); 本次从空历史开始, 原文件保留在 {path}")
+
+
+def _history_save(path: str, master: bytes) -> bool:
+    """readline 历史 → JSON → 加密(0600)原子写。成功返回 True。"""
+    try:
+        from server.core.crypto import seal
+        n = readline.get_current_history_length()
+        lines = [readline.get_history_item(i) for i in range(1, n + 1)]
+        lines = [str(x) for x in lines if x and str(x).strip()]
+        blob = seal(_json.dumps(lines, ensure_ascii=False).encode("utf-8"), master)
+        tmp = path + ".tmp"
+        fd = _os.open(tmp, _os.O_WRONLY | _os.O_CREAT | _os.O_TRUNC, 0o600)
+        with _os.fdopen(fd, "wb") as f:
+            f.write(blob)
+        _os.replace(tmp, path)
+        return True
+    except Exception as exc:
+        print(f"[历史] 加密保存失败: {exc}")
+        return False
+
+
 def console_loop(console: Console) -> None:
     """交互式控制台主循环。exit 经 dispatcher 触发 on_exit（server.stop）。"""
 
-    hist_file = _os.path.expanduser("~/.pyexec2_history")
-    try:
-        readline.read_history_file(hist_file)
-    except (FileNotFoundError, OSError):
-        pass
+    # 历史加密落盘(2026-09-28): ~/.pyexec2_history.enc(ChaCha20+HMAC, 0600)
+    # 旧的明文 ~/.pyexec2_history 若存在则本次导入, 加密写成功后再删除(不兼容保留)。
+    hist_file = _os.path.expanduser("~/.pyexec2_history.enc")
+    hist_plain = _os.path.expanduser("~/.pyexec2_history")
+    hist_master = _history_master(console)
+    _hist_migrated = False
+    if hist_master:
+        if _os.path.isfile(hist_file):
+            _history_load(hist_file, hist_master)
+        elif _os.path.isfile(hist_plain):
+            try:
+                readline.read_history_file(hist_plain)
+                _hist_migrated = True
+                print(f"[历史] 检测到明文历史, 本次会话结束后迁移为加密存储 {hist_file}")
+            except OSError as exc:
+                print(f"[历史] 明文历史读取失败: {exc}")
 
     disp = console.dispatcher
 
@@ -147,7 +229,7 @@ def console_loop(console: Console) -> None:
     console.safe_print = safe_print
 
     print("PyExec2 Server Console")
-    print("Type 'help' for commands, 'exit' to quit.\n")
+    print("Type 'help' for commands, 's_exit' to quit.\n")
 
     # 事件转发线程（T4.6）：只转发 console 启动后产生的新事件
     offset = _os.path.getsize(disp.audit.path) \
@@ -194,8 +276,12 @@ def console_loop(console: Console) -> None:
     stopped.set()
     forward_thread.join(timeout=1)
 
-    try:
+    if hist_master:
         readline.set_history_length(1000)
-        readline.write_history_file(hist_file)
-    except OSError:
-        pass
+        if _history_save(hist_file, hist_master):
+            if _hist_migrated:      # 加密写成功后才删明文(失败则保留, 不丢历史)
+                try:
+                    _os.unlink(hist_plain)
+                    print(f"[历史] 已迁移为加密存储并删除明文: {hist_file}")
+                except OSError as exc:
+                    print(f"[历史] 明文历史删除失败({exc}); 已加密保存, 明文请手工删除")

@@ -13,7 +13,7 @@ FlowScan 黑名单过滤器。
 
 检测流程（在 push_event 中）：
   1. check_file_rules(event_type, value) → 命中则丢弃
-  2. check_redis_rules(redis, event_type, value) → 命中则丢弃
+  2. check_redis_rules_cached(redis, event_type, value) → 命中则丢弃
   3. 均未命中 → 正常入队
 """
 
@@ -229,29 +229,6 @@ def test_file_rules(event_type: str, value: str) -> List[Dict[str, Any]]:
 # Redis 规则 API（动态规则，不缓存，每次实时查询）
 # ============================================================
 
-
-def check_redis_rules(redis_client: Any, event_type: str, value: str) -> bool:
-    """检查 Redis 中的动态规则。返回 True 表示应拦截。"""
-    try:
-        for raw_fp in redis_client.conn.zrange("fs3:blacklist:rules", 0, -1):
-            raw = redis_client.conn.hgetall(f"fs3:blacklist:rule:{raw_fp}")
-            if not raw:
-                continue
-            rule = BlacklistRule(
-                event_type=raw.get("event_type", "*"),
-                match_mode=raw.get("match_mode", ""),
-                value=raw.get("value", ""),
-                source="redis",
-                fp=raw_fp,
-                comment=raw.get("comment", ""),
-            )
-            if rule_matches(rule, event_type, value):
-                return True
-    except Exception:
-        pass
-    return False
-
-
 def get_redis_rules(redis_client: Any) -> List[Dict[str, Any]]:
     """获取 Redis 中所有动态规则。"""
     rules: List[Dict[str, Any]] = []
@@ -347,34 +324,6 @@ def test_redis_rules(
 # ============================================================
 # Redis 白名单 API（动态规则，实时查询；非空则只放行匹配事件）
 # ============================================================
-
-
-def check_redis_whitelist(redis_client: Any, event_type: str, value: str) -> bool:
-    """检查 Redis 白名单。返回 True 表示应拦截。
-
-    白名单为空(未设置)→ 不拦截(放行所有事件);
-    白名单非空 → 只有命中至少一条规则的事件才放行,其余全部拦截。
-    """
-    try:
-        rules: List[BlacklistRule] = []
-        for raw_fp in redis_client.conn.zrange("fs3:whitelist:rules", 0, -1):
-            raw = redis_client.conn.hgetall(f"fs3:whitelist:rule:{raw_fp}")
-            if not raw:
-                continue
-            rules.append(BlacklistRule(
-                event_type=raw.get("event_type", "*"),
-                match_mode=raw.get("match_mode", ""),
-                value=raw.get("value", ""),
-                source="whitelist",
-                fp=raw_fp,
-                comment=raw.get("comment", ""),
-            ))
-        if not rules:
-            return False
-        return not any(rule_matches(rule, event_type, value) for rule in rules)
-    except Exception:
-        return False
-
 
 def get_redis_whitelist_rules(redis_client: Any) -> List[Dict[str, Any]]:
     """获取 Redis 白名单所有规则。"""

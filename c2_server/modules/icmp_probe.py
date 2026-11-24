@@ -17,6 +17,7 @@ import subprocess
 
 MODULE = {
     "desc": "ping 命令探测网段可达性(每网段探测 .1 网关 与 .255 广播)",
+    "platforms": ["linux"],
     "params": [],
 }
 
@@ -53,7 +54,7 @@ def _ping_cmd(ip, timeout=2.0):
     try:
         r = subprocess.run(
             ["ping", "-c", "1", "-W", str(max(1, int(timeout))), ip],
-            capture_output=True, text=True, timeout=timeout + 3)
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, timeout=timeout + 3)
     except (OSError, subprocess.TimeoutExpired):
         return None
     if r.returncode != 0:

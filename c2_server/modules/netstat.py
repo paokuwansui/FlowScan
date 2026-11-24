@@ -88,7 +88,7 @@ def run_windows():
     """调用 netstat 获取网络连接"""
     import subprocess
     try:
-        out = subprocess.check_output(["netstat", "-ano"], timeout=10, text=True)
+        out = subprocess.check_output(["netstat", "-ano"], timeout=10, universal_newlines=True)
         return out.strip()
     except Exception as e:
         return f"(error: {e})"

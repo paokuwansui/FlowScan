@@ -40,11 +40,11 @@ def run():
         pass
     try:
         if os.name == "nt":
-            out = subprocess.check_output(["tasklist"], text=True,
+            out = subprocess.check_output(["tasklist"], universal_newlines=True,
                                           timeout=10)
         else:
             out = subprocess.check_output(["ps", "-A", "-o", "comm="],
-                                          text=True, timeout=10)
+                                          universal_newlines=True, timeout=10)
         low = out.lower()
         for n in _SUSPECT_PROCS:
             if n in low:

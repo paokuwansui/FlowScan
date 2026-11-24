@@ -105,7 +105,12 @@ def run_input_transform(code: str, data: Dict[str, Any], config: Dict[str, Any])
     if isinstance(result, dict):
         return [result]
     if isinstance(result, list):
-        return [item for item in result if isinstance(item, dict)]
+        items = [item for item in result if isinstance(item, dict)]
+        if len(items) != len(result):
+            raise CodeExecutionError(
+                f"input_transform_code returned non-dict items "
+                f"({len(result) - len(items)} dropped)")
+        return items
     raise CodeExecutionError("input_transform_code must return dict/list[dict]/None")
 
 
@@ -116,5 +121,10 @@ def run_output_parse(code: str, stdout: str, config: Dict[str, Any]) -> List[Dic
     if isinstance(result, dict):
         return [result]
     if isinstance(result, list):
-        return [item for item in result if isinstance(item, dict)]
+        items = [item for item in result if isinstance(item, dict)]
+        if len(items) != len(result):
+            raise CodeExecutionError(
+                f"output_parse_code returned non-dict items "
+                f"({len(result) - len(items)} dropped)")
+        return items
     raise CodeExecutionError("output_parse_code must return dict/list[dict]/None")

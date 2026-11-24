@@ -68,7 +68,7 @@ def register(app):
             limit: Any = "all"
             raw_logs = redis.conn.lrange("fs3:logs", 0, -1)
         else:
-            limit = _to_int(raw_limit, 200)
+            limit = max(1, _to_int(raw_limit, 200))   # limit<=0 → lrange(0,-1) 会取全部,钳到 1
             raw_logs = redis.conn.lrange("fs3:logs", 0, int(limit) - 1)
         # 日志行自带 'YYYY-MM-DD HH:MM:SS' 前缀(redis_store.log 写入),拆出作为时间列,
         # 消息正文不再重复携带时间戳
@@ -89,7 +89,7 @@ def register(app):
         if raw_limit == "all":
             raw_logs = redis.conn.lrange("fs3:logs", 0, -1)
         else:
-            limit = _to_int(raw_limit, 10000)
+            limit = max(1, _to_int(raw_limit, 10000))   # limit<=0 → lrange(0,-1) 会取全部,钳到 1
             raw_logs = redis.conn.lrange("fs3:logs", 0, limit - 1)
         text = "\n".join(raw_logs)
         from datetime import datetime

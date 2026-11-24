@@ -64,7 +64,7 @@ def _ping(ip, timeout=_TIMEOUT):
     try:
         r = subprocess.run(
             ["ping", "-c", "1", "-W", str(max(1, int(timeout))), ip],
-            capture_output=True, text=True, timeout=timeout + 3)
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, timeout=timeout + 3)
     except (OSError, subprocess.TimeoutExpired):
         return None
     if r.returncode != 0:

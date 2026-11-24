@@ -15,14 +15,13 @@ BIN_DIR="/usr/local/bin"
 BIN="$BIN_DIR/ksubdomain"
 
 echo "[install] 安装 ksubdomain v0.7 ..."
-CURL="curl -fsSL --connect-timeout 5 --max-time 600 --retry 3 --retry-delay 5"
 URL="https://github.com/knownsec/ksubdomain/releases/download/v0.7/ksubdomain_linux.zip"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
+# 下载 + sha256 校验 + 离线包优先(见 install/_fetch.sh;可用 FS3_OFFLINE_DIR / FS3_SHA256)
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_fetch.sh"
 cd "$TMP"
-$CURL "https://gh-proxy.com/$URL" -o dl.zip \
-    || $CURL "https://ghproxy.net/$URL" -o dl.zip \
-    || $CURL "$URL" -o dl.zip
+fs3_fetch dl.zip "$URL" || exit 1
 mkdir -p pkg
 unzip -o dl.zip -d pkg
 mkdir -p "$BIN_DIR"

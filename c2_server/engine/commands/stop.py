@@ -28,7 +28,7 @@ def run(disp, args):
     ok = 0
     failed = []
     for tid in targets:
-        task = Task(code=f"!cancel {tid}")
+        task = Task(code=f"!cancel {tid}", py=False)   # 控制指令, 非 Python 代码
         # R31:push_task 队列满时返回 "[!] ..." —— 此前丢弃返回值一律报「已下发 N 条」,
         # 操作者以为已终止实际一条没发
         msg = disp.push_task(bid, task)

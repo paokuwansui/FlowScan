@@ -8,6 +8,7 @@
 import os
 
 from server.core.bootstrap import deploy_command
+from server.core.pycompat import downgrade_py35
 
 MODULE = {
     "desc": "生成 file_server 一键部署载荷(PUT 上传/GET 下载/目录列表)",
@@ -25,7 +26,7 @@ _DEFAULT_OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 # 启动目录即文件根; 路径 unquote 后拒绝绝对路径/.. 穿越;
 # token 为空时不校验(_chk 恒放行, 默认关闭)。
 _CODE = '''\
-import http.server as _h,os as _o,sys as _i,urllib.parse as _u
+import http.server as _h,socketserver as _ss,os as _o,sys as _i,urllib.parse as _u
 _R=_o.getcwd()
 _T={token}
 def _s(p):
@@ -86,8 +87,10 @@ class _H(_h.BaseHTTPRequestHandler):
      s.wfile.write(c)
   except Exception as e:
    print("[fs3] FAIL",s.path,e,file=_i.stderr)
+class _THS(_ss.ThreadingMixIn,_h.HTTPServer):
+ daemon_threads=True
 def run():
- h=_h.ThreadingHTTPServer(("0.0.0.0",{port}),_H)
+ h=_THS(("0.0.0.0",{port}),_H)
  print("[fs3] file_server on 0.0.0.0:{port}, root:",_R)
  h.serve_forever()
 run()
@@ -99,6 +102,7 @@ def run(port, token="", out_dir=None):
     port = int(port)
     token = str(token or "")
     code = _CODE.format(port=port, token=repr(token))
+    code = downgrade_py35(code)   # 目标机 py3.5: f-string → str.format
     compile(code, "<file_server>", "exec")  # 生成即校验
 
     command = deploy_command(code)

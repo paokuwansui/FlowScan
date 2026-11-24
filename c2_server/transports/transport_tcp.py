@@ -14,6 +14,7 @@ MODULE = {
 }
 
 
+from server.core.pycompat import downgrade_py35
 def run(host, port, key_hex):
     """生成 _nT() 实现: 纯 TCP 连接 + 256B 混淆前缀。
 
@@ -32,4 +33,4 @@ def _nT():
     s.sendall(_os.urandom(256))  # 混淆: 首包随机前缀(proxy a2s 吞掉)
     return s
 '''
-    return code
+    return downgrade_py35(code)   # 目标机 py3.5: f-string → str.format

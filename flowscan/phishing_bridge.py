@@ -21,6 +21,15 @@ _PHISHING_INIT_ERROR = ""   # 初始化失败信息
 _PHISHING_ROOT = ""         # 最近一次 init_phishing 的参数(restart 用)
 _PHISHING_CONFIG_FILE = "config.json"
 _FLOWSCAN_CONFIG_PATH = ""  # FlowScan config.yaml 路径(init_from_flowscan_config 用)
+_PHISHING_FAIL_TS = 0.0     # 上次初始化失败时刻(0=无);冷却期内不再重试
+_PHISHING_FAIL_COOLDOWN = 30.0  # 启动失败后的重试冷却(秒)
+
+
+def _mark_init_fail(msg: str) -> None:
+    """记录初始化失败信息 + 时间戳(供失败冷却判定,2026-09-28)。"""
+    global _PHISHING_INIT_ERROR, _PHISHING_FAIL_TS
+    _PHISHING_INIT_ERROR = msg
+    _PHISHING_FAIL_TS = time.time()
 
 # 回传数据 Redis 键
 _REPORT_KEY = "fs3:phishing:reports"
@@ -30,17 +39,23 @@ _REPORT_MAX = 500
 
 def init_phishing(project_root: str, config_file: str = "config.json"):
     """懒加载初始化 phishing server。已初始化直接返回;失败记录错误并返回 None。"""
-    global _PHISHING, _PHISHING_INIT_ERROR, _PHISHING_ROOT, _PHISHING_CONFIG_FILE
+    global _PHISHING, _PHISHING_INIT_ERROR, _PHISHING_ROOT, _PHISHING_CONFIG_FILE, _PHISHING_FAIL_TS
     if _PHISHING is not None:
         return _PHISHING
+    # 失败冷却:启动失败后 _PHISHING_FAIL_COOLDOWN 秒内直接返回错误(不再重复
+    # import/启动 + 等满 5s);冷却过后允许再试一次(2026-09-28)
+    if _PHISHING_FAIL_TS and time.time() - _PHISHING_FAIL_TS < _PHISHING_FAIL_COOLDOWN:
+        return None
     with _PHISHING_LOCK:
         if _PHISHING is not None:
             return _PHISHING
+        if _PHISHING_FAIL_TS and time.time() - _PHISHING_FAIL_TS < _PHISHING_FAIL_COOLDOWN:
+            return None
         _PHISHING_ROOT = os.path.abspath(project_root)
         _PHISHING_CONFIG_FILE = config_file
         root = _PHISHING_ROOT
         if not os.path.isdir(root):
-            _PHISHING_INIT_ERROR = f"phishing 项目根不存在: {root}"
+            _mark_init_fail(f"phishing 项目根不存在: {root}")
             return None
         parent = os.path.dirname(root)
         if parent not in sys.path:
@@ -51,7 +66,7 @@ def init_phishing(project_root: str, config_file: str = "config.json"):
             from phishing_server.config import load_config
             from phishing_server.server import PhishingServer
         except Exception as exc:
-            _PHISHING_INIT_ERROR = f"phishing import 失败: {exc}"
+            _mark_init_fail(f"phishing import 失败: {exc}")
             return None
         config_path = os.path.join(root, config_file)
         try:
@@ -62,14 +77,14 @@ def init_phishing(project_root: str, config_file: str = "config.json"):
                 config.port = port_override
             problems = config.validate()
             if problems:
-                _PHISHING_INIT_ERROR = "config 校验失败: " + "; ".join(problems)
+                _mark_init_fail("config 校验失败: " + "; ".join(problems))
                 return None
             # host_override:config.yaml 的 phishing.host 字段可指定对外反连地址
             host_override = _host_override_from_flowscan_config()
             server = PhishingServer(config, report_callback=None,
                                     host_override=host_override)
         except Exception as exc:
-            _PHISHING_INIT_ERROR = f"phishing server 初始化失败: {exc}"
+            _mark_init_fail(f"phishing server 初始化失败: {exc}")
             return None
         # 后台线程跑 start()(阻塞在 serve_forever)
         t = threading.Thread(target=server.start, daemon=True, name="phishing-server")
@@ -79,9 +94,10 @@ def init_phishing(project_root: str, config_file: str = "config.json"):
         while not server._httpd and time.time() < deadline:
             time.sleep(0.02)
         if server._httpd is None:
-            _PHISHING_INIT_ERROR = server._start_error or "phishing server 启动失败"
+            _mark_init_fail(server._start_error or "phishing server 启动失败")
             return None
         _PHISHING = server
+        _PHISHING_FAIL_TS = 0.0
         return server
 
 
@@ -280,8 +296,19 @@ def delete_page_file(name: str, file: str):
 
 # ── 生命周期 / 配置 ──
 
+def clear_fail_cooldown() -> None:
+    """清除启动失败冷却(显式启动/重启时调用,2026-09-28)。
+
+    用户主动点「启动」必须真的重试一次;否则 30s 冷却会把显式启动吞掉,
+    面板显示的还是上一次的旧错误。
+    """
+    global _PHISHING_FAIL_TS
+    _PHISHING_FAIL_TS = 0.0
+
+
 def start():
     """启动(首次 init 已自动启动;此处用于手动重启后拉起)。"""
+    clear_fail_cooldown()
     server = get_phishing()
     if not server:
         return False, _PHISHING_INIT_ERROR or "phishing 未初始化"
@@ -338,16 +365,18 @@ def update_config(updates: dict):
         ok, changed = save_config(server._config.config_path, server._config, updates)
         if not ok:
             return False, "写回 config.json 失败"
-        # active_page/default_module/download_file 内存即时生效;端口/路由需重启
+        # active_page/default_module/download_file/host 内存即时生效;端口/路由需重启。
+        # 内存取盘上归一化(strip/置空跳过)后的值 —— 此前写 updates 原始值,盘/内存
+        # 会分叉(2026-09-28)
         cfg = server._config
-        if "active_page" in changed:
-            cfg.active_page = updates.get("active_page")
-        if "default_module" in changed:
-            cfg.default_module = str(updates.get("default_module") or "")
-        if "download_file" in changed:
-            cfg.download_file = str(updates.get("download_file") or "").strip()
-        if "host" in changed:
-            cfg.host = str(updates.get("host") or "")
+        try:
+            with open(cfg.config_path, "r", encoding="utf-8") as f:
+                disk = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            disk = {}
+        for _k in ("active_page", "default_module", "download_file", "host"):
+            if _k in changed and _k in disk:
+                setattr(cfg, _k, disk[_k])
         need_restart = any(k in changed for k in
                            ("port", "route_payload", "route_report", "report_max", "max_payload_bytes"))
         msg = f"已写入 config.json: {', '.join(changed)}"

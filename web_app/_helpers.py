@@ -4,16 +4,19 @@
 只依赖 flowscan 核心库与 _common,不依赖任何路由模块,避免循环导入。
 """
 import json
+import logging
 import os
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from flowscan.redis_store import FlowScanRedis
 from flowscan.tool_module import load_tools
 from flowscan.utils import project_root
 
 from ._common import _html_escape, _json_or_raw
+
+logger = logging.getLogger("flowscan.web.xray")
 
 
 def _parse_event_line(line: str) -> Optional[tuple]:
@@ -550,10 +553,14 @@ def xray_severity(plugin: str = "", vuln_class: str = "") -> str:
     return "low" if s.strip() else "info"
 
 
-def _parse_xray_stream(raw: str) -> List[Dict[str, Any]]:
+def _parse_xray_stream(raw: str) -> Tuple[List[Dict[str, Any]], bool]:
     """xray 被动模式(webscan --listen)流式写 JSON:以 `[` 开头、逐行对象、永不闭合 `]`。
-    兼容解析:跳过首尾括号行,逐行 json.loads(容忍行尾逗号)。"""
+    兼容解析:跳过首尾括号行,逐行 json.loads(容忍行尾逗号)。
+
+    返回 (items, failed):failed=True 表示存在无法解析的行(报告可能不完整)。
+    """
     items = []
+    failed = False
     for line in raw.splitlines():
         line = line.strip().rstrip(",")
         if not line or line in ("[", "]"):
@@ -561,29 +568,38 @@ def _parse_xray_stream(raw: str) -> List[Dict[str, Any]]:
         try:
             obj = json.loads(line)
         except json.JSONDecodeError:
+            failed = True
             continue
         if isinstance(obj, dict):
             items.append(obj)
-    return items
+    if failed:
+        logger.warning("xray 流式报告存在无法解析的行(结果可能不完整)")
+    return items, failed
 
 
-def xray_load_findings() -> List[Dict[str, Any]]:
-    """读取 xray JSON 报告,标准化为发现列表;无文件/解析失败返回空列表。"""
+def xray_load_findings() -> Tuple[List[Dict[str, Any]], bool]:
+    """读取 xray JSON 报告,标准化为发现列表。返回 (findings, failed)。
+
+    failed=True 表示文件读取失败或报告存在无法解析的内容 —— 调用方应据此提示
+    「报告可能不完整」,而不是把空列表当作「无漏洞」。
+    """
     for path in xray_json_paths():
         if os.path.isfile(path) and os.path.getsize(path) > 0:
             break
     else:
-        return []
+        return [], False
     try:
         with open(path, "r", encoding="utf-8", errors="replace") as f:
             raw = f.read()
         try:
             data = json.loads(raw)
+            failed = False
         except json.JSONDecodeError:
             # xray 被动模式流式输出(未闭合数组),逐行兼容解析
-            data = _parse_xray_stream(raw)
-    except Exception:
-        return []
+            data, failed = _parse_xray_stream(raw)
+    except Exception as e:
+        logger.warning("xray 报告读取失败 %s: %s", path, e)
+        return [], True
     items = []
     if isinstance(data, list):
         items = data
@@ -625,4 +641,4 @@ def xray_load_findings() -> List[Dict[str, Any]]:
             "addr": str(detail.get("addr") or ""),
         })
     findings.sort(key=lambda f: f.get("create_time") or 0, reverse=True)
-    return findings
+    return findings, failed

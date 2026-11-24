@@ -15,14 +15,13 @@ BIN_DIR="/usr/local/bin"
 BIN="$BIN_DIR/fofax"
 
 echo "[install] 安装 fofax v0.1.48 ..."
-CURL="curl -fsSL --connect-timeout 5 --max-time 600 --retry 3 --retry-delay 5"
 URL="https://github.com/xiecat/fofax/releases/download/v0.1.48/fofax_v0.1.48_linux_amd64.tar.gz"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
+# 下载 + sha256 校验 + 离线包优先(见 install/_fetch.sh;可用 FS3_OFFLINE_DIR / FS3_SHA256)
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_fetch.sh"
 cd "$TMP"
-$CURL "https://gh-proxy.com/$URL" -o dl.tgz \
-    || $CURL "https://ghproxy.net/$URL" -o dl.tgz \
-    || $CURL "$URL" -o dl.tgz
+fs3_fetch dl.tgz "$URL" || exit 1
 mkdir -p pkg
 tar -xzf dl.tgz -C pkg
 mkdir -p "$BIN_DIR"

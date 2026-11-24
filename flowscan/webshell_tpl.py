@@ -6,7 +6,8 @@
         jsp  :  <%-- MODULE = {...} --%>
         aspx :  <%-- MODULE = {...} --%>
         asp  :  ' MODULE = {...}
-    模板体用 {{param}} 占位符,render 时按参数替换。
+    模板体用 {{param}} 占位符,render 时按参数替换(占位符名两侧允许空白,
+    仅替换合法标识符名;参数值原样注入,不做转义)。
 
 加载失败显式化:无 MODULE 头 / JSON 非法 / 结构错误 → 告警跳过(不静默)。
 """
@@ -27,6 +28,10 @@ _MODULE_HEAD_RE = re.compile(
 
 # 支持扫描的模板扩展名
 _TEMPLATE_EXTS = (".php", ".jsp", ".aspx", ".asp", ".tpl")
+
+# 占位符:{{name}}(允许两侧空白);仅替换合法标识符名(防占位符名被篡改成代码)
+_PLACEHOLDER_RE = re.compile(r"\{\{\s*(\w+)\s*\}\}")
+_PARAM_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 @dataclass
@@ -66,22 +71,24 @@ class TemplateLoader:
             for t in self._templates.values()
         ]
 
-    def get_template(self, name: str) -> Optional[dict]:
-        tpl = self._templates.get(name)
-        if not tpl:
-            return None
-        return {"name": tpl.name, "desc": tpl.desc, "category": tpl.category,
-                "params": list(tpl.params), "body": tpl.body}
-
     def render(self, name: str, params: Optional[Dict[str, str]] = None) -> Optional[str]:
-        """渲染模板:{{param}} 按 params 替换;未提供参数保留原占位符。"""
+        """渲染模板:{{param}} 按 params 替换;未提供参数保留原占位符。
+
+        2026-09-28:改用宽松正则(与组件 builder 一致,`{{ k }}` 也认);
+        参数名必须匹配标识符 `^[A-Za-z_][A-Za-z0-9_]*$`,非法名视为未提供
+        (占位符原样保留)——防参数名被用来把占位符篡改成代码。
+        参数值原样注入,不做转义(载荷本身可含引号)。
+        """
         tpl = self._templates.get(name)
         if not tpl:
             return None
-        text = tpl.body
+        values = {}
         for k, v in (params or {}).items():
-            text = text.replace("{{" + k + "}}", str(v))
-        return text
+            k = str(k)
+            if _PARAM_NAME_RE.match(k):
+                values[k] = str(v)
+        return _PLACEHOLDER_RE.sub(
+            lambda m: values.get(m.group(1), m.group(0)), tpl.body)
 
     def reload(self) -> None:
         self.load()

@@ -12,6 +12,7 @@ import signal
 
 MODULE = {
     "desc": "按 pid 或监听端口杀进程(-listen <port> / -pid <pid> / 数字=pid)",
+    "platforms": ["linux"],
     "params": [("target", "必填；<pid> | -pid <pid> | -listen <port>")],
 }
 

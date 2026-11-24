@@ -48,7 +48,7 @@ def run_windows():
     try:
         out = subprocess.check_output(
             ["tasklist", "/fo", "csv", "/nh"],
-            timeout=10, text=True,
+            timeout=10, universal_newlines=True,
         )
         return out.strip()
     except Exception as e:

@@ -73,12 +73,12 @@ def verify_mcp_server(server: dict, timeout: int = 10):
 def _try_mcp_handshake(server: dict, timeout: int, ok_msg: str, detail: dict = None):
     """进阶验证：真实走一遍 MCP initialize + tools/list，返回工具名列表。"""
     detail = dict(detail or {})
+    cli = None
     try:
         from .mcp_client import McpClient  # 懒加载，避免循环依赖
         cli = McpClient(server, timeout=max(3, min(timeout, 30)))
         cli.initialize()
         tools = cli.list_tools()
-        cli.close()
         names = [t.get("name") for t in tools if isinstance(t, dict) and t.get("name")]
         detail["mcp_ok"] = True
         detail["tools"] = names
@@ -86,4 +86,12 @@ def _try_mcp_handshake(server: dict, timeout: int, ok_msg: str, detail: dict = N
     except Exception as exc:
         detail["mcp_ok"] = False
         detail["mcp_error"] = str(exc)[:300]
-        return True, f"{ok_msg}；MCP 握手失败: {exc}", detail
+        # 握手失败即不可用:上层 /api/mcp/verify 据此判 ok(2026-09-28)
+        return False, f"{ok_msg}；MCP 握手失败: {exc}", detail
+    finally:
+        # try/finally 保证子进程/连接一定关闭(超时/异常不泄漏,2026-09-28)
+        if cli is not None:
+            try:
+                cli.close()
+            except Exception:
+                pass

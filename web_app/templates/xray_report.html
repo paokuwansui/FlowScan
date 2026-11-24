@@ -8,6 +8,16 @@
 
 {% set sev_badge = {'critical': 'badge-danger', 'high': 'badge-warn', 'medium': 'badge-event', 'low': 'badge-muted', 'info': 'badge-muted'} %}
 
+{# 报告解析失败提示:区分「解析失败」与「确实无发现」(2026-09-28) #}
+{% if xray_parse_failed %}
+<div class="card" style="border-left:3px solid var(--warning, #e0a030);margin-bottom:14px;">
+    <div style="padding:10px 14px;color:var(--text-muted);font-size:0.88rem;">
+        ⚠ reports/xray_out.json 存在但存在无法解析的内容（文件损坏或写入中），
+        下列结果可能不完整，请稍后刷新或检查报告文件。
+    </div>
+</div>
+{% endif %}
+
 {# ── Tab 切换 ── #}
 {% if findings or html_exists %}
 <nav class="tabs">

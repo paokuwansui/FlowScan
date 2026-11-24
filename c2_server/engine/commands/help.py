@@ -24,7 +24,7 @@ _DESC = {
     "s_exec": "执行 server 端模块",
     "uplevel": "升级通道(tls,多级回退)",
     "help": "本帮助",
-    "exit": "退出",
+    "s_exit": "退出会话/关闭 Server(shell 模式下退出子 shell 用 exit)",
 }
 
 # 参数形态提示(有则拼在命令名后面)

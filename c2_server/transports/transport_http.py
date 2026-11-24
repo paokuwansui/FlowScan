@@ -13,6 +13,7 @@ MODULE = {
 }
 
 
+from server.core.pycompat import downgrade_py35
 def run(host, port, key_hex):
     """生成 _nT() 实现：HttpSocket（sendall 缓存 → POST → recv 缓存响应）。
 
@@ -54,7 +55,7 @@ def _nT():
     s._bid = _D
     return s
 '''
-    return code
+    return downgrade_py35(code)   # 目标机 py3.5: f-string → str.format
 
 
 if __name__ == "__main__":

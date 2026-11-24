@@ -182,27 +182,38 @@ class BeaconSession:
             if is_new:
                 if self._config.stage_code:
                     from server.task_queue import Task
-                    self._tq.push(client_id, Task(
-                        code=self._config.stage_code, is_init=True,
-                        task_id="stage"))
-                    self._events.emit(EVT_AUTO_CMD_SENT, client_id,
-                                      task_id="stage")
-                    if rec is not None:
-                        rec.auto_pending = True   # 待真身上线补发
+                    task = Task(code=self._config.stage_code, is_init=True,
+                                task_id="stage")
+                    if self._tq.push(client_id, task):
+                        self._events.emit(EVT_AUTO_CMD_SENT, client_id,
+                                          task_id="stage")
+                        if rec is not None:
+                            rec.auto_pending = True   # 待真身上线补发
+                    else:
+                        logger.error("队列已满,引导段(stage)下发失败: "
+                                     "beacon=%s", client_id)
                 else:
                     for task in build_auto_tasks(self._config.auto_commands,
                                                  client_id, self._dispatcher):
-                        self._tq.push(client_id, task)
-                        self._events.emit(EVT_AUTO_CMD_SENT, client_id,
-                                          task_id=task.task_id)
+                        if self._tq.push(client_id, task):
+                            self._events.emit(EVT_AUTO_CMD_SENT, client_id,
+                                              task_id=task.task_id)
+                        else:
+                            logger.error("队列已满,自动命令下发失败: "
+                                         "beacon=%s task_id=%s",
+                                         client_id, task.task_id)
             elif rec is not None and getattr(rec, "auto_pending", False):
                 # 真身已上线(第二段执行完成):补发首次上线自动命令
                 rec.auto_pending = False
                 for task in build_auto_tasks(self._config.auto_commands,
                                              client_id, self._dispatcher):
-                    self._tq.push(client_id, task)
-                    self._events.emit(EVT_AUTO_CMD_SENT, client_id,
-                                      task_id=task.task_id)
+                    if self._tq.push(client_id, task):
+                        self._events.emit(EVT_AUTO_CMD_SENT, client_id,
+                                          task_id=task.task_id)
+                    else:
+                        logger.error("队列已满,自动命令补发失败: "
+                                     "beacon=%s task_id=%s",
+                                     client_id, task.task_id)
 
         # ③ 每次会话只取一批(单帧字节预算),剩余任务留在队列、下次回连再取。
         # 旧实现 drain 全量 + 拆多帧:无状态中继(agent_http/https/dns 的

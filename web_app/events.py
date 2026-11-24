@@ -94,7 +94,9 @@ def register(app):
         if not raw:
             flash("事件内容不能为空", "error")
             return redirect(url_for("events"))
-        cascade = request.form.get("cascade", "1") == "1"
+        # 未勾选时浏览器不提交该字段 → 只有显式提交 "1" 才级联(此前兜底 "1" 导致
+        # 取消勾选仍删子事件,2026-09-28 修复)
+        cascade = request.form.get("cascade") == "1"
         redis = app.config["get_redis"]()
         total = 0
         for line in [item.strip() for item in raw.replace(",", "\n").splitlines() if item.strip()]:

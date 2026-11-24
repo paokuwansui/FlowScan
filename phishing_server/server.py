@@ -278,6 +278,17 @@ def _make_handler(server: PhishingServer):
             path = unquote(parts.path)
             query = parse_qs(parts.query, keep_blank_values=True)
             q = {k: v[0] for k, v in query.items()}
+            # 未被消费的 request body 会残留在连接里被当成下一个请求(HTTP/1.1
+            # keep-alive 下即请求走私);这类响应强制关连接。只有 POST /report
+            # 且 body 在 1MB 以内时才由 _handle_report 读掉。
+            if self.command in ("POST", "PUT", "PATCH"):
+                try:
+                    _clen = int(self.headers.get("Content-Length") or 0)
+                except (TypeError, ValueError):
+                    _clen = 0
+                if (path != server._config.route_report or _clen > 1_048_576
+                        or "Transfer-Encoding" in self.headers):
+                    self.close_connection = True
             try:
                 if self.command == "GET" and path == server._config.route_payload:
                     self._handle_payload(q)
@@ -508,6 +519,8 @@ def _make_handler(server: PhishingServer):
 
         def _send_bytes(self, code, ctype, data):
             self.send_response(code)
+            if self.close_connection:
+                self.send_header("Connection", "close")
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(data)))
             self.send_header("Cache-Control", "no-store")

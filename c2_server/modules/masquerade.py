@@ -18,7 +18,7 @@ def run(new_name=""):
         try:
             subprocess.run(
                 ["powershell", "-NoProfile", "-Command", f"$Host.UI.RawUI.WindowTitle='{n}'"],
-                timeout=10, capture_output=True)
+                timeout=10, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except Exception:
             pass
         return f"(masquerade: WindowTitle -> {n})"

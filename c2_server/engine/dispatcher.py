@@ -230,7 +230,8 @@ class Dispatcher:
         """把一行文本作为 shell 命令下发到当前 beacon。"""
         if not self.current_beacon:
             return "[!] 未指定 Beacon (use <beacon_id>)"
-        task = Task(code=line)
+        # py=False: shell 命令行不是 Python, `#` 可能是命令的一部分, 不能剥注释
+        task = Task(code=line, py=False)
         return self.push_task(self.current_beacon, task)
 
     # ── 内部 ──

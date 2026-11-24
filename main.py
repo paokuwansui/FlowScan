@@ -47,7 +47,7 @@ def main() -> int:
     parser.add_argument("--redis-password", default=None)
     parser.add_argument("--node-id", default=None)
     parser.add_argument("--pool-size", type=int, default=20)
-    parser.add_argument("--event-type", default="DOMAIN", help="worker 模式启动时注入的事件类型")
+    parser.add_argument("--event-type", default="INPUT", help="worker 模式启动时注入的事件类型(全仓唯一入口事件)")
     parser.add_argument("--value", default="", help="worker 模式启动时注入的事件值")
     parser.add_argument("--host", default=None, help="web 模式监听地址")
     parser.add_argument("--port", type=int, default=None, help="web 模式监听端口")

@@ -7,7 +7,13 @@ set -euo pipefail
 BIN_DIR="/usr/local/bin"
 [ -w "$BIN_DIR" ] || BIN_DIR="$HOME/.local/bin"
 [ -w "$BIN_DIR" ] || BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bin"
-CURL="curl -fsSL --connect-timeout 5 --max-time 600 --retry 3 --retry-delay 5"
+# 下载 + sha256 校验 + 离线包优先(见 install/_fetch.sh;可用 FS3_OFFLINE_DIR / FS3_SHA256)
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_fetch.sh"
+
+ORIG_PWD="$PWD"
+TMP=""
+# 异常退出也要清临时目录(此前只在函数末尾 rm,失败路径会残留)
+trap 'rm -rf "$TMP"' EXIT
 
 install_from_zip() {
     # install_from_zip <binary_name> <download_url> <zip_glob>
@@ -17,17 +23,16 @@ install_from_zip() {
         return 0
     fi
     echo "[install] 安装 $name ..."
-    local tmp
-    tmp="$(mktemp -d)"
-    cd "$tmp"
-    $CURL "https://gh-proxy.com/$url" -o dl.zip \
-        || $CURL "https://ghproxy.net/$url" -o dl.zip \
-        || $CURL "$url" -o dl.zip
+    TMP="$(mktemp -d)"
+    cd "$TMP"
+    fs3_fetch dl.zip "$url" || { cd "$ORIG_PWD"; return 1; }
     mkdir -p pkg
     unzip -o dl.zip -d pkg >/dev/null
     mkdir -p "$BIN_DIR"
     find pkg -type f -name "$glob" -perm /111 -print -quit | xargs -I{} install -m 0755 {} "$BIN_DIR/$name"
-    rm -rf "$tmp"
+    cd "$ORIG_PWD"       # 先回原目录再删,否则函数返回后 cwd 指向已删目录
+    rm -rf "$TMP"
+    TMP=""
     [ -x "$BIN_DIR/$name" ] || command -v "$name" >/dev/null 2>&1
     echo "[install] $name 安装完成"
 }

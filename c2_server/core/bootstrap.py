@@ -21,6 +21,8 @@ import base64
 import random
 import zlib
 
+from server.core.pycompat import downgrade_py35
+
 _BOOTSTRAP = (
     "import zlib,base64;"
     "exec(zlib.decompress(bytes(b.__xor__({k}) "
@@ -55,6 +57,7 @@ def build_bootstrap(code: str, k: int = None) -> str:
     """
     if k is None:
         k = random.randint(1, 255)
+    code = downgrade_py35(code)      # 目标机可能是 py3.5: f-string → str.format
     payload = encode_payload(code, k)
     if "\\" in payload or "'" in payload:
         raise ValueError("payload contains unsafe characters (\\ or ')")

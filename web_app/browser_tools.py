@@ -76,10 +76,6 @@ async def _get_browser() -> Any:
     return _browser
 
 
-def browser_available() -> bool:
-    return _BROWSER_AVAILABLE
-
-
 # ══════════════════════ 完整浏览器自动化(CDP) ══════════════════════
 
 def browser_navigate(url: str) -> str:

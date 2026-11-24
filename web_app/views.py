@@ -37,7 +37,7 @@ def register(app):
         if html_exists:
             size = os.path.getsize(report_path)
             mtime = datetime.fromtimestamp(os.path.getmtime(report_path)).strftime("%Y-%m-%d %H:%M:%S")
-        findings = xray_load_findings()
+        findings, xray_parse_failed = xray_load_findings()
         sev_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
         for f in findings:
             sev = f.get("severity", "info")
@@ -50,6 +50,7 @@ def register(app):
             "xray_report.html",
             html_exists=html_exists, size=size, mtime=mtime,
             findings=findings, sev_counts=sev_counts, tab=tab,
+            xray_parse_failed=xray_parse_failed,
             xray_port=_xray_listen_addr(),
         )
 
@@ -90,14 +91,15 @@ def register(app):
     @login_required
     def xray_report_findings():
         """标准化 findings 列表 JSON(前端自动刷新/过滤用)。"""
-        findings = xray_load_findings()
+        findings, xray_parse_failed = xray_load_findings()
         sev_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
         for f in findings:
             sev = f.get("severity", "info")
             if sev in sev_counts:
                 sev_counts[sev] += 1
         return Response(
-            json.dumps({"ok": True, "findings": findings, "sev_counts": sev_counts},
+            json.dumps({"ok": True, "findings": findings, "sev_counts": sev_counts,
+                        "parse_failed": xray_parse_failed},
                        ensure_ascii=False),
             mimetype="application/json; charset=utf-8",
         )

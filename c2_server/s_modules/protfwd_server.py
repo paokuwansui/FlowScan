@@ -9,6 +9,7 @@
 import os
 
 from server.core.bootstrap import deploy_command
+from server.core.pycompat import downgrade_py35
 
 MODULE = {
     "desc": "生成端口转发服务端一键部署代码(独立部署, 目标端口内嵌)",
@@ -92,6 +93,7 @@ def run(listen_port, target_host, target_port, tunnel_port=None, out_dir=None):
     out_dir = out_dir or _DEFAULT_OUT
     os.makedirs(out_dir, exist_ok=True)
     code = _CODE.format(lp=lp, tp=tp, th=target_host, tpt=tpt)
+    code = downgrade_py35(code)   # 目标机 py3.5: f-string → str.format
     compile(code, "<protfwd_server>", "exec")  # 生成即校验
     command = deploy_command(code)
     cmd_file = os.path.join(out_dir, "protfwd_server_command.txt")

@@ -276,8 +276,14 @@ def _delete_agent_session(redis: FlowScanRedis, session_id: str) -> bool:
     pipe.delete(f"fs3:agent:session:{session_id}:state")
     pipe.delete(f"fs3:agent:session:{session_id}:goal")
     pipe.delete(f"fs3:agent:session:{session_id}:audit")
+    pipe.delete(f"fs3:agent:session:{session_id}:pending")
+    pipe.delete(f"fs3:agent:spill:{session_id}")
+    pipe.delete(f"fs3:agent:queue:{session_id}")
     pipe.zrem("fs3:agent:sessions", session_id)
     pipe.execute()
+    # 内存里的打断标志也要清(否则删掉重建同名会话会继承虚假打断态)
+    with _AGENT_INTERRUPT_LOCK:
+        _AGENT_INTERRUPT.pop(session_id, None)
     return existed
 
 
@@ -763,10 +769,13 @@ def _dispatch_agent_tool(name: str, args: Dict[str, Any], redis: FlowScanRedis,
     elif name == "xray_report":
         limit = min(int(args.get("limit") or 20), 100)
         search = (args.get("search") or "").strip().lower()
-        findings = xray_load_findings()
+        findings, xray_parse_failed = xray_load_findings()
         if not findings:
-            result = json.dumps({"ok": False, "count": 0,
-                                 "error": "reports/xray_out.json 不存在或无内容(等待 xray 被动扫描输出 JSON 报告)"}, ensure_ascii=False)
+            err = "reports/xray_out.json 不存在或无内容(等待 xray 被动扫描输出 JSON 报告)"
+            if xray_parse_failed:
+                err = "reports/xray_out.json 存在但解析失败(文件损坏/非完整 JSON),结果不可信"
+            result = json.dumps({"ok": False, "count": 0, "parse_failed": xray_parse_failed,
+                                 "error": err}, ensure_ascii=False)
         else:
             if search:
                 findings = [f for f in findings if search in (
@@ -780,6 +789,7 @@ def _dispatch_agent_tool(name: str, args: Dict[str, Any], redis: FlowScanRedis,
                     "payload": (f.get("payload") or "")[:400],
                     "create_time_iso": f.get("create_time_iso", "")} for f in findings[:limit]]
             result = json.dumps({"ok": True, "total": total, "returned": len(out),
+                                 "parse_failed": xray_parse_failed,
                                  "findings": out}, ensure_ascii=False)
     elif name == "phishing_build":
         srv = phishing_bridge.init_from_flowscan_config()
@@ -1073,16 +1083,6 @@ def _truncate_for_context(text: str, max_chars: int, spill_ref: str = "") -> str
     tail = budget - head
     return text[:head] + marker + text[-tail:]
 
-
-def _messages_char_count(messages: List[Dict[str, Any]]) -> int:
-    total = 0
-    for m in messages:
-        total += len(str(m.get("content", "")))
-        for tc in (m.get("tool_calls") or []):
-            total += len(str(tc))
-    return total
-
-
 _CJK_RE = re.compile(r"[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]")
 
 
@@ -1198,6 +1198,9 @@ def _tool_result_failed(result: str) -> bool:
     try:
         rj = json.loads(result)
     except Exception:
+        return False
+    if not isinstance(rj, dict):
+        # JSON 合法但不是对象(数组/字符串/数字)→ 无 .get;视为未失败,不误判
         return False
     if rj.get("hitl"):
         return False
@@ -1476,7 +1479,7 @@ def _run_agent_loop(redis: FlowScanRedis, session_id: str, user_input: str, ai_c
                     result = _dispatch_agent_tool_safe(name, args, redis, session_id, config)
             # spill 溢出保护:大结果截断 + 存完整内容
             if len(result) > _SPILL_MAX:
-                ref = f"spill_{int(time.time() * 1000)}"
+                ref = f"spill_{uuid.uuid4().hex[:16]}"   # uuid:毫秒时间戳同毫秒会互相覆盖
                 redis.conn.hset(f"fs3:agent:spill:{session_id}", ref, result)
                 result = _truncate_for_context(result, _SPILL_MAX, ref)
             _append_agent_message(redis, session_id, {"role": "tool", "tool_call_id": tool_call_id, "name": name, "content": result})
@@ -1607,7 +1610,7 @@ def _run_subagent_loop(redis: FlowScanRedis, sub_id: str, task: str, ai_cfg: Dic
                 args = {}
             result = _dispatch_agent_tool_safe(name, args, redis, sub_id, config={})
             if len(result) > _SPILL_MAX:
-                ref = f"spill_{int(time.time() * 1000)}"
+                ref = f"spill_{uuid.uuid4().hex[:16]}"   # uuid:毫秒时间戳同毫秒会互相覆盖
                 redis.conn.hset(f"fs3:agent:spill:{sub_id}", ref, result)
                 result = _truncate_for_context(result, _SPILL_MAX, ref)
             _append_sub_message(redis, sub_id, {"role": "tool", "tool_call_id": call.get("id", ""),
@@ -1824,7 +1827,7 @@ def register(app):
         if action == "approve":
             result = _dispatch_agent_tool_safe(name, args, redis, session_id, config)
             if len(result) > _SPILL_MAX:
-                ref = f"spill_{int(time.time() * 1000)}"
+                ref = f"spill_{uuid.uuid4().hex[:16]}"   # uuid:毫秒时间戳同毫秒会互相覆盖
                 redis.conn.hset(f"fs3:agent:spill:{session_id}", ref, result)
                 result = _truncate_for_context(result, _SPILL_MAX, ref)
             _append_agent_message(redis, session_id, {"role": "tool", "tool_call_id": tool_call_id, "name": name, "content": result})

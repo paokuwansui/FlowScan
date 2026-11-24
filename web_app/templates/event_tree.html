@@ -317,38 +317,6 @@ function renderChildrenList(parentFp, groups) {
     document.getElementById('detail-children').innerHTML = html;
 }
 
-function renderImmediateChildren(parentFp, done) {
-    var parentId = fpNodeMap[parentFp];
-    if (!parentId) { if (done) done(); return; }
-    fetch('/api/event-tree/children/' + encodeURIComponent(parentFp))
-        .then(function(resp) { return resp.json(); })
-        .then(function(groups) {
-            renderedChildren[parentFp] = groups || [];
-            (groups || []).forEach(function(group) {
-                (group.events || []).forEach(function(raw) {
-                    var evt = cacheEvent(normalizeEvent({
-                        fingerprint: raw.fp,
-                        event_type: group.event_type,
-                        value: raw.value,
-                        source_tool: raw.tool || raw.source,
-                        parent_fp: parentFp
-                    }));
-                    renderEventNode(evt, parentFp);
-                    renderEdge(parentFp, evt);
-                });
-            });
-            // 为新加入的节点做一次局部布局后关闭物理引擎
-            network.setOptions({ physics: true });
-            network.stabilize(120);
-            setTimeout(function() {
-                network.setOptions({ physics: false });
-                network.fit({ animation: true });
-            }, 400);
-            if (done) done();
-        })
-        .catch(function() { if (done) done(); });
-}
-
 function deleteSelectedRenderedSubtree() {
     if (!selectedFp || !fpNodeMap[selectedFp]) return;
     var removeFps = collectRenderedDescendants(selectedFp);

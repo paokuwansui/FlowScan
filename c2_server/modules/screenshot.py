@@ -34,7 +34,7 @@ def _windows():
     for cmd in (["powershell", "-NoProfile", "-Command", ps],
                 ["powershell.exe", "-NoProfile", "-Command", ps]):
         try:
-            out = subprocess.check_output(cmd, timeout=25, text=True)
+            out = subprocess.check_output(cmd, timeout=25, universal_newlines=True)
             return out.strip()
         except FileNotFoundError:
             continue

@@ -100,7 +100,20 @@ class Listener:
                     continue
                 self._active += 1
 
-            session = self._session_factory(conn, key, expected_role)
+            try:
+                session = self._session_factory(conn, key, expected_role)
+            except Exception:
+                # 工厂异常不得逃出接受循环:否则本线程死亡 → 该端口永久不再
+                # 接受连接,且 _active 永不归还(2026-09-28 修复)
+                logger.exception("session factory failed (%s)", addr)
+                with self._lock:
+                    if self._active > 0:
+                        self._active -= 1
+                try:
+                    conn.close()
+                except OSError:
+                    pass
+                continue
             if session is None:
                 # 工厂拒绝（如 TLS 握手失败，conn 已关闭）：归还计数，
                 # 否则 _active 只增不减 → 最终耗尽 max_connections（S1）
